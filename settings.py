@@ -27,3 +27,9 @@ DEFAULT_CONFIG = {
     "oper-params": {},
     "algo-params": {}
 }
+
+
+# the integrals in the computation of H are approximated by a sum of finite elements, the number of elements is
+# 'precision' ; this number impacts the computation time when we calculate each element of H but doesn't impact
+# the overall computation time. 100 is way enough to compute precisely the integrals and doesnt take much time.
+precision = 100

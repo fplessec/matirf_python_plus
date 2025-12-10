@@ -1,8 +1,8 @@
 algorithm = "ADMM"
 
 [input-paths]
-mode = "synthetic-data"
-tif = "/Users/fplessec/Documents/GitHub/matirf_python_plus/data/results/ADMM/f.TIF"
+mode = "real-data"
+tif = "/Users/fplessec/Documents/GitHub/matirf_python_plus/data/measurements/esoubies.TIF"
 json = "/Users/fplessec/Documents/GitHub/matirf_python_plus/data/measurements/esoubies.json"
 
 [add-noise]

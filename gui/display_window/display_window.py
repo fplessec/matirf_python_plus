@@ -129,7 +129,8 @@ class DisplayWindow(QMainWindow):
         self.figures_section.depth_map_widget.update_plot()
         self.figures_section.profiles_widget.update_plot()
         self.save_recons_button.setEnabled(self._is_button_enable())
-        self.change_right_column_stack_button.setEnabled(self._is_button_enable())
+        if self._is_synthetic_data():
+            self.change_right_column_stack_button.setEnabled(self._is_button_enable())
 
     def save_reconstruction(self):
         """Ouvre un dialogue pour choisir un dossier et enregistre la reconstruction."""

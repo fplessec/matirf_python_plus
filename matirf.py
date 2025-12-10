@@ -1,42 +1,7 @@
 import torch
 
-from algorithms import ALGORITHMS
-from in_out import load_or_create_toml, save_toml, load_tif, load_json, save_tif, CACHE_DIR
 from operations import compute_min_max_angles_from_params
 from settings import device
-
-
-def save_params_to_toml(key, params, file_path):
-    config = load_or_create_toml(file_path)
-    config[key] = params
-    save_toml(config, file_path)
-    print(f"{key} saved in {file_path}")
-
-
-def reconstruct(config, COMMAND_NAMES):
-    from operations import compute_matirf_operator_from_params
-    tif_path = config[COMMAND_NAMES[0]]['tif']
-    json_path = config[COMMAND_NAMES[0]]['json']
-    g = load_tif(tif_path)
-    matirf_params = load_json(json_path)
-    g = preprocess_matirf_images(g, matirf_params)
-    oper_params = config[COMMAND_NAMES[1]]
-    H = compute_matirf_operator_from_params(matirf_params, oper_params)
-    save_tif(H, CACHE_DIR / 'op.TIF')
-    algo_params = config[COMMAND_NAMES[2]]
-    algorithm = ALGORITHMS[config["algorithm"]]["object"]()
-    return algorithm.run(g, H, algo_params)
-
-
-def open_gui(COMMAND_NAMES):
-    from PyQt5.QtWidgets import QApplication
-    import sys
-    from gui import ControlWindow
-    app = QApplication(sys.argv)
-    CW = ControlWindow(ALGORITHMS, COMMAND_NAMES)
-    CW.show()
-    sys.exit(app.exec_())
-
 
 
 def preprocess_matirf_images(g, matirf_params, normalisation=1):
