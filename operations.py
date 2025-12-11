@@ -89,14 +89,12 @@ def compute_tirf_intensity_at_interface(angle_deg: float, ni: float, nt: float) 
     Is = ts * torch.conj(ts)
     return 0.75 * abs(Is) + 0.25 * abs(Ip)
 
-
 def normalize_operator(A: torch.Tensor) -> torch.Tensor:
     """
     Given an operator 'A' (2D tensor), this function returns a normalized version of it.
     """
     U, S, V = torch.linalg.svd(A)
     return A / torch.max(S)
-
 
 def compute_matirf_operator(angles_deg, depths, nz, n_glass, n_medium, numerical_aperture, n_oil,
                             wavelength_nm, beam_divergence_deg, normalize, precision=settings.precision):
@@ -166,7 +164,6 @@ def compute_matirf_operator(angles_deg, depths, nz, n_glass, n_medium, numerical
     if normalize: H = normalize_operator(H)
     return H
 
-
 def compute_matirf_operator_from_params(matirf_params: dict, operator_params: dict) -> torch.Tensor:
     """
     This function takes the measurement parameter dictionary 'measurement_params' and the operator parameter dictionary
@@ -192,4 +189,3 @@ def apply_matirf_operator(H: torch.Tensor, f: torch.Tensor) -> torch.Tensor:
     transposed version of H and g is a tensor from the mathematical set of the MA-TIRF measurement stack.
     """
     return torch.einsum('ij,jkl->ikl', H, f)
-

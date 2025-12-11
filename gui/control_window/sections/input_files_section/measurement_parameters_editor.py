@@ -22,11 +22,17 @@ class MeasurementParametersEditor(QWidget):
     > "beam_divergence_deg": the divergence of the excitation beam, in degrees
     This widget opens in a new window and uses mostly SimpleParameterWidget(s) to manage parameters. We use a dedicated
     dictionary MEASUREMENT_PARAMETERS_UI that stores all the attributes for each SimpleParameterWidget.
+
+    The U.I. consists of :
+    > first line, a QLabel to give information about the next widget
+    > a QWidget to write the list of incident angle
+    > each line then is a SimpleParameterWidget for the other parameters
+    > a QPushButton to save the parameters in the json file
     """
     def __init__(self, parent):
         super().__init__()
-        self.params_dict = MEASUREMENT_PARAMETERS_UI
-        self.parameter_widgets = {}
+        self.params_ui_dict = MEASUREMENT_PARAMETERS_UI
+        self.parameter_widgets = {}  # <-to keep each widget in memory
         self.parent = parent
         self.json_path = self.parent.json_path if self.parent.is_file_selected else None
         self.json_file = load_json(self.json_path) if self.parent.is_file_selected else None
@@ -41,8 +47,9 @@ class MeasurementParametersEditor(QWidget):
         # create and put the objects one after another in the layout:
         self.angles_widget = self.create_angle_widget()
         layout.addWidget(self.angles_widget)
+        layout.addWidget(QSeparator('H'))
         widgets_count = 0
-        for param_name, param_config in self.params_dict.items():
+        for param_name, param_config in self.params_ui_dict.items():
             if widgets_count > 0:
                 layout.addWidget(QSeparator('H'))
             if self.parent.is_file_selected:  # if file already selected put values from the file and not default ones
@@ -54,7 +61,7 @@ class MeasurementParametersEditor(QWidget):
                 toml_key_list=['oper-params', param_name]
             )
             self.parameter_widgets[param_name] = widget
-            if widgets_count == len(self.params_dict) - 1:
+            if widgets_count == len(self.params_ui_dict) - 1:
                 widget.setContentsMargins(1, 1, 1, 3)  # <- add a bottom margin before the button
             layout.addWidget(widget)
             widgets_count += 1

@@ -1,8 +1,9 @@
 import os
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
 
+from gui.more_widgets import QCrossButton
 from settings import FontSize
 from cache import update_cache
 from in_out import MEASUREMENTS_DIR
@@ -18,11 +19,13 @@ class TifFileSelector(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.is_file_selected = False
         self.setup_ui()
+
     def setup_ui(self):
         layout = QVBoxLayout()
         layout.setContentsMargins(1, 1, 1, 1)
-        layout.setSpacing(1)
+        layout.setSpacing(10)
         # creation of the widgets one after another:
         self.title_label = QLabel(self.mode_dependent_text_update())
         self.title_label.setStyleSheet(f"font-size: {FontSize.NORMAL}pt;")
@@ -30,13 +33,21 @@ class TifFileSelector(QWidget):
         choose_button.clicked.connect(self.choose_file)
         self.file_label = QLabel("No .tif file selected")
         self.file_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {FontSize.NORMAL}pt;")
+        self.unselect_button = QCrossButton()
+        self.unselect_button.clicked.connect(self.unselect_file)
+        last_line = QHBoxLayout()
         # build the widgets together to make the layout:
         layout.addWidget(self.title_label, alignment=Qt.AlignHCenter)
         layout.addStretch()
         layout.addWidget(choose_button, alignment=Qt.AlignHCenter)
         layout.addStretch()
-        layout.addWidget(self.file_label, alignment=Qt.AlignHCenter)
+        last_line.addStretch()
+        last_line.addWidget(self.file_label, alignment=Qt.AlignHCenter)
+        last_line.addWidget(self.unselect_button)
+        last_line.addStretch()
+        layout.addLayout(last_line)
         self.setLayout(layout)
+
     def choose_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self,
                                                    self.mode_dependent_text_update(),
@@ -44,12 +55,25 @@ class TifFileSelector(QWidget):
                                                    "Image Files (*.tif *.tiff)")
         if file_path:
             self.update_selected_file(file_path)
+
     def update_selected_file(self, file_path):
         self.tif_path = file_path
         update_cache(["input-paths", "tif"], file_path)
         filename = os.path.basename(file_path)
-        self.file_label.setText(f"selected file : {filename}")
+        if file_path != 'None':
+            self.is_file_selected = True
+            self.file_label.setText(f"selected file : {filename}")
+        else:
+            self.is_file_selected = False
+            self.file_label.setText("No .json file selected")
+
+    def unselect_file(self):
+        self.is_file_selected = False
+        self.file_label.setText("No .json file selected")
+        update_cache(["input-paths", "tif"], 'None')
+
     def mode_dependent_text_update(self):
         return "Path of the MA-TIRF image stack" if self.parent.mode1 else "Path of the 3D object (synthetic truth)"
+
     def update_mode(self):
         self.title_label.setText(self.mode_dependent_text_update())

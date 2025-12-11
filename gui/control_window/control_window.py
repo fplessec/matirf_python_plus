@@ -1,6 +1,6 @@
 from os.path import join
 
-from PyQt5.QtCore import Qt, QThreadPool
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QAction
 
