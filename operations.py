@@ -186,6 +186,6 @@ def apply_matirf_operator(H: torch.Tensor, f: torch.Tensor) -> torch.Tensor:
     This function computes the operation H*f where H is a MA-TIRF operator (2D torch.Tensor) and f a tensor from the
     mathematical set of the desired reconstructed image.
     This function can also be used to operate the other way: to compute the operation Ht*g where Ht is the conjugate
-    transposed version of H and g is a tensor from the mathematical set of the MA-TIRF measurement stack.
+    transposed version of H and g is a tensor from the mathematical set of the MA-TIRF measurement stacks.
     """
     return torch.einsum('ij,jkl->ikl', H, f)

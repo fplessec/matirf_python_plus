@@ -68,6 +68,7 @@ class QLatexLabel(QWidget):
         self.color = color
         self.dpi = dpi
         self.setup_ui(formula)
+
     def setup_ui(self, formula):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)  # no margin
@@ -80,6 +81,7 @@ class QLatexLabel(QWidget):
         #
         layout.addWidget(self.label)
         self.setLayout(layout)
+
     def update_latex(self, latex_formula):
         buf = render_latex(latex_formula, fontsize=self.fontsize, color=self.color, dpi=self.dpi)
         # we use a QPixmap to render the latex formula image

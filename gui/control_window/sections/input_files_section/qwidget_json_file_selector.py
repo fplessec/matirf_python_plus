@@ -12,6 +12,7 @@ from .measurement_parameters_editor import MeasurementParametersEditor, MEASUREM
 
 
 def check_measurement_parameters_file_format(filepath):
+    """This function ensures that the selected JSON file is written correctly."""
     dictionary = load_json(filepath)
     REQUIRED_KEYS = list(MEASUREMENT_PARAMETERS_UI.keys())
     missing_keys = []

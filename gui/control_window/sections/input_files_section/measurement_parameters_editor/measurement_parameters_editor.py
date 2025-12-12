@@ -13,21 +13,21 @@ class MeasurementParametersEditor(QWidget):
     """
     A widget that allows the user to choose the measurement parameters values from an existing measurement parameters
     file, or to same them in a new one. This file is a json file, and should contain those parameters:
-    > "angles_deg": a list of the incident angle for each measurement stack, in degrees
-    > "n_glass": the optical index of the incident medium
-    > "n_medium": the optical index of the sample medium
-    > "n_oil": the optical index of the immersion oil of the objective
-    > "numerical_aperture": the numerical aperture of the objective
-    > "wavelength_nm": the wavelength of the excitation light, in nanometers
-    > "beam_divergence_deg": the divergence of the excitation beam, in degrees
+        > "angles_deg": a list of the incident angle for each measurement stack, in degrees
+        > "n_glass": the optical index of the incident medium
+        > "n_medium": the optical index of the sample medium
+        > "n_oil": the optical index of the immersion oil of the objective
+        > "numerical_aperture": the numerical aperture of the objective
+        > "wavelength_nm": the wavelength of the excitation light, in nanometers
+        > "beam_divergence_deg": the divergence of the excitation beam, in degrees
     This widget opens in a new window and uses mostly SimpleParameterWidget(s) to manage parameters. We use a dedicated
     dictionary MEASUREMENT_PARAMETERS_UI that stores all the attributes for each SimpleParameterWidget.
 
     The U.I. consists of :
-    > first line, a QLabel to give information about the next widget
-    > a QWidget to write the list of incident angle
-    > each line then is a SimpleParameterWidget for the other parameters
-    > a QPushButton to save the parameters in the json file
+        > first line, a QLabel to give information about the next widget
+        > a QWidget to write the list of incident angle
+        > each line then is a SimpleParameterWidget for the other parameters
+        > a QPushButton to save the parameters in the json file
     """
     def __init__(self, parent):
         super().__init__()

@@ -12,11 +12,11 @@ class InputFilesSection(QGroupBox):
     """
     This section of the user interface allows the user to select the path of the data.
     There is two possible modes:
-    > mode1: the data are real measurements from MA-TIRF microscopy ; the user needs to choose a tif file which is
-             the actual MA-TIRF image stack, and a json file which is the parameters of this measurement.
-    > mode2 (not mode1): the data are synthetic measurements ; the user needs to choose a tif file which is the
-             ground truth object, a 3D image, and a json file which is a fake measurement parameters file, in order
-             to compute the operator a fake MA-TIRF measurement
+        > mode1: the data are real measurements from MA-TIRF microscopy ; the user needs to choose a tif file which is
+                 the actual MA-TIRF image stack, and a json file which is the parameters of this measurement.
+        > mode2 (not mode1): the data are synthetic measurements ; the user needs to choose a tif file which is the
+                 ground truth object, a 3D image, and a json file which is a fake measurement parameters file, in order
+                 to compute the operator a fake MA-TIRF measurement
     """
     def __init__(self, parent=None):
         super().__init__("Input Files")

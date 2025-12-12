@@ -1,13 +1,11 @@
 from os import makedirs
 from os.path import join
-from tkinter import Button
 
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QStackedWidget
 from tomli_w import dumps
 
 from algorithms import ALGORITHMS
-from algorithms.abstract_algo import Algorithm
 from gui.display_window.sections.figures_section import FiguresSection
 from gui.display_window.sections.message_section import MessageSection
 import settings

@@ -48,25 +48,27 @@ class SimpleParameterWidget(QWidget):
         fontsize (int): the size of the font used in the QLabel/QLatexLabel.
         toml_key_list (list or None): if not None, used to specify the key pathway of the parameter in the config file.
     The different types:
-    > type = 'value': the parameter is a number,
-    > type = 'bool': the parameter is a choice (Yes or No, True or False),
-    > type = 'option': the parameter is a choice between a finite number of options (Choice1 or Choice2 or Choice3 ...).
+        > type = 'value': the parameter is a number,
+        > type = 'bool': the parameter is a choice (Yes or No, True or False),
+        > type = 'option': the parameter is a choice between a finite number of options (Choice1 or Choice2 or Choice3
+          ...).
     Depending on the type, the param_info dictionary contains:
-    > for type = 'value', param_info should be = {
-        'dtype': the data type (int or float),
-        'unit': the unit of the parameter value ('' for no unit, for example: 'nm' or '°'),
-        'latex_name': the display widget is a QLatexLabel, it looks like this:
-                      [latex_name] = [value] [unit]
-                      latex_name a latex formulation of the parameter (for example: '\\text{variable name}' or '\mu')
-        'default': the default value of the parameter (None for no default value)
-        }
-    > for type = 'bool', param_info should be = {
-        'default': the default value of the parameter (None is by default False)
-        }
-    > for type = 'option', param_info should be = {
-        'options_list': a string list, which are the possible values (for example: ["string1", "string2", "string3"])
-                        the default value is the first element of the list
-        }
+        > for type = 'value', param_info should be = {
+            'dtype': the data type (int or float),
+            'unit': the unit of the parameter value ('' for no unit, for example: 'nm' or '°'),
+            'latex_name': the display widget is a QLatexLabel, it looks like this:
+                          [latex_name] = [value] [unit]
+                          latex_name a latex formulation of the parameter (for example: '\\text{variable name}' or
+                          '\mu')
+            'default': the default value of the parameter (None for no default value)
+            }
+        > for type = 'bool', param_info should be = {
+            'default': the default value of the parameter (None is by default False)
+            }
+        > for type = 'option', param_info should be = {
+            'options_list': a string list, which are the possible values (for example: ["string1", "string2",
+                            "string3"]) the default value is the first element of the list
+            }
     """
     def __init__(self, title, type, param_info={}, fontsize=FontSize.NORMAL, toml_key_list=None):
         super().__init__()
