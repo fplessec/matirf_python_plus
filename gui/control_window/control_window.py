@@ -20,8 +20,6 @@ class ControlWindow(QMainWindow):
         # if it's the first time the config file it's create, allow it no fill the necessary parameters to 'None',
         # and to put the bool parameters to their default value:
         self.load_cached_config()
-        # then call it again to update the ui:
-        self.load_cached_config()
 
     def setup_ui(self):
         self.setFocus()

@@ -96,13 +96,13 @@ def normalize_operator(A: torch.Tensor) -> torch.Tensor:
     U, S, V = torch.linalg.svd(A)
     return A / torch.max(S)
 
-def compute_matirf_operator(angles_deg, depths, nz, n_glass, n_medium, numerical_aperture, n_oil,
+def compute_matirf_operator(angles_deg, nz, z0, zN, n_glass, n_medium, numerical_aperture, n_oil,
                             wavelength_nm, beam_divergence_deg, normalize, precision=settings.precision):
     """
     :param angles_deg: a python list of the incident angle for each measurement stack, in degrees
-    :param depths: a list (1D torch.Tensor with a size nZ+1), which corresponds to the z axis that represents the desire
-    reconstructed image.
     :param nz: the number of cuts of the reconstructed image on the z axis
+    :param z0: the smallest depth on z of the reconstructed image, in nanometers
+    :param zN: the largest depth on z of the reconstructed image, in nanometers
     :param n_glass: the optical index of the incident medium
     :param n_medium: the optical index of the sample medium
     :param numerical_aperture: the numerical aperture of the objective
@@ -113,9 +113,10 @@ def compute_matirf_operator(angles_deg, depths, nz, n_glass, n_medium, numerical
     :param precision: used to approximate an integral by a sum of finite elements, the number of elements is 'precision'
     :return: a 2D torch.Tensor, which is the MA-TIRF operator of the given parameters
     """
+    p = precision
     angles_deg = torch.tensor(angles_deg, device=settings.device, dtype=settings.dtype)
     n_angles = len(angles_deg)
-    p = precision
+    depths = compute_depths(z0, zN, nz)  # <-size nz+1
     theta_min_deg = compute_tirf_critical_angle(n_glass, n_medium)
     theta_max_deg = compute_tirf_max_angle(numerical_aperture, n_oil)
     ### Variables in capslock are 4D tensors for cleverly calculating integrals (except H: the operator).
@@ -175,11 +176,8 @@ def compute_matirf_operator_from_params(matirf_params: dict, operator_params: di
                                                             'wavelength_nm', 'beam_divergence_deg'])
     (nz, z0, zN, normalize) = get_variables_from_dict(operator_params, ['nz', 'z0','zN',
                                                                                         'normalize'])
-    depths = compute_depths(z0, zN, nz)
-    return compute_matirf_operator(angles_deg, depths, nz, n_glass, n_medium,
-                                   numerical_aperture, n_oil,
-                                   wavelength_nm, beam_divergence_deg,
-                                   normalize)
+    return compute_matirf_operator(angles_deg, nz, z0, zN, n_glass, n_medium, numerical_aperture, n_oil,
+                                   wavelength_nm, beam_divergence_deg, normalize)
 
 def apply_matirf_operator(H: torch.Tensor, f: torch.Tensor) -> torch.Tensor:
     """

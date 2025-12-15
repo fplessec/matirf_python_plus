@@ -2,7 +2,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QFileDialog
 
-from in_out import load_json, save_json, MEASUREMENTS_DIR
+from in_out import load_json, save_json, MEASUREMENTS_DIR, CONFIG_PATH
 from gui.control_window import SimpleParameterWidget
 from gui.more_widgets import QSeparator, QTextEditTab2Switch
 from settings import FontSize
@@ -39,6 +39,7 @@ class MeasurementParametersEditor(QWidget):
         self.setWindowTitle("Modify Parameters" if self.parent.is_file_selected else "Create Parameters")
         self.resize(700 , 1)
         self.setup_ui()
+        self.update_ui_current_parameters()
 
     def setup_ui(self):
         layout = QVBoxLayout()
@@ -58,7 +59,7 @@ class MeasurementParametersEditor(QWidget):
                 title=param_config["title"],
                 type=param_config["type"],
                 param_info=param_config["param_info"],
-                toml_key_list=['oper-params', param_name]
+                #toml_key_list=['oper-params', param_name]
             )
             self.parameter_widgets[param_name] = widget
             if widgets_count == len(self.params_ui_dict) - 1:
@@ -141,6 +142,13 @@ class MeasurementParametersEditor(QWidget):
         for param_name, widget in self.parameter_widgets.items():
             params[param_name] = widget.param_value
         return params
+
+    def update_ui_current_parameters(self):
+        params = self.collect_current_parameters()
+        for param_name, param_value in params.items():
+            if param_name != 'angles_deg':
+                widget = self.parameter_widgets[param_name]
+                widget.update()
 
     def closeEvent(self, event):
         if self.json_path is not None:

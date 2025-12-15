@@ -9,7 +9,12 @@ This package contains three files and one subpackage:
     > the 'measurement_parameters_editor' subpackage, allowing the user to write or edit the measurement parameters
       file
 
-The specificity of the ‘input-path’ parameter set is the possibility of using two modes, with its ‘mode’ parameter:
+The 'input-paths' parameter set contains the following parameters:
+    > mode: as explained bellow
+    > tif: the path of the tif file
+    > json: the path of the json file
+
+The specificity of the ‘input-paths’ parameter set is the possibility of using two modes, with its ‘mode’ parameter:
     > mode = “real-data”: the tif file is a real MA-TIRF measurement stack, which I denote by the letter g:
       g is a  3D tensor from the mathematical set of the MA-TIRF measurement stacks.
       With this mode, the json file contains the measurement parameters used for this measurement g.
