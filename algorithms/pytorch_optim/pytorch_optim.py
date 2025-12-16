@@ -5,7 +5,7 @@ import torch
 
 from algorithms.abstract_algo import Algorithm
 from operations import apply_matirf_operator, get_variables_from_dict
-from .utils import *
+from .utils import get_lr, compute_loss
 from settings import device, dtype
 
 

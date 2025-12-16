@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QGroupBox
 
 from gui.more_widgets import QSeparator
 from gui.control_window import SimpleParameterWidget
-from .operator_parameters_ui_dictionary import OPERATOR_PARAMETERS_UI
+from gui_dictionnaries import OPERATOR_PARAMETERS_UI
 
 
 class OperatorParametersSection(QGroupBox):

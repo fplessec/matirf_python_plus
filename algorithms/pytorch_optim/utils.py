@@ -1,13 +1,12 @@
 import torch
 import torch.nn.functional as F
 from operations import apply_matirf_operator
-from ..ui_params_dicts.option_lists import REGULARIZATION_LIST
+from gui_dictionnaries.option_lists import REGULARIZATION_LIST
 
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
-
 
 def compute_loss(f, g, H, reg, coeff, rho):
     """Calcule la fonction de perte selon la régularisation choisie"""
@@ -31,9 +30,7 @@ def compute_loss(f, g, H, reg, coeff, rho):
         loss = (1 - coeff) * data_term + coeff * hessian_schatten_1(f).mean()
     else:
         raise ValueError(f'Erreur: pas de régularisation associée à reg = {reg}')
-
     return loss
-
 
 def spatial_grad(f):
     """Calcul du gradient spatial 3D de manière compatible avec autograd"""
@@ -44,20 +41,17 @@ def spatial_grad(f):
     dx = padded[1:-1, 1:-1, 2:] - padded[1:-1, 1:-1, :-2]
     return dz, dy, dx
 
-
 def gradient_L2(f, eps=1e-8):
     """Calcul de la norme L2 du gradient"""
     dz, dy, dx = spatial_grad(f)
     grad = dz.square() + dy.square() + dx.square()
     return torch.sqrt(grad + eps ** 2)
 
-
 def gradient_L1(f):
     """Calcul de la norme L1 du gradient"""
     dz, dy, dx = spatial_grad(f)
     grad = torch.abs(dz) + torch.abs(dy) + torch.abs(dx)
     return grad
-
 
 def hessian(f, delta=1.):
     """Calcul de la matrice hessienne"""
@@ -78,18 +72,15 @@ def hessian(f, delta=1.):
     hessian_matrix = hessian_matrix.view(3, 3, f.shape[0], f.shape[1], f.shape[2])
     return hessian_matrix
 
-
 def frobenius_norm(matrix, eps=1e-8):
     """Calcul de la norme de Frobenius"""
     # Utilisation de einsum pour la somme des carrés des éléments
     squared_sum = torch.einsum("ij...,ij...->...", matrix, matrix)
     return torch.sqrt(squared_sum + eps ** 2)
 
-
 def schatten_norm_1(matrix):
     """Calcul de la norme de Schatten d'ordre 1 (somme des valeurs singulières)"""
     return torch.einsum("ii...", torch.abs(matrix))
-
 
 def shv(f, delta=1., weighting=0.5, eps=1e-8):
     """Calcul de la régularisation SHV (Sparse Hessian Variation)"""
@@ -97,12 +88,10 @@ def shv(f, delta=1., weighting=0.5, eps=1e-8):
     sparse_h_v = weighting * frobenius_norm(hessian_matrix, eps=eps) + (1 - weighting) * torch.abs(f)
     return sparse_h_v
 
-
 def hessian_frobenius(f, delta=1., eps=1e-8):
     """Calcul de la norme de Frobenius de la hessienne"""
     hessian_matrix = hessian(f, delta)
     return frobenius_norm(hessian_matrix, eps=eps)
-
 
 def hessian_schatten_1(f, delta=1.):
     """Calcul de la norme de Schatten d'ordre 1 de la hessienne"""

@@ -10,7 +10,7 @@ from gui.display_window.sections.figures_section import FiguresSection
 from gui.display_window.sections.message_section import MessageSection
 import settings
 from in_out import load_tif, load_json, RESULTS_DIR, save_tif, save_toml, save_txt
-from matirf import preprocess_matirf_images
+from preprocess_measurement import preprocess_measurement_stack
 from operations import compute_matirf_operator_from_params, apply_matirf_operator
 from .synthetic_truth_layout import SyntheticTruthSection
 
@@ -94,21 +94,21 @@ class DisplayWindow(QMainWindow):
                 tif_path = self.config['input-paths']['tif']
                 json_path = self.config['input-paths']['json']
                 g = load_tif(tif_path)
-                matirf_params = load_json(json_path)
-                self.g = preprocess_matirf_images(g, matirf_params)
+                measurement_params = load_json(json_path)
+                self.g, measurement_params = preprocess_measurement_stack(g, measurement_params)
                 oper_params = self.config['oper-params']
-                self.H = compute_matirf_operator_from_params(matirf_params, oper_params)
+                self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
                 self.algo_params = self.config['algo-params']
                 self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
             else:  # synthetic data
                 tif_path = self.config['input-paths']['tif']
                 json_path = self.config['input-paths']['json']
                 self.f_true = load_tif(tif_path)
-                matirf_params = load_json(json_path)
+                measurement_params = load_json(json_path)
                 oper_params = self.config['oper-params']
-                self.H = compute_matirf_operator_from_params(matirf_params, oper_params)
+                self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
                 g = apply_matirf_operator(self.H, self.f_true)
-                self.g = preprocess_matirf_images(g, matirf_params)
+                self.g = preprocess_measurement_stack(g, measurement_params)
                 self.algo_params = self.config['algo-params']
                 self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
         else:  # no need to setup the reconstruction: just need to update the f in the figures

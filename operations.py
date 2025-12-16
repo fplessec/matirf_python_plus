@@ -165,13 +165,13 @@ def compute_matirf_operator(angles_deg, nz, z0, zN, n_glass, n_medium, numerical
     if normalize: H = normalize_operator(H)
     return H
 
-def compute_matirf_operator_from_params(matirf_params: dict, operator_params: dict) -> torch.Tensor:
+def compute_matirf_operator_from_params(measurement_params: dict, operator_params: dict) -> torch.Tensor:
     """
     This function takes the measurement parameter dictionary 'measurement_params' and the operator parameter dictionary
     'operator_params' and returns the MA-TIRF operator of the given parameters.
     """
     (angles_deg, n_glass, n_medium, n_oil, numerical_aperture,
-     wavelength_nm, beam_divergence_deg) = get_variables_from_dict(matirf_params, ['angles_deg',
+     wavelength_nm, beam_divergence_deg) = get_variables_from_dict(measurement_params, ['angles_deg',
                                                             'n_glass', 'n_medium', 'n_oil', 'numerical_aperture',
                                                             'wavelength_nm', 'beam_divergence_deg'])
     (nz, z0, zN, normalize) = get_variables_from_dict(operator_params, ['nz', 'z0','zN',

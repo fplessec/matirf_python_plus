@@ -2,11 +2,12 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QFileDialog
 
-from in_out import load_json, save_json, MEASUREMENTS_DIR, CONFIG_PATH
+from in_out import load_json, save_json, MEASUREMENTS_DIR
 from gui.control_window import SimpleParameterWidget
 from gui.more_widgets import QSeparator, QTextEditTab2Switch
+from gui_dictionnaries import MEASUREMENT_PARAMETERS_UI
 from settings import FontSize
-from .measurement_parameters_ui_dictionary import MEASUREMENT_PARAMETERS_UI
+
 
 
 class MeasurementParametersEditor(QWidget):

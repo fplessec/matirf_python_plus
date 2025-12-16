@@ -1,6 +1,6 @@
-from .ui_params_dicts import *
 from .admm_optim import AdmmOptimization
 from .pytorch_optim import PytorchOptimization
+from gui_dictionnaries.algorithms import *
 
 
 ALGORITHMS = {
