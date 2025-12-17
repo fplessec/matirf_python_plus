@@ -1,4 +1,27 @@
 import torch
+import sys
+from pathlib import Path
+
+
+if sys.platform.startswith("linux"):
+    os_name = "linux"
+elif sys.platform == "darwin":
+    os_name = "mac"
+elif sys.platform.startswith("win"):
+    os_name = "windows"
+else:
+    raise RuntimeError("Your OS is not supported. It should be Linux/MacOS/Windows.")
+
+fiji_path = None
+if sys.platform.startswith("linux"):
+    fiji_path = Path("/opt/Fiji.app/ImageJ-linux64")
+elif sys.platform == "darwin":
+    fiji_path = Path("/Applications/Fiji.app/Contents/MacOS/ImageJ-macosx")
+elif sys.platform.startswith("win"):
+    fiji_path = Path(r"C:\Fiji.app\ImageJ-win64.exe")
+if not fiji_path.exists() or fiji_path is None:
+    raise FileNotFoundError(f"Fiji cant be found : {fiji_path}")
+print(fiji_path)
 
 device = 'cpu'
 dtype = torch.float32

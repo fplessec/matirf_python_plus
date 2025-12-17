@@ -90,9 +90,7 @@ def compute_tirf_intensity_at_interface(angle_deg: float, ni: float, nt: float) 
     return 0.75 * abs(Is) + 0.25 * abs(Ip)
 
 def normalize_operator(A: torch.Tensor) -> torch.Tensor:
-    """
-    Given an operator 'A' (2D tensor), this function returns a normalized version of it.
-    """
+    """Given an operator 'A' (2D tensor), this function returns a normalized version of it."""
     U, S, V = torch.linalg.svd(A)
     return A / torch.max(S)
 

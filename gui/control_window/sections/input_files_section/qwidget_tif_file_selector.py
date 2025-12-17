@@ -55,6 +55,12 @@ class TifFileSelector(QWidget):
                                                    "Image Files (*.tif *.tiff)")
         if file_path:
             self.update_selected_file(file_path)
+            # a faire en bcp mieux etc etc:::
+            import subprocess
+            from settings import fiji_path
+            print(fiji_path)
+            print(fiji_path)
+            subprocess.Popen([str(fiji_path), str(file_path)])
 
     def update_selected_file(self, file_path):
         self.tif_path = file_path

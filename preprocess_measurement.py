@@ -4,50 +4,39 @@ from operations import compute_min_max_angles_from_params
 from settings import device
 
 
-def preprocess_measurement_stack(g, measurement_params, normalization=4):
+def preprocess_measurement_stack(g, measurement_params, add_noise_params, normalization=1):
     angles_deg = measurement_params['angles_deg']
-    g, angles_deg = check_number_of_angles_and_number_of_stacks(g, angles_deg)
     n_angles, n_stacks = len(angles_deg), g.shape[0]
+    assert n_angles == n_stacks, (
+        f"\nWhile preprocessing the MA-TIRF measurement:\nThe number of angles ({n_angles}) and the number of stacks "
+        f"({n_stacks}) do not match."
+    )
     # if a stack correspond to an angle higher than the maximum angle of the TIRF microscope,
     # then the corresponding stack is an image of the background
     background_list = []  # <-to store each background stack
     g_list = []  # <-to store each non-background stacks
     _, theta_max_deg = compute_min_max_angles_from_params(measurement_params)
     for i in range(n_stacks):
-        if angles_deg[i] > theta_max_deg:
+        if angles_deg[i] > theta_max_deg:  # <-background
             background_list.append(g[i, :, :])
             angles_deg[i] = 'background-angle'
             print(f"stack {i} is background ({angles_deg[i]}° > {theta_max_deg}° the maximum angle)")
         else:
             g_list.append(g[i, :, :])
-    # we can do the mean of the stacks higher than the max angle to estimate the background:
-    estimated_background = torch.stack(background_list, dim=0).to(device).mean(dim=0).unsqueeze(0)
-    # then we just have to subtract the estimated background from the useful stacks:
-    g = torch.stack(g_list, dim=0).to(device) - estimated_background
-    angles_deg = [angle for angle in angles_deg if angle != 'background-angle']  # <-only keep the useful angles
-    measurement_params['angles_deg'] = angles_deg  # <-update the measurement parameters with the non-background angles
-                                                   #  so we can use the right parameters to compute the MA-TIRF operator
-    ### print("angles_deg:\n", angles_deg)
-    ### print("measurement_params:\n", measurement_params)
-    ### print(f"estimated_background.shape : {estimated_background.shape}")
-    ### print(f"g.shape : {g.shape}")
-    # finally we normalize the resulting MA-TIRF stacks to complete the preprocessing:
+    if background_list:  # <-background_list is not empty: we have background stack(s)
+        # we can do the mean of the stacks higher than the max angle to estimate the background:
+        estimated_background = torch.stack(background_list, dim=0).to(device).mean(dim=0).unsqueeze(0)
+        # then we just have to subtract the estimated background from the useful stacks:
+        g = torch.stack(g_list, dim=0).to(device) - estimated_background
+        angles_deg = [angle for angle in angles_deg if angle != 'background-angle']  # <-only keep the useful angles
+        measurement_params['angles_deg'] = angles_deg  # <-update the measurement parameters with the non-background
+                                                       # angles to compute the right the MA-TIRF operator
+    # we normalize the resulting MA-TIRF stacks to complete the preprocessing:
     g = normalize_measurement(g, normalization=normalization)
+    # and finally we can add noise is the user specified it:
+    if add_noise_params['add_noise']:
+        g = add_noise_to_measurement(g, add_noise_params)
     return g, measurement_params
-
-def check_number_of_angles_and_number_of_stacks(g, angles_deg):
-    n_angles = len(angles_deg)
-    n_stacks = g.shape[0]
-    if n_angles != n_stacks:  # the angles and the stacks do not match
-        print(f"\nWarning : while preprocessing the MA-TIRF measurement stack:\n"
-              f" > number of angles ({n_angles}) and number of stacks ({g.shape[0]}) do not match.")
-        if n_angles > n_stacks:  # if more angles than stacks
-            print(f" > removal of the {n_angles - n_stacks} last angle(s).")
-            angles_deg = angles_deg[:n_stacks]
-        else:  # if more stacks than angles
-            print(f" > removal of the {g.shape[0] - n_angles} last stack(s).")
-            g = g[:n_angles, :, :]
-    return g, angles_deg
 
 def normalize_measurement(g, normalization=1):
     if normalization == 0:  # no normalisation
@@ -61,3 +50,12 @@ def normalize_measurement(g, normalization=1):
     elif normalization == 4:  # mean = 1
         g = g / g.mean()
     return g
+
+def add_noise_to_measurement(g, add_noise_params):
+    if add_noise_params['is_gaussian']:
+        noise = torch.randn_like(g) * add_noise_params['sigma']
+        g_noisy = g + noise
+    else:
+        raise Exception('To be implemented')
+    return g_noisy
+

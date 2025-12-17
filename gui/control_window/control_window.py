@@ -43,24 +43,37 @@ class ControlWindow(QMainWindow):
 
     def create_menu_bar(self):
         menubar = self.menuBar()
+        # file menu:
         file_menu = menubar.addMenu('File')
+            # load cache action:
         load_cache_action = QAction(QIcon(), "Load cached config", self)
         load_cache_action.setShortcut("Ctrl+C")
         load_cache_action.triggered.connect(self.load_cached_config)
         file_menu.addAction(load_cache_action)
+            # load any config action:
         load_any_action = QAction(QIcon(), "Load any config", self)
         load_any_action.setShortcut("Ctrl+Shift+C")
         load_any_action.triggered.connect(self.load_any_config)
         file_menu.addAction(load_any_action)
+            # save config action:
         save_action = QAction(QIcon(), "Save config", self)
         save_action.setShortcut("Ctrl+S")
         save_action.triggered.connect(self.save_config)
         file_menu.addAction(save_action)
+        # run menu:
         run_menu = menubar.addMenu('Run')
+            # run action:
         run_action = QAction(QIcon(), "Run", self)
         run_action.setShortcut("Ctrl+R")
         run_action.triggered.connect(self.run)
         run_menu.addAction(run_action)
+        # window menu:
+        window_menu = menubar.addMenu('Window')
+            # close all display windows action:
+        close_all_display_windows_action = QAction(QIcon(), "Close all display windows", self)
+        close_all_display_windows_action.setShortcut("Ctrl+Shift+W")
+        close_all_display_windows_action.triggered.connect(DisplayWindowManager.close_all)
+        window_menu.addAction(close_all_display_windows_action)
 
     def create_left_layout(self):
         left_layout = QVBoxLayout()
@@ -182,6 +195,7 @@ class ControlWindow(QMainWindow):
         if config['add-noise']['add_noise']:
             if config['add-noise']['sigma'] == 'None':
                 print("Missing parameter to Run: no 'sigma' selected in 'add-noise' section.")
+                is_any_parameter_missing = True
         return not is_any_parameter_missing  # if not is_any_parameter_missing == True, then you can run
 
     def closeEvent(self, event):

@@ -95,7 +95,8 @@ class DisplayWindow(QMainWindow):
                 json_path = self.config['input-paths']['json']
                 g = load_tif(tif_path)
                 measurement_params = load_json(json_path)
-                self.g, measurement_params = preprocess_measurement_stack(g, measurement_params)
+                add_noise_params = self.config['add-noise']
+                self.g, measurement_params = preprocess_measurement_stack(g, measurement_params, add_noise_params)
                 oper_params = self.config['oper-params']
                 self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
                 self.algo_params = self.config['algo-params']
@@ -106,17 +107,22 @@ class DisplayWindow(QMainWindow):
                 self.f_true = load_tif(tif_path)
                 measurement_params = load_json(json_path)
                 oper_params = self.config['oper-params']
+                nz_true = self.f_true.shape[0]
+                nz = oper_params['nz']
+                assert nz == nz_true, (
+                    f"\nWhile computing the synthetic MA-TIRF measurement:\nThe parameter 'nz' in 'oper-params' (nz = "
+                    f"{nz}) must be equal to the number of plans in the synthetic truth ({nz_true})."
+                )
                 self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
                 g = apply_matirf_operator(self.H, self.f_true)
-                self.g = preprocess_measurement_stack(g, measurement_params)
+                add_noise_params = self.config['add-noise']
+                self.g, _ = preprocess_measurement_stack(g, measurement_params, add_noise_params)
                 self.algo_params = self.config['algo-params']
                 self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
         else:  # no need to setup the reconstruction: just need to update the f in the figures
-                # ie happens when user clicked on 'Open reconstruction'
+               # ie happens when user clicked on 'Open reconstruction'
             self.update_f(self.f)
             self.update_plot()
-
-
 
     def update_f(self, f):
         self.figures_section.depth_map_widget.f = f

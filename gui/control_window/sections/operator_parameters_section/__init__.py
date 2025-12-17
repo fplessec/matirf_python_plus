@@ -10,6 +10,9 @@ The 'oper-params' parameter set contains the following parameters:
     > z0: the smallest depth on z of the reconstructed image, in nanometers
     > zN: the largest depth on z of the reconstructed image, in nanometers
     > normalize: a boolean to choose whether to normalize the operator
+
+In the case where the user choose to work with synthetic data, they have to make sure that 'nz' be equal to the number
+of planes along z of the synthetic truth.
 """
 
 
