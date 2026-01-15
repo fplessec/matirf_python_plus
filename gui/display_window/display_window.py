@@ -2,7 +2,8 @@ from os import makedirs
 from os.path import join
 
 from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QStackedWidget
+from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QStackedWidget, \
+    QSizePolicy
 from tomli_w import dumps
 
 from algorithms import ALGORITHMS
@@ -68,17 +69,25 @@ class DisplayWindow(QMainWindow):
 
     def create_bottom_bar(self):
         bottom_widget = QWidget()
-        bottom_layout = QHBoxLayout()
+        bottom_layout = QVBoxLayout()
         self.save_recons_button = QPushButton("Save reconstruction")
         self.save_recons_button.setEnabled(self._is_button_enable())
         self.save_recons_button.clicked.connect(self.save_reconstruction)
-        bottom_layout.addWidget(self.save_recons_button)
+        self.save_recons_button.setSizePolicy(
+            QSizePolicy.Fixed,  # horizontally: does not stretch
+            QSizePolicy.Preferred  # vertically: does stretch
+        )
+        bottom_layout.addWidget(self.save_recons_button, alignment=Qt.AlignCenter)
         bottom_layout.addStretch()
         if self._is_synthetic_data():
             self.change_right_column_stack_button = QPushButton("Go To Truth →")
-            self.change_right_column_stack_button.clicked.connect(self.change_right_column)
             self.change_right_column_stack_button.setEnabled(self._is_button_enable())
-            bottom_layout.addWidget(self.change_right_column_stack_button)
+            self.change_right_column_stack_button.clicked.connect(self.change_right_column)
+            self.change_right_column_stack_button.setSizePolicy(
+                QSizePolicy.Fixed,  # horizontally: does not stretch
+                QSizePolicy.Preferred  # vertically: does stretch
+            )
+            bottom_layout.addWidget(self.change_right_column_stack_button, alignment=Qt.AlignCenter)
         bottom_widget.setLayout(bottom_layout)
         return bottom_widget
 

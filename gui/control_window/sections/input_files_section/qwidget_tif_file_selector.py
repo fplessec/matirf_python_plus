@@ -31,19 +31,25 @@ class TifFileSelector(QWidget):
         self.title_label.setStyleSheet(f"font-size: {FontSize.NORMAL}pt;")
         choose_button = QPushButton("Choose .tif file")
         choose_button.clicked.connect(self.choose_file)
+
+        self.info_button = QPushButton("Info ...")
+        #self.info_button.clicked.connect(self...........)
+        self.info_button.setVisible(False)  # hidden by default
+
         self.file_label = QLabel("No .tif file selected")
         self.file_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {FontSize.NORMAL}pt;")
-        self.unselect_button = QCrossButton()
-        self.unselect_button.clicked.connect(self.unselect_file)
+        unselect_button = QCrossButton()
+        unselect_button.clicked.connect(self.unselect_file)
         last_line = QHBoxLayout()
         # build the widgets together to make the layout:
         layout.addWidget(self.title_label, alignment=Qt.AlignHCenter)
         layout.addStretch()
         layout.addWidget(choose_button, alignment=Qt.AlignHCenter)
+        layout.addWidget(self.info_button, alignment=Qt.AlignHCenter)
         layout.addStretch()
         last_line.addStretch()
         last_line.addWidget(self.file_label, alignment=Qt.AlignHCenter)
-        last_line.addWidget(self.unselect_button)
+        last_line.addWidget(unselect_button)
         last_line.addStretch()
         layout.addLayout(last_line)
         self.setLayout(layout)
@@ -55,12 +61,13 @@ class TifFileSelector(QWidget):
                                                    "Image Files (*.tif *.tiff)")
         if file_path:
             self.update_selected_file(file_path)
-            # a faire en bcp mieux etc etc:::
-            import subprocess
-            from settings import fiji_path
-            print(fiji_path)
-            print(fiji_path)
-            subprocess.Popen([str(fiji_path), str(file_path)])
+            # ICI TEST POUR OUVRIR AVEC FIJI:
+            # # a faire en bcp mieux etc etc:::
+            # import subprocess
+            # from settings import fiji_path
+            # print(fiji_path)
+            # print(fiji_path)
+            # subprocess.Popen([str(fiji_path), str(file_path)])
 
     def update_selected_file(self, file_path):
         self.tif_path = file_path
@@ -69,13 +76,16 @@ class TifFileSelector(QWidget):
         if file_path != 'None':
             self.is_file_selected = True
             self.file_label.setText(f"selected file : {filename}")
+            self.info_button.setVisible(True)
         else:
             self.is_file_selected = False
             self.file_label.setText("No .json file selected")
+            self.info_button.setVisible(False)
 
     def unselect_file(self):
         self.is_file_selected = False
         self.file_label.setText("No .json file selected")
+        self.info_button.setVisible(False)
         update_cache(["input-paths", "tif"], 'None')
 
     def mode_dependent_text_update(self):
