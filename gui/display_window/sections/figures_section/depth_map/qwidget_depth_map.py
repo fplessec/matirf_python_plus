@@ -9,6 +9,7 @@ import numpy as np
 
 from in_out import load_or_create_toml, CONFIG_PATH
 from operations import get_variables_from_dict
+import settings
 
 
 class DepthMap(QWidget):
@@ -24,7 +25,7 @@ class DepthMap(QWidget):
         self.layout.setSpacing(0)
 
         # Crée une figure matplotlib et un canevas pour l'affichage
-        self.figure = Figure(figsize=(8, 6))
+        self.figure = Figure(facecolor=settings.window_color)
         self.canvas = FigureCanvas(self.figure)
 
         # Label pour afficher un message si f est None
@@ -60,7 +61,7 @@ class DepthMap(QWidget):
 
             self.plot_depths_map(ax, self.f, z0, zN)
 
-            self.figure.suptitle("Depth map")
+            self.figure.suptitle("Depth map", color='w')
             self.figure.tight_layout()
             self.canvas.draw()
 
@@ -87,4 +88,6 @@ class DepthMap(QWidget):
         norm = Normalize(vmin=z0, vmax=zN)
         sm = ScalarMappable(cmap=cmap, norm=norm)
         cbar = self.figure.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.035, pad=0.05)
-        cbar.set_label(f'Depth ({unit})', fontsize=11)
+        cbar.set_label(f'Depth ({unit})', fontsize=11, color='#808080')
+        cbar.outline.set_color('#808080')
+        cbar.ax.tick_params(colors='#808080')

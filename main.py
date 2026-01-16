@@ -6,6 +6,7 @@ def open_gui():
     from PyQt5.QtWidgets import QApplication
     from gui import ControlWindow
     app = QApplication(sys.argv)
+    app.setStyle("macintosh")  # <- force the style for any OS to macintosh
     CW = ControlWindow()
     CW.show()
     sys.exit(app.exec_())

@@ -1,35 +1,19 @@
 import torch
 import sys
-from pathlib import Path
 
+from PyQt5.QtWidgets import QApplication
 
-if sys.platform.startswith("linux"):
-    os_name = "linux"
-elif sys.platform == "darwin":
-    os_name = "mac"
-elif sys.platform.startswith("win"):
-    os_name = "windows"
-else:
-    raise RuntimeError("Your OS is not supported. It should be Linux/MacOS/Windows.")
-
-fiji_path = None
-if sys.platform.startswith("linux"):
-    fiji_path = Path("/opt/Fiji.app/ImageJ-linux64")
-elif sys.platform == "darwin":
-    fiji_path = Path("/Applications/Fiji.app/Contents/MacOS/ImageJ-macosx")
-elif sys.platform.startswith("win"):
-    fiji_path = Path(r"C:\Fiji.app\ImageJ-win64.exe")
-if not fiji_path.exists() or fiji_path is None:
-    raise FileNotFoundError(f"Fiji cant be found : {fiji_path}")
-print(fiji_path)
 
 device = 'cpu'
 dtype = torch.float32
 
-class FontSize:
-    SMALL = 11
-    NORMAL = 14
-    BIG = 18
+# get the default PyQt5 color  for 'macintosh' style :
+app = QApplication(sys.argv).instance()
+app.setStyle("macintosh")  # <- force the style for any OS to macintosh
+window_color = app.palette().color(app.palette().Window).name()  # background color of QWidget (macintosh style)
+del app
+# my favorite grey color:
+gray_color = '#808080'
 
 # control window settings :
 width_cw = 1100
@@ -37,6 +21,11 @@ height_cw = 700
 # display window settings :
 width_dw = 1200
 height_dw = 800
+
+class FontSize:
+    SMALL = 11
+    NORMAL = 14
+    BIG = 18
 
 
 DEFAULT_CONFIG = {
@@ -56,3 +45,14 @@ DEFAULT_CONFIG = {
 # 'precision' ; this number impacts the computation time when we calculate each element of H but doesn't impact
 # the overall computation time. 100 is way enough to compute precisely the integrals and doesnt take much time.
 precision = 100
+
+
+
+# if sys.platform.startswith("linux"):
+#     os_name = "linux"
+# elif sys.platform == "darwin":
+#     os_name = "mac"
+# elif sys.platform.startswith("win"):
+#     os_name = "windows"
+# else:
+#     raise RuntimeError("Your OS is not supported. It should be Linux/MacOS/Windows.")

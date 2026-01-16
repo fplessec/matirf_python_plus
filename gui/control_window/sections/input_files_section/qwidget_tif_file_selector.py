@@ -3,6 +3,7 @@ import os
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
 
+from gui.control_window.sections.input_files_section.tif_file_preprocess_editor import TifFilePreprocessEditor
 from gui.more_widgets import QCrossButton
 from settings import FontSize
 from cache import update_cache
@@ -20,6 +21,7 @@ class TifFileSelector(QWidget):
         super().__init__()
         self.parent = parent
         self.is_file_selected = False
+        self.tif_file_preprocess_editor = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -33,7 +35,7 @@ class TifFileSelector(QWidget):
         choose_button.clicked.connect(self.choose_file)
 
         self.info_button = QPushButton("Info ...")
-        #self.info_button.clicked.connect(self...........)
+        self.info_button.clicked.connect(self.open_tif_file_preprocess_editor)
         self.info_button.setVisible(False)  # hidden by default
 
         self.file_label = QLabel("No .tif file selected")
@@ -61,13 +63,6 @@ class TifFileSelector(QWidget):
                                                    "Image Files (*.tif *.tiff)")
         if file_path:
             self.update_selected_file(file_path)
-            # ICI TEST POUR OUVRIR AVEC FIJI:
-            # # a faire en bcp mieux etc etc:::
-            # import subprocess
-            # from settings import fiji_path
-            # print(fiji_path)
-            # print(fiji_path)
-            # subprocess.Popen([str(fiji_path), str(file_path)])
 
     def update_selected_file(self, file_path):
         self.tif_path = file_path
@@ -79,14 +74,21 @@ class TifFileSelector(QWidget):
             self.info_button.setVisible(True)
         else:
             self.is_file_selected = False
-            self.file_label.setText("No .json file selected")
+            self.file_label.setText("No .tif file selected")
             self.info_button.setVisible(False)
 
     def unselect_file(self):
         self.is_file_selected = False
-        self.file_label.setText("No .json file selected")
+        self.file_label.setText("No .tif file selected")
         self.info_button.setVisible(False)
         update_cache(["input-paths", "tif"], 'None')
+
+    def open_tif_file_preprocess_editor(self):
+        if self.tif_file_preprocess_editor is not None:
+            self.tif_file_preprocess_editor.close()
+        self.tif_file_preprocess_editor = TifFilePreprocessEditor(parent=self)
+        self.tif_file_preprocess_editor.show()
+
 
     def mode_dependent_text_update(self):
         return "Path of the MA-TIRF image stack" if self.parent.mode1 else "Path of the 3D object (synthetic truth)"
