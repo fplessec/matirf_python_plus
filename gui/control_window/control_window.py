@@ -127,7 +127,8 @@ class ControlWindow(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(self,
                                                    "Select a complete config file",
                                                    str(RESULTS_DIR),
-                                                   "Configuration Files (*.toml)")
+                                                   "Configuration Files (*.toml)",
+                                                   )
         if file_path:
             # writes the entire config file in the cache:
             config = load_or_create_toml(file_path)
@@ -164,7 +165,6 @@ class ControlWindow(QMainWindow):
         config = load_or_create_toml(CONFIG_PATH)
         print("Initializing Run with the current configuration.")
         if self.check_missing_parameters_in_config(config):
-            # Créer une nouvelle fenêtre
             display_window = DisplayWindow(config)
             DisplayWindowManager.add(display_window)
             display_window.show()

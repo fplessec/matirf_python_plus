@@ -5,9 +5,6 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QSlider, QHBoxLayout, QSizePolicy
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.colors import Normalize
-from matplotlib.cm import ScalarMappable
-import matplotlib.pyplot as plt
 
 import settings
 
@@ -87,7 +84,7 @@ class Image3DViewer(QWidget):
     def on_mouse_move(self, event):
         """Retrieves the coordinates and values of pixels on the canvas."""
         if self.current_slice_raw is None:
-            return  # ← empêche l'erreur
+            return
         if event.xdata is None or event.ydata is None:  # <- mouse on the canvas margins
             self.pixel_label.setText("Pixel: (x, y) = -, value = -")
             return

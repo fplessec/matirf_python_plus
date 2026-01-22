@@ -6,7 +6,7 @@ from in_out import load_json, save_json, MEASUREMENTS_DIR
 from gui.control_window import SimpleParameterWidget
 from gui.more_widgets import QSeparator, QTextEditTab2Switch
 from gui_dictionnaries import MEASUREMENT_PARAMETERS_UI
-from settings import FontSize
+import settings
 
 
 
@@ -59,8 +59,7 @@ class MeasurementParametersEditor(QWidget):
             widget = SimpleParameterWidget(
                 title=param_config["title"],
                 type=param_config["type"],
-                param_info=param_config["param_info"],
-                #toml_key_list=['oper-params', param_name]
+                param_info=param_config["param_info"]
             )
             self.parameter_widgets[param_name] = widget
             if widgets_count == len(self.params_ui_dict) - 1:
@@ -70,7 +69,7 @@ class MeasurementParametersEditor(QWidget):
         layout.addWidget(self.create_button())
         self.setLayout(layout)
 
-    def create_angle_widget(self, fontsize=FontSize.NORMAL):
+    def create_angle_widget(self, fontsize=settings.FontSize.NORMAL):
         layout = QVBoxLayout()
         # creation of the objects one after another:
         font = QFont()
@@ -95,7 +94,7 @@ class MeasurementParametersEditor(QWidget):
         title_label = QLabel("Incident angles (deg)")
         title_label.setFont(qfont)
         informative_label = QLabel("1 angle per line, respecting the stack order")
-        informative_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {FontSize.SMALL}pt;")
+        informative_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {settings.FontSize.SMALL}pt;")
         # build the widgets together to make the first line:
         first_line.addWidget(title_label)
         first_line.addStretch()
@@ -105,7 +104,7 @@ class MeasurementParametersEditor(QWidget):
     def create_button(self):
         button = QPushButton()
         button.setText("Save modifications" if self.parent.is_file_selected else "Create file")
-        button.setFont(QFont("", FontSize.BIG))
+        button.setFont(QFont("", settings.FontSize.BIG))
         button.setSizePolicy(button.sizePolicy().horizontalPolicy(), button.sizePolicy().verticalPolicy())
         button.setStyleSheet("padding: 6px 12px;")
         if self.parent.is_file_selected:

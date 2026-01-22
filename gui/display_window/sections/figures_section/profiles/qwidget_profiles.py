@@ -22,7 +22,7 @@ class Profiles(QWidget):
         self.layout.setSpacing(0)
 
         # Crée une figure matplotlib et un canevas pour l'affichage
-        self.figure = Figure(facecolor=settings.window_color)
+        self.figure = Figure(facecolor=settings.Color.QGROUP)
         self.canvas = FigureCanvas(self.figure)
 
         # Label pour afficher un message si f est None
@@ -57,10 +57,10 @@ class Profiles(QWidget):
             self.figure.clear()
             ax1 = self.figure.add_subplot(211)  # yz
             ax2 = self.figure.add_subplot(212)  # zx
-            ax1.tick_params(colors=settings.gray_color)
-            ax2.tick_params(colors=settings.gray_color)
-            for spine in ax1.spines.values(): spine.set_color(settings.gray_color)
-            for spine in ax2.spines.values(): spine.set_color(settings.gray_color)
+            ax1.tick_params(colors=settings.Color.GRAY)
+            ax2.tick_params(colors=settings.Color.GRAY)
+            for spine in ax1.spines.values(): spine.set_color(settings.Color.GRAY)
+            for spine in ax2.spines.values(): spine.set_color(settings.Color.GRAY)
             self.plot_profiles(ax1, ax2, self.f, z0, zN)
 
             self.figure.suptitle("Profiles", color='w')
@@ -72,12 +72,12 @@ class Profiles(QWidget):
         z_ticks_label = np.linspace(z0, zN, num_ticks)
         z_ticks = np.linspace(0, self.f.shape[0] - 1, num_ticks)
 
-        ax1.set_xlabel("nm", color=settings.gray_color)
-        ax1.set_ylabel("pix", color=settings.gray_color)
-        ax1.set_xticks(z_ticks, labels=[f"{z:.0f}" for z in z_ticks_label], color=settings.gray_color)
-        ax2.set_xlabel("pix", color=settings.gray_color)
-        ax2.set_ylabel("nm", color=settings.gray_color)
-        ax2.set_yticks(z_ticks, labels=[f"{z:.0f}" for z in z_ticks_label], color=settings.gray_color)
+        ax1.set_xlabel("nm", color=settings.Color.GRAY)
+        ax1.set_ylabel("pix", color=settings.Color.GRAY)
+        ax1.set_xticks(z_ticks, labels=[f"{z:.0f}" for z in z_ticks_label], color=settings.Color.GRAY)
+        ax2.set_xlabel("pix", color=settings.Color.GRAY)
+        ax2.set_ylabel("nm", color=settings.Color.GRAY)
+        ax2.set_yticks(z_ticks, labels=[f"{z:.0f}" for z in z_ticks_label], color=settings.Color.GRAY)
 
         vmin = min(f_.mean(dim=2).min(), f_.mean(dim=1).min(), f_.mean(dim=0).min()).item()
         vmax = max(f_.mean(dim=2).max(), f_.mean(dim=1).max(), f_.mean(dim=0).max()).item()

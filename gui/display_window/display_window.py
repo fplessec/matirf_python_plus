@@ -27,11 +27,16 @@ class DisplayWindow(QMainWindow):
         self.setup_ui()
         self.setup_reconstruction()
 
+    def get_config(self):
+        return self.config
+    def set_f(self, f):
+        self.f = f
+
     def setup_ui(self):
         self.menuBar()
         # the base objects:
         central_widget = QWidget()
-        main_layout = QHBoxLayout()  # Layout horizontal principal pour les deux colonnes
+        main_layout = QHBoxLayout()
         # create the specifics layouts/sections one after another:
         right_column = self.create_right_column()
         left_column = self.create_left_column()
@@ -43,15 +48,15 @@ class DisplayWindow(QMainWindow):
 
     def create_left_column(self):
         left_layout = QVBoxLayout()
-        # Section config (1 tier de la hauteur)
+        # config section (1-third of the height)
         config_section = MessageSection("Config")
         config_section._print(dumps(self.config))
-        # Section messages (2 tiers de la hauteur)
+        # messages section (2-third of the height)
         self.messages_section = MessageSection("Messages")
         self.bottom_bar = self.create_bottom_bar()
-        # Ajouter les widgets avec les proportions souhaitées
-        left_layout.addWidget(config_section, 1)  # 1 tier de la hauteur
-        left_layout.addWidget(self.messages_section, 2)  # 2 tiers de la hauteur
+        # build the section together in one column:
+        left_layout.addWidget(config_section, 1)  # (1-third of the height)
+        left_layout.addWidget(self.messages_section, 2)  # (2-third of the height)
         left_layout.addWidget(self.bottom_bar)
         return left_layout
 
@@ -59,7 +64,7 @@ class DisplayWindow(QMainWindow):
         right_layout = QVBoxLayout()
         # right column is a QStackedWidget and can switch between some sections:
         self.right_column_stack = QStackedWidget()
-        self.figures_section = FiguresSection()
+        self.figures_section = FiguresSection(parent=self)
         self.right_column_stack.addWidget(self.figures_section)  # index = 0
         if self._is_synthetic_data():
             self.synthetic_truth_section = SyntheticTruthSection()
@@ -98,24 +103,25 @@ class DisplayWindow(QMainWindow):
         return self.config['input-paths']['mode'] == 'synthetic-data'
 
     def setup_reconstruction(self):
-        if self.f is None:
-            if not self._is_synthetic_data():
-                tif_path = self.config['input-paths']['tif']
-                json_path = self.config['input-paths']['json']
+        if self.f is not None:
+            # no need to setup the reconstruction: just need to update the f in the figures
+            # ie happens when user clicked on 'Open reconstruction'
+            self.update_f(self.f)
+            self.update_plot()
+        else:
+            tif_path = self.config['input-paths']['tif']
+            json_path = self.config['input-paths']['json']
+            measurement_params = load_json(json_path)
+            oper_params = self.config['oper-params']
+            add_noise_params = self.config['add-noise']
+            self.algo_params = self.config['algo-params']
+            if not self._is_synthetic_data():  # working with real MA-TIRF measurement
                 g = load_tif(tif_path)
-                measurement_params = load_json(json_path)
-                add_noise_params = self.config['add-noise']
                 self.g, measurement_params = preprocess_measurement_stack(g, measurement_params, add_noise_params)
-                oper_params = self.config['oper-params']
                 self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
-                self.algo_params = self.config['algo-params']
                 self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
-            else:  # synthetic data
-                tif_path = self.config['input-paths']['tif']
-                json_path = self.config['input-paths']['json']
+            else:  # working with synthetic data
                 self.f_true = load_tif(tif_path)
-                measurement_params = load_json(json_path)
-                oper_params = self.config['oper-params']
                 nz_true = self.f_true.shape[0]
                 nz = oper_params['nz']
                 assert nz == nz_true, (
@@ -124,31 +130,27 @@ class DisplayWindow(QMainWindow):
                 )
                 self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
                 g = apply_matirf_operator(self.H, self.f_true)
-                add_noise_params = self.config['add-noise']
                 self.g, _ = preprocess_measurement_stack(g, measurement_params, add_noise_params)
                 self.algo_params = self.config['algo-params']
                 self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
-        else:  # no need to setup the reconstruction: just need to update the f in the figures
-               # ie happens when user clicked on 'Open reconstruction'
-            self.update_f(self.f)
-            self.update_plot()
 
     def update_f(self, f):
-        self.figures_section.depth_map_widget.f = f
-        self.figures_section.profiles_widget.f = f
-        self.f = f
+        self.figures_section.set_image(f)
+        self.set_f(f)
 
     def update_plot(self):
-        self.figures_section.depth_map_widget.update_plot()
-        self.figures_section.profiles_widget.update_plot()
+        self.figures_section.update_plot()
         self.save_recons_button.setEnabled(self._is_button_enable())
         if self._is_synthetic_data():
             self.change_right_column_stack_button.setEnabled(self._is_button_enable())
 
     def save_reconstruction(self):
-        """Ouvre un dialogue pour choisir un dossier et enregistre la reconstruction."""
-        save_dir, _ = QFileDialog.getSaveFileName(self, "Select Save Directory", str(RESULTS_DIR),
-                                                  "Folder Selection (*.*)")
+        """
+        Opens a dialog box to create a folder and saves the reconstruction.
+        Each reconstruction is a folder that contains data and metadata, such as the configuration file.
+        """
+        save_dir, _ = QFileDialog.getSaveFileName(self, "Name the Save Directory",
+                                                  str(RESULTS_DIR), "Folder Selection (*.*)")
         if save_dir not in ['', RESULTS_DIR, None]:
             makedirs(save_dir)
             save_tif(self.f, join(save_dir, 'f.TIF'))
@@ -160,9 +162,14 @@ class DisplayWindow(QMainWindow):
             self._print(f"Saved reconstruction in {save_dir}")
 
     def run(self):
+        """
+        After the reconstruction setup is done (see setup_reconstruction method), this function can be called to lunch
+        the desired algorithm inside the DisplayWindow, calling the _run methode of the Algorithm object from the
+        abstract_algo.py module.
+        """
         if hasattr(self, 'algorithm'):
             print("Running started.\n")
-            self.f = self.algorithm._run(self.g, self.H, self.algo_params, window=self)
+            self.set_f(self.algorithm._run(self.g, self.H, self.algo_params, window=self))
 
     def change_right_column(self):
         if self.right_column_stack.currentIndex() == 0:
@@ -174,12 +181,17 @@ class DisplayWindow(QMainWindow):
 
     @pyqtSlot(str)
     def _print(self, string):
+        """
+        This function is called by the Algorithm object from the abstract_algo.py module, it can be used for example
+        to print the loss of the algorithm at a certain point inside the DisplayWindow (in the messages section).
+        """
         if hasattr(self, 'messages_section'):
             self.messages_section._print(string)
         else:
             print(string)
 
     def closeEvent(self, event):
+        """Rewrites the closeEvent to stop the algorithm correctly and communicate with the DisplayWindowManager."""
         if hasattr(self, 'algorithm') and self.algorithm:
             self.algorithm.stop_running()
         from ..control_window import DisplayWindowManager

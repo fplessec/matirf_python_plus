@@ -16,6 +16,7 @@ def preprocess_measurement_stack(g, measurement_params, add_noise_params, normal
     background_list = []  # <-to store each background stack
     g_list = []  # <-to store each non-background stacks
     _, theta_max_deg = compute_min_max_angles_from_params(measurement_params)
+    print(f"theta crit = {_}°\ntheta max = {theta_max_deg}°")
     for i in range(n_stacks):
         if angles_deg[i] > theta_max_deg:  # <-background
             background_list.append(g[i, :, :])
@@ -45,7 +46,7 @@ def normalize_measurement(g, normalization=1):
         g = (g - g.min()) / (g.max() - g.min())
     elif normalization == 2:  # sum of square sqrt = 1
         g = g / g.square().sum().sqrt()
-    elif normalization == 3:  # mean of square sqrt =1
+    elif normalization == 3:  # mean of square sqrt = 1
         g = g / g.square().mean().sqrt()
     elif normalization == 4:  # mean = 1
         g = g / g.mean()

@@ -57,38 +57,35 @@ class TifFileSelector(QWidget):
         self.setLayout(layout)
 
     def choose_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self,
-                                                   self.mode_dependent_text_update(),
-                                                   str(MEASUREMENTS_DIR),
-                                                   "Image Files (*.tif *.tiff)")
+        file_path, _ = QFileDialog.getOpenFileName(self, self.mode_dependent_text_update(),
+                                                   str(MEASUREMENTS_DIR), "Image Files (*.tif *.tiff)")
         if file_path:
             self.update_selected_file(file_path)
 
     def update_selected_file(self, file_path):
         self.tif_path = file_path
         update_cache(["input-paths", "tif"], file_path)
-        filename = os.path.basename(file_path)
-        if file_path != 'None':
-            self.is_file_selected = True
-            self.file_label.setText(f"selected file : {filename}")
-            self.info_button.setVisible(True)
-        else:
-            self.is_file_selected = False
-            self.file_label.setText("No .tif file selected")
-            self.info_button.setVisible(False)
+        file_name = os.path.basename(file_path)
+        self.is_file_selected = file_path != 'None'
+        self.update_ui(file_name)
 
     def unselect_file(self):
-        self.is_file_selected = False
-        self.file_label.setText("No .tif file selected")
-        self.info_button.setVisible(False)
         update_cache(["input-paths", "tif"], 'None')
+        self.is_file_selected = False
+        self.update_ui('None')
+
+    def update_ui(self, file_name):
+        self.file_label.setText(f"selected file : {file_name}" if self.is_file_selected else "No .tif file selected")
+        font = self.file_label.font()
+        font.setBold(self.is_file_selected)
+        self.file_label.setFont(font)
+        self.info_button.setVisible(self.is_file_selected)
 
     def open_tif_file_preprocess_editor(self):
         if self.tif_file_preprocess_editor is not None:
             self.tif_file_preprocess_editor.close()
         self.tif_file_preprocess_editor = TifFilePreprocessEditor(parent=self)
         self.tif_file_preprocess_editor.show()
-
 
     def mode_dependent_text_update(self):
         return "Path of the MA-TIRF image stack" if self.parent.mode1 else "Path of the 3D object (synthetic truth)"

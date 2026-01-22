@@ -1,19 +1,17 @@
 import torch
-import sys
 
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtGui import QPalette, QPixmap, QColor
+from PyQt5.QtWidgets import QApplication, QStyleFactory, QGroupBox
 
 
 device = 'cpu'
 dtype = torch.float32
 
-# get the default PyQt5 color  for 'macintosh' style :
-app = QApplication(sys.argv).instance()
-app.setStyle("macintosh")  # <- force the style for any OS to macintosh
-window_color = app.palette().color(app.palette().Window).name()  # background color of QWidget (macintosh style)
-del app
-# my favorite grey color:
-gray_color = '#808080'
+app_style = "macintosh"
+app_palette = "macintosh"
+
+
+
 
 # control window settings :
 width_cw = 1100
@@ -26,6 +24,8 @@ class FontSize:
     SMALL = 11
     NORMAL = 14
     BIG = 18
+
+
 
 
 DEFAULT_CONFIG = {

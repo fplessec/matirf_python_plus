@@ -1,3 +1,4 @@
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QHBoxLayout
 
 from gui.more_widgets.histogram_3d_object import HistogramWidget
@@ -16,10 +17,10 @@ class TifFilePreprocessEditor(QWidget):
         json_path = config['input-paths']['json']
         measurement_params = load_json(json_path)
         add_noise_params = config['add-noise']
-        self.f = load_tif(tif_path)
+        self.f = load_tif(tif_path) + 4.
         #self.g = self.f.clone()
         self.g, measurement_params = preprocess_measurement_stack(self.f, measurement_params, add_noise_params,
-                                                                  normalization=4)
+                                                                  normalization=1)
 
         self.setWindowTitle("Info .....")
 
@@ -72,3 +73,9 @@ class TifFilePreprocessEditor(QWidget):
     def closeEvent(self, event):
         self.parent.tif_file_preprocess_editor = None
         super().closeEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_W and event.modifiers() & Qt.ControlModifier:  # Ctrl+W is clicked
+            self.close()
+        else:
+            super().keyPressEvent(event)

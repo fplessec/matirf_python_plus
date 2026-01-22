@@ -72,10 +72,8 @@ class JsonFileSelector(QWidget):
         self.setLayout(layout)
 
     def choose_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self,
-                                                   self.mode_dependent_text_update(),
-                                                   str(MEASUREMENTS_DIR),
-                                                   "Parameters Files (*.json)")
+        file_path, _ = QFileDialog.getOpenFileName(self, self.mode_dependent_text_update(),
+                                                   str(MEASUREMENTS_DIR), "Parameters Files (*.json)")
         if file_path:
             if check_measurement_parameters_file_format(file_path):
                 self.update_selected_file(file_path)
@@ -83,19 +81,20 @@ class JsonFileSelector(QWidget):
     def update_selected_file(self, file_path):
         self.json_path = file_path
         update_cache(["input-paths", "json"], file_path)
-        filename = os.path.basename(file_path)
-        if file_path != 'None':
-            self.is_file_selected = True
-            self.file_label.setText(f"selected file : {filename}")
-        else:
-            self.is_file_selected = False
-            self.file_label.setText("No .json file selected")
-        self.update_create_modify_button_text()
+        file_name = os.path.basename(file_path)
+        self.is_file_selected = file_path != 'None'
+        self.update_ui(file_name)
 
     def unselect_file(self):
-        self.is_file_selected = False
-        self.file_label.setText("No .json file selected")
         update_cache(["input-paths", "json"], 'None')
+        self.is_file_selected = False
+        self.update_ui('None')
+
+    def update_ui(self, file_name):
+        self.file_label.setText(f"selected file : {file_name}" if self.is_file_selected else "No .json file selected")
+        font = self.file_label.font()
+        font.setBold(self.is_file_selected)
+        self.file_label.setFont(font)
         self.update_create_modify_button_text()
 
     def update_create_modify_button_text(self):

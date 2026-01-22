@@ -17,34 +17,29 @@ class DepthMap(QWidget):
         super().__init__()
         self.f = None
         self.setup_ui()
+        self.update_plot()
 
     def setup_ui(self):
         """Initialise l'interface du tab Depths Map."""
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(1, 1, 0, 1)
-        self.layout.setSpacing(0)
-
-        # Crée une figure matplotlib et un canevas pour l'affichage
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(1, 1, 0, 1)
+        layout.setSpacing(0)
+        ### creation of the widgets one after another:
+        # a canvas to render the depth map:
         self.figure = Figure(facecolor=settings.window_color)
         self.canvas = FigureCanvas(self.figure)
-
-        # Label pour afficher un message si f est None
+        # an empty label for when f is None:
         self.empty_label = QLabel()
-
-        # Ajoute les widgets dans le layout
-        self.layout.addWidget(self.empty_label)
-        self.layout.addWidget(self.canvas)
-
-        # Ajoute la barre d'outils Matplotlib en bas
+        # the matplotlib toolbar:
         self.toolbar = NavigationToolbar(self.canvas, self)
-        self.layout.addWidget(self.toolbar)
-
-        # Cache les éléments au début si nécessaire
-        self.empty_label.hide()
-        self.update_plot()
+        ### build the objects together to make the layout:
+        layout.addWidget(self.empty_label)
+        layout.addWidget(self.canvas)
+        layout.addWidget(self.toolbar)
+        self.setLayout(layout)
 
     def update_plot(self):
-        """Vérifie si f existe, sinon affiche un message."""
+        """Show f depth map if f is not None."""
         if self.f is None:
             self.canvas.hide()
             self.empty_label.show()
@@ -53,14 +48,11 @@ class DepthMap(QWidget):
             self.empty_label.hide()
             self.canvas.show()
             self.toolbar.show()
-
             config = load_or_create_toml(CONFIG_PATH)
             (z0, zN) = get_variables_from_dict(config['oper-params'], ['z0', 'zN'])
             self.figure.clear()
             ax = self.figure.add_subplot(111)
-
             self.plot_depths_map(ax, self.f, z0, zN)
-
             self.figure.suptitle("Depth map", color='w')
             self.figure.tight_layout()
             self.canvas.draw()
