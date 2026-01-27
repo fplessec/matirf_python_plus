@@ -1,3 +1,4 @@
+from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QHBoxLayout, QGroupBox, QVBoxLayout, QLabel
 
 from settings import FontSize
@@ -20,6 +21,9 @@ class InputFilesSection(QGroupBox):
     """
     def __init__(self, parent=None):
         super().__init__("Input Files")
+        # the colors depend on the QPalette:
+        self.on_color = self.palette().color(QPalette.WindowText).name()
+        self.off_color = self.palette().color(QPalette.PlaceholderText).name()
         self.parent = parent
         self.mode1 = self.get_cached_mode()
         self.setup_ui()
@@ -75,11 +79,11 @@ class InputFilesSection(QGroupBox):
 
     def update_labels(self):
         if self.mode1:
-            self.mode1_label.setStyleSheet(f"color: white; font-style: italic; font-size: {FontSize.SMALL}pt;")
-            self.mode2_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {FontSize.SMALL}pt;")
+            self.mode1_label.setStyleSheet(f"color: {self.on_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
+            self.mode2_label.setStyleSheet(f"color: {self.off_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
         else:
-            self.mode1_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {FontSize.SMALL}pt;")
-            self.mode2_label.setStyleSheet(f"color: white; font-style: italic; font-size: {FontSize.SMALL}pt;")
+            self.mode1_label.setStyleSheet(f"color: {self.off_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
+            self.mode2_label.setStyleSheet(f"color: {self.on_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
 
     def switch_mode(self):
         self.mode1 = not self.mode1

@@ -1,6 +1,7 @@
 import os
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
 
 from gui.control_window.sections.input_files_section.tif_file_preprocess_editor import TifFilePreprocessEditor
@@ -39,7 +40,8 @@ class TifFileSelector(QWidget):
         self.info_button.setVisible(False)  # hidden by default
 
         self.file_label = QLabel("No .tif file selected")
-        self.file_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {FontSize.NORMAL}pt;")
+        file_label_color = self.palette().color(QPalette.PlaceholderText).name()
+        self.file_label.setStyleSheet(f"color: {file_label_color}; font-style: italic; font-size: {FontSize.NORMAL}pt;")
         unselect_button = QCrossButton()
         unselect_button.clicked.connect(self.unselect_file)
         last_line = QHBoxLayout()

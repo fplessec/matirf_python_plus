@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QLabel, QWidget, QVBoxLayout
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QPalette
 import matplotlib.pyplot as plt
 
 from io import BytesIO
@@ -62,10 +62,10 @@ class QLatexLabel(QWidget):
     A QWidget that can read latex formulations in order to display it.
     Can be updated with the method update_latex(...).
     """
-    def __init__(self, formula, fontsize=12, color='w', dpi=100):
+    def __init__(self, formula, fontsize=12, dpi=100):
         super().__init__()
         self.fontsize = fontsize
-        self.color = color
+        self.color = self.palette().color(QPalette.WindowText).name()  # the color depends on the QPalette
         self.dpi = dpi
         self.setup_ui(formula)
 

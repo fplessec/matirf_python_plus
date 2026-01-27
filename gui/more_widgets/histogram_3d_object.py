@@ -5,26 +5,30 @@ from matplotlib.figure import Figure
 
 
 class HistogramWidget(QWidget):
-    def __init__(self, image: torch.tensor, parent=None):
+    def __init__(self, image: torch.tensor, bins=256, parent=None):
         super().__init__()
         self.parent = parent
         image = image.cpu().numpy()
         self.image = image.flatten()  # <- histogram on the entire 3d image
+        self.bins = bins
+        self.setup_ui()
+        self.draw_histogram()
+
+    def setup_ui(self):
+        layout = QVBoxLayout()
         self.figure = Figure(figsize=(4, 2.5))
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
-        layout = QVBoxLayout()
         layout.addWidget(self.canvas)
         self.setLayout(layout)
-        self.draw_histogram()
 
     def draw_histogram(self):
         self.ax.clear()
         self.ax.hist(
             self.image,
-            bins=256,
+            bins=self.bins,
             color='gray',
-            edgecolor='black'
+            edgecolor='gray'
         )
         self.ax.set_yscale("log")
         self.ax.set_title("Histogram of the entire 3D object:")

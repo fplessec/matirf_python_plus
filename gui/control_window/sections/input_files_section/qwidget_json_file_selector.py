@@ -1,6 +1,7 @@
 import os
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
 
 from settings import FontSize
@@ -54,7 +55,8 @@ class JsonFileSelector(QWidget):
         self.update_create_modify_button_text()
         self.create_modify_button.clicked.connect(self.create_modify_file)
         self.file_label = QLabel("No .json file selected")
-        self.file_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {FontSize.NORMAL}pt;")
+        file_label_color = self.palette().color(QPalette.PlaceholderText).name()
+        self.file_label.setStyleSheet(f"color: {file_label_color}; font-style: italic; font-size: {FontSize.NORMAL}pt;")
         unselect_button = QCrossButton()
         unselect_button.clicked.connect(self.unselect_file)
         last_line = QHBoxLayout()

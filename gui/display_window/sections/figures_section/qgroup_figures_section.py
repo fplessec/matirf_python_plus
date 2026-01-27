@@ -3,10 +3,9 @@ from PyQt5.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QStackedLayout, QWid
 
 from gui.more_widgets import QSwitchButton
 from gui.more_widgets.depth_map_viewer import DepthMapViewer
+from gui.more_widgets.histogram_3d_object import HistogramWidget
 from gui.more_widgets.image_3d_viewer import Image3DViewer
 from gui.more_widgets.profiles_viewer import ProfilesViewer
-from .depth_map import DepthMap
-from .profiles import Profiles
 import settings
 
 
@@ -53,29 +52,19 @@ class FiguresSection(QGroupBox):
         return header
 
     def create_view1_widget(self):
-        config = self.parent.get_config()
         view1 = QWidget()
-        layout = QHBoxLayout(view1)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        # creation of the widgets one after another:
-        self.depth_map_widget = DepthMapViewer(z0=config['oper-params']['z0'], zN=config['oper-params']['zN'])
-        self.profiles_widget = ProfilesViewer(z0=config['oper-params']['z0'], zN=config['oper-params']['zN'])
-        # build the widgets together to make the layout:
-        layout.addWidget(self.depth_map_widget, 2)  # 2/3 of the width
-        layout.addWidget(self.profiles_widget, 1)  # 1/3 of the width
+        self.view1_layout = QHBoxLayout(view1)
+        self.view1_layout.setContentsMargins(0, 0, 0, 0)
+        self.view1_layout.setSpacing(0)
+        # view1 is initially empty and widget will be add when update_plot method is called
         return view1
 
     def create_view2_widget(self):
         view2 = QWidget()
-        # creation of the widgets one after another:
-        #viewer3d = Image3DViewer()
-        text_layout = QVBoxLayout(view2)
-        text_layout.setAlignment(Qt.AlignCenter)
-        self.text_label = QLabel("texte")
-        self.text_label.setAlignment(Qt.AlignCenter)
-        # build the widgets together to make the layout:
-        text_layout.addWidget(self.text_label)
+        self.view2_layout = QVBoxLayout(view2)
+        self.view2_layout.setContentsMargins(0, 0, 0, 0)
+        self.view2_layout.setSpacing(0)
+        # view2 is initially empty and widget will be add when update_plot method is called
         return view2
 
     def on_switch_toggled(self):
@@ -95,6 +84,31 @@ class FiguresSection(QGroupBox):
         self.depth_map_widget.set_image(image)
         self.profiles_widget.set_image(image)
 
-    def update_plot(self):
-        self.depth_map_widget.update_plot()
-        self.profiles_widget.update_plot()
+    def update_plot(self, f, config):
+        z0 = config['oper-params']['z0']
+        zN = config['oper-params']['zN']
+        # clear the view1 layout:
+        self.clear_layout(self.view1_layout)
+        # create the objects for view1:
+        depth_map_widget = DepthMapViewer(f, z0, zN)
+        profiles_widget = ProfilesViewer(f, z0, zN)
+        # build the widgets together to make the view1 layout:
+        self.view1_layout.addWidget(depth_map_widget, 2)  # 2/3 of the width
+        self.view1_layout.addWidget(profiles_widget, 1)  # 1/3 of the width
+        # clear the view2 layout:
+        self.clear_layout(self.view2_layout)
+        # create the objects for view1:
+        viewer_3d = Image3DViewer(f)
+        hist = HistogramWidget(f, bins=64)
+        # build the widgets together to make the view1 layout:
+        self.view2_layout.addWidget(viewer_3d, 2)  # 2/3 of the height
+        self.view2_layout.addWidget(hist, 1)  # 1/3 of the height
+
+    @staticmethod
+    def clear_layout(layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()

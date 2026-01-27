@@ -1,19 +1,23 @@
 import torch
 
-from .extract_colors import extract_colors
+from .custom_palette import dark_palette, light_palette
+
 
 device = 'cpu'
 dtype = torch.float32
 
-app_style = "macintosh"
-app_palette = "macintosh"
 
-class Color:
-    (
-     QAPP,
-     QGROUP,
-     GRAY
-    ) = extract_colors(app_style, app_palette)
+
+app_style = "fusion"
+dark = 0
+
+if dark==0:
+    app_palette = dark_palette
+elif dark==1:
+    app_palette = light_palette
+else:
+    app_palette = dark_palette
+
 
 class FontSize:
     SMALL = 11

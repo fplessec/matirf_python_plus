@@ -106,7 +106,6 @@ class DisplayWindow(QMainWindow):
         if self.f is not None:
             # no need to setup the reconstruction: just need to update the f in the figures
             # ie happens when user clicked on 'Open reconstruction'
-            self.update_f(self.f)
             self.update_plot()
         else:
             tif_path = self.config['input-paths']['tif']
@@ -135,14 +134,14 @@ class DisplayWindow(QMainWindow):
                 self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
 
     def update_f(self, f):
-        self.figures_section.set_image(f)
-        self.set_f(f)
+        self.f = f
 
     def update_plot(self):
-        self.figures_section.update_plot()
+        self.figures_section.update_plot(self.f, self.config)
         self.save_recons_button.setEnabled(self._is_button_enable())
         if self._is_synthetic_data():
             self.change_right_column_stack_button.setEnabled(self._is_button_enable())
+            self.synthetic_truth_section.update_plot(self.f, self.f_true, self.config)
 
     def save_reconstruction(self):
         """
@@ -169,7 +168,8 @@ class DisplayWindow(QMainWindow):
         """
         if hasattr(self, 'algorithm'):
             print("Running started.\n")
-            self.set_f(self.algorithm._run(self.g, self.H, self.algo_params, window=self))
+            self.f = self.algorithm._run(self.g, self.H, self.algo_params, window=self)
+            # see on algo finished
 
     def change_right_column(self):
         if self.right_column_stack.currentIndex() == 0:

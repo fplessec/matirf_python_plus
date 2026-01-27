@@ -1,4 +1,5 @@
 import torch
+from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QLabel
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -13,7 +14,7 @@ import settings
 
 class DepthMapViewer(QWidget):
 
-    def __init__(self, image=None, z0=None, zN=None, unit='nm', title='Depths map', cmap='jet_r'):
+    def __init__(self, image, z0, zN, unit='nm', title='Depths map', cmap='jet_r'):
         super().__init__()
         self.image = image
         self.z0 = z0
@@ -21,18 +22,10 @@ class DepthMapViewer(QWidget):
         self.unit = unit
         self.cmap = cmap
         self.title = title
+        self.text1_color = self.palette().color(QPalette.WindowText).name()  # depends on the palette
+        self.text2_color = self.palette().color(QPalette.PlaceholderText).name()  # depends on the palette
         self.setup_ui()
         self.update_plot()
-
-    def set_image(self, image:torch.tensor):
-        assert image.ndim == 3, "Image must be 3D (Z,Y,X)"
-        self.image = image
-    def set_z0(self, z0:float):
-        self.z0 = z0
-    def set_zN(self, zN:float):
-        self.zN = zN
-    def set_unit(self, unit:str):
-        self.unit = unit
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -40,33 +33,21 @@ class DepthMapViewer(QWidget):
         layout.setSpacing(0)
         ### creation of the widgets one after another:
         # a canvas to render the depth map:
-        self.figure = Figure(facecolor=settings.Color.QGROUP)
+        qgroupbox_color = self.palette().color(QPalette.Mid).name()  # depends on the palette
+        self.figure = Figure(facecolor=qgroupbox_color)
         self.canvas = FigureCanvas(self.figure)
-        # an empty label for when image is None:
-        self.empty_label = QLabel()
         # the matplotlib toolbar:
         self.toolbar = NavigationToolbar(self.canvas, self)
         ### build the objects together to make the layout:
-        layout.addWidget(self.empty_label)
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
         self.setLayout(layout)
 
     def update_plot(self):
         """Show image depth map if image is not None."""
-        if self.image is None:
-            self.canvas.hide()
-            self.empty_label.show()
-            self.toolbar.hide()
-            return
-        assert self.z0 is not None, "z0, the coordinate of the first plane, is not set in DepthMapViewer"
-        assert self.zN is not None, "zN, the coordinate of the last plane, is not set in DepthMapViewer"
-        self.empty_label.hide()
-        self.canvas.show()
-        self.toolbar.show()
         self.figure.clear()
         self.plot_depths_map()
-        self.figure.suptitle(self.title, color='w')
+        self.figure.suptitle(self.title, color=self.text1_color)
         self.figure.tight_layout()
         self.canvas.draw()
 
@@ -98,8 +79,8 @@ class DepthMapViewer(QWidget):
         ticks = np.linspace(self.z0, self.zN, num_ticks)
         cbar.set_ticks(ticks, labels=[f"{t:.0f}" for t in ticks])
         cbar.set_label(f'Depth ({self.unit})', fontsize=11, color='#808080')
-        cbar.outline.set_color('#808080')
-        cbar.ax.tick_params(colors='#808080')
+        cbar.outline.set_color(self.text2_color)
+        cbar.ax.tick_params(colors=self.text2_color)
         ### show the depth value in the matplotlib toolbar:
         # calculate the weighted average depth: depth(x, y) = sum_z_(I(z,y,x) * z) / sum_z_(I(z,x,y))
         depths = np.linspace(self.z0, self.zN, nz)

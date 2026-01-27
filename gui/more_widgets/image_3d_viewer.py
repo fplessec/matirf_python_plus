@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette
 
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QSlider, QHBoxLayout, QSizePolicy
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -11,11 +12,12 @@ import settings
 
 class Image3DViewer(QWidget):
 
-    def __init__(self, image: torch.tensor, parent=None):
+    def __init__(self, image: torch.tensor, parent=None, cmap='gray'):
         super().__init__()
         self.parent = parent
         assert image.ndim == 3, "Image must be 3D (Z,Y,X)"
         self.image = image.cpu()
+        self.cmap = cmap
         self.nz, self.h, self.w = self.image.shape
         self.current_slice = 0
         self.current_slice_raw = None
@@ -28,7 +30,8 @@ class Image3DViewer(QWidget):
         layout.setSpacing(0)
         ### creation of the widgets one after another:
         # a canvas to render the current slice:
-        self.figure = Figure(facecolor=settings.window_color)
+        qgroupbox_color = self.palette().color(QPalette.Mid).name()  # depends on the palette
+        self.figure = Figure(facecolor=qgroupbox_color)
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         self.ax.axis('off')
@@ -44,7 +47,8 @@ class Image3DViewer(QWidget):
         # label to show size:
         self.slice_label = QLabel()
         self.size_label = QLabel(f"Size: {self.w} × {self.h} pixels")
-        self.size_label.setStyleSheet(f"color: gray; font-style: italic; font-size: {settings.FontSize.SMALL}pt;")
+        size_label_color = self.palette().color(QPalette.PlaceholderText).name()  # depends on the palette
+        self.size_label.setStyleSheet(f"color: {size_label_color}; font-style: italic; font-size: {settings.FontSize.SMALL}pt;")
         # label to show pixel value on mouse:
         self.pixel_label = QLabel("Pixel: (x, y) = -, value = -")
         self.pixel_label.setAlignment(Qt.AlignCenter)
@@ -74,7 +78,7 @@ class Image3DViewer(QWidget):
             slice_norm /= slice_norm.max()
         # draw the slice:
         self.ax.clear()
-        self.ax.imshow(slice_norm, cmap='gray', origin='upper')
+        self.ax.imshow(slice_norm, cmap=self.cmap, origin='upper')
         self.ax.axis('off')  # toujours off
         self.figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
         self.canvas.draw()
