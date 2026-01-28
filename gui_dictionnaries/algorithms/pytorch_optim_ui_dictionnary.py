@@ -1,5 +1,6 @@
 from ..option_lists import REGULARIZATION_LIST
 
+
 PYTORCH_UI_PARAMETERS = {
         "max_iter": {
             "title": "Maximum iteration number",

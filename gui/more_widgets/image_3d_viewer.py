@@ -16,7 +16,7 @@ class Image3DViewer(QWidget):
         super().__init__()
         self.parent = parent
         assert image.ndim == 3, "Image must be 3D (Z,Y,X)"
-        self.image = image.cpu()
+        self.image = image.cpu().detach()
         self.cmap = cmap
         self.nz, self.h, self.w = self.image.shape
         self.current_slice = 0

@@ -1,5 +1,6 @@
 from .admm_optim import AdmmOptimization
 from .pytorch_optim import PytorchOptimization
+from .pnp_optim import PnpOptimization
 from gui_dictionnaries.algorithms import *
 
 
@@ -11,6 +12,10 @@ ALGORITHMS = {
     "ADMM": {
         'object': AdmmOptimization,
         'ui_params': ADMM_UI_PARAMETERS
+    },
+    "Plug and Play": {
+        'object': PnpOptimization,
+        'ui_params': PNP_UI_PARAMETERS
     }
 }
 

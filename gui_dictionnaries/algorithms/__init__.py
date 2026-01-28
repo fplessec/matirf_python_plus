@@ -1,2 +1,3 @@
 from .admm_optim_ui_dictionnary import ADMM_UI_PARAMETERS
 from .pytorch_optim_ui_dictionnary import PYTORCH_UI_PARAMETERS
+from .pnp_optim_ui_dictionnary import PNP_UI_PARAMETERS

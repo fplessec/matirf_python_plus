@@ -8,7 +8,7 @@ class HistogramWidget(QWidget):
     def __init__(self, image: torch.tensor, bins=256, parent=None):
         super().__init__()
         self.parent = parent
-        image = image.cpu().numpy()
+        image = image.cpu().detach().numpy()
         self.image = image.flatten()  # <- histogram on the entire 3d image
         self.bins = bins
         self.setup_ui()
