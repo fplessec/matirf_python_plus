@@ -1,25 +1,25 @@
-from ..option_lists import REGULARIZATION_LIST
+from ..option_lists import PPXA_REGULARIZATION_LIST
 
 
-PYTORCH_UI_PARAMETERS = {
+PPXA_UI_PARAMETERS = {
         "max_iter": {
             "title": "Maximum iteration number",
             "type": "value",
             "param_info": {
-                'dtype': int,
+                "dtype": int,
                 'unit': '',
-                'latex_name': '\\text{max\\_iter}',
-                'default': 1000
+                'latex_name': "\\text{max_iter}",
+                'default': 2000
             }
         },
-        "lr": {
-            "title": "Learning rate",
+        "lambda_relax": {
+            "title": "Relaxation parameter",
             "type": "value",
             "param_info": {
-                'dtype': float,
+                "dtype": float,
                 'unit': '',
-                'latex_name': '\\text{lr}',
-                'default': 0.1
+                'latex_name': '\lambda_{relax}',
+                'default': 1.9
             }
         },
         "K": {
@@ -42,21 +42,31 @@ PYTORCH_UI_PARAMETERS = {
                 'default': 1e-8
             }
         },
+        "gamma": {
+            "title": "Ridge regression coefficient",
+            "type": "value",
+            "param_info": {
+                'dtype': float,
+                'unit': '',
+                'latex_name': '\\gamma',
+                'default': 10000.
+            }
+        },
         "reg": {
             "title": "Regularization",
             "type": "option",
             "param_info": {
-                'options_list': REGULARIZATION_LIST
+                'options_list': PPXA_REGULARIZATION_LIST
             }
         },
         "lambda_reg": {
             "title": "Regularization coefficient",
             "type": "value",
             "param_info": {
-                'dtype': float,
+                "dtype": float,
                 'unit': '',
-                'latex_name': '\\lambda_{reg}',
-                'default': 0.10
+                'latex_name': '\lambda_{reg}',
+                'default': 0.001
             }
         },
         "delta": {
@@ -78,5 +88,5 @@ PYTORCH_UI_PARAMETERS = {
                 'latex_name': '\\rho',
                 'default': 0.6
             }
-        }
+        },
     }

@@ -26,6 +26,7 @@ by the user for a given reconstruction.
 from math import pi
 import torch
 import numpy as np
+from torch.optim import NAdam
 
 import settings
 
@@ -172,7 +173,7 @@ def compute_matirf_operator_from_params(measurement_params: dict, operator_param
      wavelength_nm, beam_divergence_deg) = get_variables_from_dict(measurement_params, ['angles_deg',
                                                             'n_glass', 'n_medium', 'n_oil', 'numerical_aperture',
                                                             'wavelength_nm', 'beam_divergence_deg'])
-    (nz, z0, zN, normalize) = get_variables_from_dict(operator_params, ['nz', 'z0','zN',
+    (nz, z0, zN, normalize) = get_variables_from_dict(operator_params, ['nz', 'z0', 'zN',
                                                                                         'normalize'])
     return compute_matirf_operator(angles_deg, nz, z0, zN, n_glass, n_medium, numerical_aperture, n_oil,
                                    wavelength_nm, beam_divergence_deg, normalize)
@@ -185,3 +186,28 @@ def apply_matirf_operator(H: torch.Tensor, f: torch.Tensor) -> torch.Tensor:
     transposed version of H and g is a tensor from the mathematical set of the MA-TIRF measurement stacks.
     """
     return torch.einsum('ij,jkl->ikl', H, f)
+
+def estimate_delta_anisotropy(nz, z0, zN, nt, NA, wavelength_nm) -> float:
+    """
+    Using 'z0' (the smallest depth on z of the reconstructed image, in nanometers) 'zN' (the smallest depth on z of the
+    reconstructed image, in nanometers) and 'nz' (the number of cuts of the reconstructed image on the z axis), we can
+    compute Δz, the size of the voxel of the reconstructed image along z.
+    Using 'nt' (the optical index of the sample medium), 'NA' (the numerical aperture of the objective) and
+    'wavelength_nm' (the wavelength of the excitation beam in nm) we can estimate Δxy, the size of the the voxel of the
+    reconstructed image along x or y.
+    Under certain hypothesis, such as considering that the resolution is limited by diffraction, we can approximate:
+    Δxy ≈ Δxy_Rayleigh = 0.61 λ / nt / NA
+    This function return the estimated anisotropy ratio δ = Δz / Δxy.
+    """
+    # δ ≈ (zN - z0) / nz * n_medium * NA_obj / 0.61 / λ
+    return  (zN - z0) / nz * nt * NA / 0.61 / wavelength_nm
+
+def estimate_delta_anisotropy_from_params(measurement_params: dict, operator_params: dict) -> float:
+    """
+    This function takes the measurement parameter dictionary 'measurement_params' and the operator parameter dictionary
+    'operator_params' and returns the estimated anisotropy ratio.
+    """
+    (n_medium, numerical_aperture, wavelength_nm) = get_variables_from_dict(measurement_params,
+                                                ['n_medium', 'numerical_aperture', 'wavelength_nm'])
+    (nz, z0, zN) = get_variables_from_dict(operator_params, ['nz', 'z0', 'zN'])
+    return estimate_delta_anisotropy(nz, z0, zN, n_medium, numerical_aperture, wavelength_nm)

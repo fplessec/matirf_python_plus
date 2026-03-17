@@ -1,6 +1,6 @@
 ADMM_UI_PARAMETERS = {
     "iter": {
-        "title": "Number of pnp iteration",
+        "title": "Number of iteration",
         "type": "value",
         "param_info": {
             'dtype': int,

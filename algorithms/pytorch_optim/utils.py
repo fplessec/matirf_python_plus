@@ -3,12 +3,43 @@ import torch.nn.functional as F
 from operations import apply_matirf_operator
 from gui_dictionnaries.option_lists import REGULARIZATION_LIST
 
+"""
+δ = Δz / Δxy << 1
+delta est le ratio de la taille des pixels sur la direction z par rapport à celle sur les directions xy.
+Si on veut régulariser le gradient spacial de l'image 3D f super-résolue sur z, il faut prendre en compte l'anisotropie !
+> || grad(f) ||² = dz² + dy² + dx² 
+  ici on considère une variation entre deux pixels sur z aussi importante qu'une variation entre deux pixels sur x/y
+  or entre deux pixels sur x/y on peut mettre parfois 10 à 30 pixels sur z
+  ainsi en regularisant on regularise de la meme manière sur xy que sur z donc on sur-régularise la direction z 
+  (sur-lissage etc)
+  autrement dit, la direction z étant plus fine elle est beaucoup plus sensible à la régularisation
+> || grad(f) ||² = Δz² * dz² +  Δxy² * dy² + Δxy² * dx²  ou bien:
+  || grad(f) ||² = δ² * dz² +  dy² + dx² 
+  ici en prenant en compte l'anisotropie on corrige la sur-régularisation sur z qui peut  etre responsable de la 
+  destruction de la super-résolution
+  
+Comment calculer delta ?
+Δz = (zN - z0) / nz  est choisi par l'utilisateur
+Δxy = FOV_camera / Npixel_xy
+Si FOV_camera est inconnu, on peut estimer Δxy à partir des paramètres de mesures sous l'hypothèse suivante:
+la résolution est limitée par la diffraction et donc la taille du pixel est bien choisie pour echantillonnée:
+Δxy ≈ Δxy_Rayleigh / 2  (Nyquist)
+et :
+Δxy_Rayleigh ≈ 0.61 λ / n_medium / NA_obj  qui sont dans les paramètres de mesure (indice optique, longueur d'onde, 
+ouverture numérique, ...)
+Comme on veut juste un ordre de grandeur pour delta on va ignoré Nyquist et prendre Δxy ≈ Δxy_Rayleigh
+
+On a donc:
+δ ≈ (zN - z0) / nz * n_medium * NA_obj / 0.61 / λ
+"""
+
+
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
 
-def compute_loss(f, g, H, reg, coeff, rho):
+def compute_loss(f, g, H, reg, lambda_reg, rho, delta=1.):
     """Calcule la fonction de perte selon la régularisation choisie"""
     zero = torch.zeros_like(f)
     norm_L1 = torch.nn.L1Loss(reduction='mean')
@@ -17,17 +48,17 @@ def compute_loss(f, g, H, reg, coeff, rho):
     if reg == REGULARIZATION_LIST[0]:  # Sans régularisation
         loss = data_term
     elif reg == REGULARIZATION_LIST[1]:  # norme L1 de x : sparse
-        loss = (1 - coeff) * data_term + coeff * norm_L1(f, zero)
+        loss = (1 - lambda_reg) * data_term + lambda_reg * norm_L1(f, zero)
     elif reg == REGULARIZATION_LIST[2]:  # norme L2 du grad : Tikhonov
-        loss = (1 - coeff) * data_term + coeff * gradient_L2(f).mean()
+        loss = (1 - lambda_reg) * data_term + lambda_reg * gradient_L2(f, delta=delta).mean()
     elif reg == REGULARIZATION_LIST[3]:  # norme L1 du grad : TV
-        loss = (1 - coeff) * data_term + coeff * gradient_L1(f).mean()
+        loss = (1 - lambda_reg) * data_term + lambda_reg * gradient_L1(f, delta=delta).mean()
     elif reg == REGULARIZATION_LIST[4]:  # norme de frobenius de la hessienne
-        loss = (1 - coeff) * data_term + coeff * hessian_frobenius(f).mean()
+        loss = (1 - lambda_reg) * data_term + lambda_reg * hessian_frobenius(f, delta=delta).mean()
     elif reg == REGULARIZATION_LIST[5]:  # shv regularization
-        loss = (1 - coeff) * data_term + coeff * shv(f, weighting=rho).mean()
+        loss = (1 - lambda_reg) * data_term + lambda_reg * shv(f, weighting=rho, delta=delta).mean()
     elif reg == REGULARIZATION_LIST[6]:  # schatten norm d'ordre 1 de la hessienne
-        loss = (1 - coeff) * data_term + coeff * hessian_schatten_1(f).mean()
+        loss = (1 - lambda_reg) * data_term + lambda_reg * hessian_schatten_1(f, delta=delta).mean()
     else:
         raise ValueError(f'Erreur: pas de régularisation associée à reg = {reg}')
     return loss
@@ -41,36 +72,34 @@ def spatial_grad(f):
     dx = padded[1:-1, 1:-1, 2:] - padded[1:-1, 1:-1, :-2]
     return dz, dy, dx
 
-def gradient_L2(f, eps=1e-8):
+def gradient_L2(f, delta=1., eps=1e-8):
     """Calcul de la norme L2 du gradient"""
     dz, dy, dx = spatial_grad(f)
-    grad = dz.square() + dy.square() + dx.square()
+    grad = delta**2 * dz.square() + dy.square() + dx.square()
     return torch.sqrt(grad + eps ** 2)
 
-def gradient_L1(f):
+def gradient_L1(f, delta=1.):
     """Calcul de la norme L1 du gradient"""
     dz, dy, dx = spatial_grad(f)
-    grad = torch.abs(dz) + torch.abs(dy) + torch.abs(dx)
+    grad = delta * torch.abs(dz) + torch.abs(dy) + torch.abs(dx)
     return grad
 
 def hessian(f, delta=1.):
-    """Calcul de la matrice hessienne"""
-    # Calcul du gradient
+    """Computation of the 3D Hessian matrix."""
+    # gradient computation:
     dz, dy, dx = spatial_grad(f)
-    # Calcul des dérivées secondes avec autograd
+    # second partial derivatives computation:
     dxdz, dxdy, dxdx = spatial_grad(dx)
     dydz, dydy, dydx = spatial_grad(dy)
     dzdz, dzdy, dzdx = spatial_grad(dz)
-    # Formation de la matrice hessienne
-    hessian_components = [
-        delta ** 2 * dzdz, delta * dzdy, delta * dzdx,
-        delta * dydz, dydy, dydx,
-        delta * dxdz, dxdy, dxdx
-    ]
-    # Reshape pour obtenir la matrice 3x3 pour chaque voxel
-    hessian_matrix = torch.stack(hessian_components, dim=0)
-    hessian_matrix = hessian_matrix.view(3, 3, f.shape[0], f.shape[1], f.shape[2])
-    return hessian_matrix
+    # formation of the Hessian matrix:
+    hess = torch.stack([
+        delta**2 * dzdz, delta * dzdy, delta * dzdx,
+        delta * dydz,    dydy,         dydx,
+        delta * dxdz,    dxdy,         dxdx
+    ])
+    return hess.view(3, 3, *f.shape)
+
 
 def frobenius_norm(matrix, eps=1e-8):
     """Calcul de la norme de Frobenius"""

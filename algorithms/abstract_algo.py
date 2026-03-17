@@ -1,4 +1,5 @@
 import threading
+import traceback
 from typing import Dict, Any
 from abc import ABC, abstractmethod
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -12,11 +13,13 @@ class AlgorithmSignals(QObject):
 
 
 class Algorithm(ABC):
-    def __init__(self):
+    def __init__(self, measurement_params=None, oper_params=None):
         self.window = None   # <- this object is a DisplayWindow when using the GUI
         self._stop_event = threading.Event()
         self._thread = None
         self.signals = AlgorithmSignals()
+        self.measurement_params = measurement_params
+        self.oper_params = oper_params
 
     def _run(self, g, H, params: Dict[str, Any], window=None):
         # _run is a wrapper for run, making it interruptible
@@ -43,6 +46,9 @@ class Algorithm(ABC):
             if not self._stop_event.is_set():
                 self.signals.finished.emit(result)
         except Exception as e:
+            print("=== Exception Traceback ===")
+            traceback.print_exc()
+            print("=====================")
             self.signals.error.emit(str(e))
 
     def _on_finished(self, result):
@@ -54,6 +60,7 @@ class Algorithm(ABC):
     def _on_error(self, error_msg):
         # is called if there's an exception when the algorithm is running
         self._print(f"Exception during execution: {error_msg}")
+        self._print(f"-> See on terminal console the complete traceback.")
 
     @abstractmethod
     def run(self, g, H, params: Dict[str, Any]):

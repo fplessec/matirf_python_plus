@@ -118,7 +118,8 @@ class DisplayWindow(QMainWindow):
                 g = load_tif(tif_path)
                 self.g, measurement_params = preprocess_measurement_stack(g, measurement_params, add_noise_params)
                 self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
-                self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
+                self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"](measurement_params=measurement_params,
+                                                                                oper_params=oper_params)
             else:  # working with synthetic data
                 self.f_true = load_tif(tif_path)
                 nz_true = self.f_true.shape[0]
@@ -131,7 +132,8 @@ class DisplayWindow(QMainWindow):
                 g = apply_matirf_operator(self.H, self.f_true)
                 self.g, _ = preprocess_measurement_stack(g, measurement_params, add_noise_params)
                 self.algo_params = self.config['algo-params']
-                self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"]()
+                self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"](measurement_params=measurement_params,
+                                                                                oper_params=oper_params)
 
     def update_f(self, f):
         self.f = f

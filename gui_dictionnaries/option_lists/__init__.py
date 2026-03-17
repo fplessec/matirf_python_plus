@@ -1,2 +1,2 @@
 from .denoiser_list import DENOISER_LIST
-from .regularization_list import REGULARIZATION_LIST
+from .regularization_list import REGULARIZATION_LIST, PPXA_REGULARIZATION_LIST

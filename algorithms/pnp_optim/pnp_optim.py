@@ -3,9 +3,7 @@ import time
 import numpy as np
 import torch
 
-from .nlbayes import denoise_NL_BAYES
-from .nlridge import denoise_NL_RIDGE
-from .cimg_denoise import denoise_Cimg
+from ..denoisers import denoise_tv_bregman, denoise_NL_RIDGE
 from ..abstract_algo import Algorithm
 from settings import device, dtype
 from operations import apply_matirf_operator, get_variables_from_dict
@@ -75,10 +73,11 @@ class PnpOptimization(Algorithm):
                 z = f.clone()
             elif denoiser == "Non-Local Ridge":
                 z = denoise_NL_RIDGE(f, sigma[k])
-            elif denoiser == "Non-Local Bayes":
-                z = denoise_NL_BAYES(f, sigma[k])
+            elif denoiser == "TV Bregman":
+                z = denoise_tv_bregman(f, weight=sigma[k])
             else:
-                z = denoise_Cimg(f, sigma[k], denoiser)
+                self._print(f"{denoiser} not implemented.")
+                break
 
             self._print(
                 f"z : min = {z.min().item():.3g} | "
