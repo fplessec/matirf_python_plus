@@ -43,13 +43,13 @@ PPXA_UI_PARAMETERS = {
             }
         },
         "gamma": {
-            "title": "Ridge regression coefficient",
+            "title": "Data term step size",
             "type": "value",
             "param_info": {
                 'dtype': float,
                 'unit': '',
                 'latex_name': '\\gamma',
-                'default': 10000.
+                'default': 0.05
             }
         },
         "reg": {

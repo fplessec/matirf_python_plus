@@ -14,7 +14,7 @@ https://github.com/zcshinee/Pol-TIRF/tree/master
 """
 
 
-class AdmmOptimization(Algorithm):
+class AdmmAlgo(Algorithm):
 
     def run(self, g, H, params: Dict[str, Any]):
 

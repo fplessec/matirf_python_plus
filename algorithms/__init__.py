@@ -1,26 +1,29 @@
-from .admm_optim import AdmmOptimization
-from .pytorch_optim import PytorchOptimization
-from .pnp_optim import PnpOptimization
-from .ppxa_optim import PpxaOptimization
-from gui_dictionnaries.algorithms import *
+from .optim_adam import AdamAlgo
+from .optim_ppxa import PpxaAlgo
+from .optim_admm import AdmmAlgo
+from .optim_pnp import PnpAlgo
+
+from gui_dictionnaries.algorithms import ADAM_UI_PARAMETERS, PPXA_UI_PARAMETERS, ADMM_UI_PARAMETERS, PNP_UI_PARAMETERS
 
 
+# this super mega dictionnary is imported in qgroup_algorithm_and_algo_params.py and makes the link between the ui and
+# the algorithms
 ALGORITHMS = {
-    "Pytorch": {
-        'object': PytorchOptimization,
-        'ui_params': PYTORCH_UI_PARAMETERS
-    },
-    "ADMM": {
-        'object': AdmmOptimization,
-        'ui_params': ADMM_UI_PARAMETERS
-    },
-    "Plug and Play": {
-        'object': PnpOptimization,
-        'ui_params': PNP_UI_PARAMETERS
+    "ADAM": {
+        'object': AdamAlgo,
+        'ui_params': ADAM_UI_PARAMETERS
     },
     "PPXA": {
-        'object': PpxaOptimization,
+        'object': PpxaAlgo,
         'ui_params': PPXA_UI_PARAMETERS
+    },
+    "ADMM": {
+        'object': AdmmAlgo,
+        'ui_params': ADMM_UI_PARAMETERS
+    },
+    "PNP": {
+        'object': PnpAlgo,
+        'ui_params': PNP_UI_PARAMETERS
     }
 }
 

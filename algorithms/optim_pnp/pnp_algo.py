@@ -11,7 +11,7 @@ from operations import apply_matirf_operator, get_variables_from_dict
 from skimage.restoration import estimate_sigma
 
 
-class PnpOptimization(Algorithm):
+class PnpAlgo(Algorithm):
 
     def run(self, g: torch.Tensor, H: torch.Tensor, params: Dict[str, Any]):
 

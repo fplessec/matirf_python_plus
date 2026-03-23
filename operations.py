@@ -185,7 +185,11 @@ def apply_matirf_operator(H: torch.Tensor, f: torch.Tensor) -> torch.Tensor:
     This function can also be used to operate the other way: to compute the operation Ht*g where Ht is the conjugate
     transposed version of H and g is a tensor from the mathematical set of the MA-TIRF measurement stacks.
     """
-    return torch.einsum('ij,jkl->ikl', H, f)
+    j = f.shape[0]
+    f_flat = f.reshape(j, -1)        # (j, k*l)
+    out = H @ f_flat                # (i, k*l)
+    return out.reshape(H.shape[0], *f.shape[1:])
+    #return torch.einsum('ij,jkl->ikl', H, f)
 
 def estimate_delta_anisotropy(nz, z0, zN, nt, NA, wavelength_nm) -> float:
     """

@@ -7,8 +7,6 @@ from gui.more_widgets import QSeparator
 from gui.control_window import SimpleParameterWidget
 
 
-
-
 class AlgoParamsWidget(QWidget):
     """
     A widget that handle a specific algorithm's list of parameters. It should take in argument algo_dict, which is a
