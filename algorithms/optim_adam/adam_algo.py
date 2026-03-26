@@ -33,7 +33,6 @@ class AdamAlgo(Algorithm):
         f = apply_matirf_operator(torch.inverse(HtH + lambda_rr * identity), Htg)
         f.requires_grad = True
 
-        # LossComputer instancié
         loss_computer = LossComputer(f, g, H, reg=reg, lambda_reg=lambda_reg, rho=rho, delta=delta)
         optimizer = torch.optim.Adam([f], lr=lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)

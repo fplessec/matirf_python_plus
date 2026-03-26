@@ -12,9 +12,9 @@ class DifferentialOperators:
     - Thread-safe: kernels are stored per instance
     """
 
-    def __init__(self, delta=1.):
+    def __init__(self, delta=1.,):
         self.delta = delta
-        if device == 'gpu':
+        if device == 'cuda':
             self.build_kernels()
 
     def build_kernels(self):
@@ -34,15 +34,17 @@ class DifferentialOperators:
         k_dz = zero()
         k_dz[2, 1, 1] = 1
         k_dz[0, 1, 1] = -1
-        k_dz *= delta
+        k_dz *= 0.5 * delta
         # dy
         k_dy = zero()
         k_dy[1, 2, 1] = 1
         k_dy[1, 0, 1] = -1
+        k_dy *= 0.5
         # dx
         k_dx = zero()
         k_dx[1, 1, 2] = 1
         k_dx[1, 1, 0] = -1
+        k_dx *= 0.5
         ##### second order diagonal
         # dzz
         k_dzz = zero()
@@ -63,58 +65,50 @@ class DifferentialOperators:
         ##### second order mixed
         # dyz
         k_dyz = zero()
-        k_dyz[2, 2, 1] = 1
         k_dyz[0, 0, 1] = 1
-        k_dyz[2, 0, 1] = -1
+        k_dyz[2, 2, 1] = 1
         k_dyz[0, 2, 1] = -1
+        k_dyz[2, 0, 1] = -1
         k_dyz *= 0.25 * delta
         # dxz
         k_dxz = zero()
-        k_dxz[2, 1, 2] = 1
         k_dxz[0, 1, 0] = 1
-        k_dxz[2, 1, 0] = -1
+        k_dxz[2, 1, 2] = 1
         k_dxz[0, 1, 2] = -1
+        k_dxz[2, 1, 0] = -1
         k_dxz *= 0.25 * delta
         # dxy
         k_dxy = zero()
-        k_dxy[1, 2, 2] = 1
         k_dxy[1, 0, 0] = 1
-        k_dxy[1, 2, 0] = -1
+        k_dxy[1, 2, 2] = 1
         k_dxy[1, 0, 2] = -1
+        k_dxy[1, 2, 0] = -1
         k_dxy *= 0.25
 
-        ##### pre-stacked kernels
-        # for gradient:
+        ##### pre-stacked kernels: (C_out, C_in, 3, 3, 3)
+        # for gradient:  (C_out=3, C_in=1, 3, 3, 3)
         self.grad_kernel = torch.stack([
-            k_dx.unsqueeze(0),
+            k_dz.unsqueeze(0),
             k_dy.unsqueeze(0),
-            k_dz.unsqueeze(0)
+            k_dx.unsqueeze(0)
         ], dim=0)
-        print("self.grad_kernel.shape", self.grad_kernel.shape)
-        # for divergence:
+        # for divergence:  (C_out=1, C_in=3, 3, 3, 3)
         self.div_kernel = torch.stack([
-            (-k_dz).unsqueeze(0),
-            (-k_dy).unsqueeze(0),
-            (-k_dx).unsqueeze(0)
-        ], dim=0)
-        print("self.div_kernel.shape", self.div_kernel.shape)
-        # for laplacian:
-        self.lap_kernel = torch.stack([
-            k_dxx.unsqueeze(0),
-            k_dyy.unsqueeze(0),
-            k_dzz.unsqueeze(0)
-        ], dim=0)
-        print("self.lap_kernel.shape", self.lap_kernel.shape)
-        # for hessian:
-        self.hessian_kernel = torch.stack([
-            k_dxx.unsqueeze(0),
-            k_dyy.unsqueeze(0),
+            (-k_dz),
+            (-k_dy),
+            (-k_dx)
+        ], dim=0).unsqueeze(0)
+        # for laplacian:  (C_out=1, C_in=1, 3, 3, 3)
+        self.lap_kernel = (k_dzz + k_dyy + k_dxx).unsqueeze(0).unsqueeze(0)
+        # for hessian:  (C_out=6, C_in=1, 3, 3, 3)
+        self.hess_kernel = torch.stack([
             k_dzz.unsqueeze(0),
-            k_dxy.unsqueeze(0),
+            k_dyy.unsqueeze(0),
+            k_dxx.unsqueeze(0),
+            k_dyz.unsqueeze(0),
             k_dxz.unsqueeze(0),
-            k_dyz.unsqueeze(0)
+            k_dxy.unsqueeze(0)
         ], dim=0)
-        print("self.hessian_kernel.shape", self.hessian_kernel.shape)
 
     # pytorch conv need 5 dimensional tensors:
     @staticmethod
@@ -129,116 +123,97 @@ class DifferentialOperators:
         ##### CPU Implementations:
 
         def spatial_grad(self, f):
-            padded = F.pad(f.unsqueeze(0).unsqueeze(0), pad=(1, 1, 1, 1, 1, 1), mode='replicate').squeeze(0).squeeze(0)
-            # finite difference computation: (first order approximation of the gradient)
-            dz = (padded[2:, 1:-1, 1:-1] - padded[:-2, 1:-1, 1:-1]) * self.delta
+            padded = self._from_5d(F.pad(self._to_5d(f), pad=(1, 1, 1, 1, 1, 1), mode='constant'))
+            # finite central difference computation: (first order approximation of the gradient)
+            dz = (padded[2:, 1:-1, 1:-1] - padded[:-2, 1:-1, 1:-1])
+            dz *= 0.5 * self.delta
             dy = padded[1:-1, 2:, 1:-1] - padded[1:-1, :-2, 1:-1]
+            dy *= 0.5
             dx = padded[1:-1, 1:-1, 2:] - padded[1:-1, 1:-1, :-2]
+            dx *= 0.5
             return dz, dy, dx
-            # f5 = f.unsqueeze(0).unsqueeze(0)
-            # padded = F.pad(f5, (1, 1, 1, 1, 1, 1), mode='replicate').squeeze()
-            # dz = (padded[2:, 1:-1, 1:-1] - padded[:-2, 1:-1, 1:-1]) * self.delta
-            # dy = padded[1:-1, 2:, 1:-1] - padded[1:-1, :-2, 1:-1]
-            # dx = padded[1:-1, 1:-1, 2:] - padded[1:-1, 1:-1, :-2]
-            # return dz, dy, dx
-            # padded = self._from_5d(F.pad(self._to_5d(f), (1, 1, 1, 1, 1, 1), mode='replicate'))
-            # dz = (padded[2:, 1:-1, 1:-1] - padded[:-2, 1:-1, 1:-1]) * self.delta
-            # dy = padded[1:-1, 2:, 1:-1] - padded[1:-1, :-2, 1:-1]
-            # dx = padded[1:-1, 1:-1, 2:] - padded[1:-1, 1:-1, :-2]
-            # return dz, dy, dx
-            #
-            # return dx, dy, dz
 
         def divergence(self, z, y, x):
-            div = torch.zeros_like(z)
-            # z direction:
-            div[1:-1, :, :] += z[1:-1, :, :] - z[:-2, :, :]
-            div[0, :, :] += z[0, :, :]
-            div[-1, :, :] -= z[-2, :, :]
-            # y direction:
-            div[:, 1:-1, :] += y[:, 1:-1, :] - y[:, :-2, :]
-            div[:, 0, :] += y[:, 0, :]
-            div[:, -1, :] -= y[:, -2, :]
-            # x direction:
-            div[:, :, 1:-1] += x[:, :, 1:-1] - x[:, :, :-2]
-            div[:, :, 0] += x[:, :, 0]
-            div[:, :, -1] -= x[:, :, -2]
+            padded_z = self._from_5d(F.pad(self._to_5d(z), pad=(1, 1, 1, 1, 1, 1), mode='constant'))
+            padded_y = self._from_5d(F.pad(self._to_5d(y), pad=(1, 1, 1, 1, 1, 1), mode='constant'))
+            padded_x = self._from_5d(F.pad(self._to_5d(x), pad=(1, 1, 1, 1, 1, 1), mode='constant'))
+            # finite central differences:
+            dz = (padded_z[2:, 1:-1, 1:-1] - padded_z[:-2, 1:-1, 1:-1])
+            dz *= 0.5 * self.delta
+            dy = (padded_y[1:-1, 2:, 1:-1] - padded_y[1:-1, :-2, 1:-1])
+            dy *= 0.5
+            dx = (padded_x[1:-1, 1:-1, 2:] - padded_x[1:-1, 1:-1, :-2])
+            dx *= 0.5
+            # sum of derivatives -> divergence:
+            div = dz + dy + dx
             return div
-            # div = torch.zeros_like(z)
-            # div[1:-1] += z[1:-1] - z[:-2]
-            # div[0] += z[0]
-            # div[-1] -= z[-2]
-            # div[:, 1:-1] += y[:, 1:-1] - y[:, :-2]
-            # div[:, 0] += y[:, 0]
-            # div[:, -1] -= y[:, -2]
-            # div[:, :, 1:-1] += x[:, :, 1:-1] - x[:, :, :-2]
-            # div[:, :, 0] += x[:, :, 0]
-            # div[:, :, -1] -= x[:, :, -2]
-            # return div
-            # dz_pad = self._from_5d(F.pad(self._to_5d(z), (0, 0, 0, 0, 1, 1), mode='replicate'))
-            # dy_pad = self._from_5d(F.pad(self._to_5d(y), (0, 0, 1, 1, 0, 0), mode='replicate'))
-            # dx_pad = self._from_5d(F.pad(self._to_5d(x), (1, 1, 0, 0, 0, 0), mode='replicate'))
-            # div = ((dz_pad[2:] - dz_pad[:-2]) * self.delta +
-            #        dy_pad[:, 2:] - dy_pad[:, :-2] +
-            #        dx_pad[:, :, 2:] - dx_pad[:, :, :-2])
-            # return div
 
         def laplacian(self, f):
-            dz, dy, dx = self.spatial_grad(f)
-            return self.divergence(dz, dy, dx)
-            # f5 = f.unsqueeze(0).unsqueeze(0)
-            # padded = F.pad(f5, (1, 1, 1, 1, 1, 1), mode='replicate').squeeze()
-            #
-            # center = padded[1:-1, 1:-1, 1:-1]
-            #
-            # lap = (
-            #         (padded[2:, 1:-1, 1:-1] + padded[:-2, 1:-1, 1:-1] - 2 * center) * self.delta ** 2
-            #         + (padded[1:-1, 2:, 1:-1] + padded[1:-1, :-2, 1:-1] - 2 * center)
-            #         + (padded[1:-1, 1:-1, 2:] + padded[1:-1, 1:-1, :-2] - 2 * center)
-            # )
-            #
-            # return lap
-            # dz, dy, dx = self.spatial_grad(f)
-            # return self.divergence(dz, dy, dx)
-            #
-            # dz, dy, dx = self.spatial_grad(f)
-            # ddx, ddy, ddz = self.spatial_grad(dx)[0], self.spatial_grad(dy)[1], self.spatial_grad(dz)[2]
-            # return ddx + ddy + ddz
+            padded = self._from_5d(F.pad(self._to_5d(f), pad=(1, 1, 1, 1, 1, 1), mode='constant'))
+            # diagonal second-order central finite differences:
+            dzz = (padded[2:, 1:-1, 1:-1] - 2 * padded[1:-1, 1:-1, 1:-1] + padded[:-2, 1:-1, 1:-1])
+            dzz *= self.delta**2
+            dyy = padded[1:-1, 2:, 1:-1] - 2 * padded[1:-1, 1:-1, 1:-1] + padded[1:-1, :-2, 1:-1]
+            dxx = padded[1:-1, 1:-1, 2:] - 2 * padded[1:-1, 1:-1, 1:-1] + padded[1:-1, 1:-1, :-2]
+            # sum of second derivatives -> laplacian:
+            lap = dzz + dyy + dxx
+            return lap
 
         def hessian(self, f):
-            dz, dy, dx = self.spatial_grad(f)
-            dzdz, dzdy, dzdx = self.spatial_grad(dz)
-            dydz, dydy, dydx = self.spatial_grad(dy)
-            dxdz, dxdy, dxdx = self.spatial_grad(dx)
+            padded = self._from_5d(F.pad(self._to_5d(f), pad=(1, 1, 1, 1, 1, 1), mode='constant'))
+            # diagonal second-order central finite differences:
+            dzz = (padded[2:, 1:-1, 1:-1] - 2 * padded[1:-1, 1:-1, 1:-1] + padded[:-2, 1:-1, 1:-1])
+            dzz *= self.delta**2
+            dyy = (padded[1:-1, 2:, 1:-1] - 2 * padded[1:-1, 1:-1, 1:-1] + padded[1:-1, :-2, 1:-1])
+            dxx = (padded[1:-1, 1:-1, 2:] - 2 * padded[1:-1, 1:-1, 1:-1] + padded[1:-1, 1:-1, :-2])
+            # cross second-order central finite differences:
+            dyz = padded[2:, 2:, 1:-1] + padded[:-2, :-2, 1:-1] - padded[2:, :-2, 1:-1] - padded[:-2, 2:, 1:-1]
+            dyz *= 0.25 * self.delta
+            dxz = padded[2:, 1:-1, 2:] + padded[:-2, 1:-1, :-2] - padded[2:, 1:-1, :-2] - padded[:-2, 1:-1, 2:]
+            dxz *= 0.25 * self.delta
+            dxy = padded[1:-1, 2:, 2:] + padded[1:-1, :-2, :-2] - padded[1:-1, 2:, :-2] - padded[1:-1, :-2, 2:]
+            dxy *= 0.25
+            # stack into hessian matrix:
             hess = torch.stack([
-                dzdz, dzdy, dzdx,
-                dydz, dydy, dydx,
-                dxdz, dxdy, dxdx
+                dzz, dyz, dxz,
+                dyz, dyy, dxy,
+                dxz, dxy, dxx
             ])
             return hess.view(3, 3, *f.shape)
 
 
-    elif device == 'gpu':
+    elif device == 'cuda':
         ##### GPU Implementations:
 
         def spatial_grad(self, f):
+            # conv3d( input(1,1,D,H,W), grad_kernel(1,3,3,3,3) ) -> output(1,3,D,H,W)
             out = F.conv3d(self._to_5d(f), self.grad_kernel, padding=1)
             # out.shape = (1, 3, D, H, W)
             out = out.squeeze(0)  # (3, D, H, W)
-            dx, dy, dz = out[0], out[1], out[2]
-            return dx, dy, dz
+            dz, dy, dx = out[0], out[1], out[2]
+            return dz, dy, dx  # (D, H, W)
 
         def divergence(self, z, y, x):
-            inp = torch.stack([z, y, x]).unsqueeze(1)  # (3,1,D,H,W)
-            out = F.conv3d(inp, self.div_kernel, padding=1, groups=3)
-            return self._from_5d(out.sum(0))
+            # 5d input the field (z,y,x):
+            inp = torch.stack([z, y, x], dim=0).unsqueeze(0)  # (1,3,D,H,W)
+            # conv3d( input(1,3,D,H,W), div_kernel(1,3,3,3,3) ) -> output(1,1,D,H,W)
+            out = F.conv3d(inp, self.div_kernel, padding=1)  # (1,1,D,H,W)
+            return self._from_5d(out)  # (D,H,W)
 
         def laplacian(self, f):
-            out = F.conv3d(self._to_5d(f), self.lap_kernel, padding=1)
-            return self._from_5d(out.sum(0))
+            # conv3d( input(1,1,D,H,W), lap_kernel(1,1,3,3,3) ) -> output(1,1,D,H,W)
+            out = F.conv3d(self._to_5d(f), self.lap_kernel, padding=1)  # (1,1,D,H,W)
+            return self._from_5d(out)  # (D,H,W)
 
         def hessian(self, f):
-            out = F.conv3d(self._to_5d(f), self.hessian_kernel, padding=1)
-            dxx, dyy, dzz, dxy, dxz, dyz = [self._from_5d(out[i]) for i in range(6)]
-            H = torch.stack([dzz, dyz, dxz, dyz, dyy, dxy, dxz, dxy, dxx])
-            return H.view(3, 3, *f.shape)
+            # conv3d( input(1,1,D,H,W), hess_kernel(6,1,3,3,3) ) -> output(1,6,D,H,W)
+            out = F.conv3d(self._to_5d(f), self.hess_kernel, padding=1).squeeze()
+            # out.shape = (1, 6, D, H, W)
+            out = out.squeeze(0)  # (6, D, H, W)
+            dzz, dyy, dxx, dyz, dxz, dxy = [self._from_5d(out[i]) for i in range(6)]
+            hess = torch.stack([
+                dzz, dyz, dxz,
+                dyz, dyy, dxy,
+                dxz, dxy, dxx
+            ])
+            return hess.view(3, 3, *f.shape)  # (3, 3, D, H, W)

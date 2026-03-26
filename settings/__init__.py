@@ -5,6 +5,7 @@ from .custom_palette import dark_palette, light_palette
 
 device = 'cpu'
 dtype = torch.float32
+#dtype = torch.float64
 
 
 

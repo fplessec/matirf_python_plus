@@ -39,7 +39,6 @@ class ProximalOperators:
             tau: step size for gradient descent ; default = 1 / (1 + 12*lambda_reg)
             n_iter: number of iterations
         """
-
         if tau is None:
             tau = 1 / (1 + 12 * lambda_reg)
         u = f.clone()
