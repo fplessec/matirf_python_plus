@@ -6,16 +6,25 @@ from settings import device, dtype
 
 class DifferentialOperators:
     """
-    Differential operators for 3D volumes, optimized for CPU or GPU:
-    - CPU: uses fast finite differences (vectorized)
-    - GPU: uses 3D convolutions (better for parallelism)
-    - Thread-safe: kernels are stored per instance
+    This is a thread-safe class (e.g. kernels are stored per instance) that gather methods for computing differential
+    operations for 3D volumes, optimized for CPU (uses fast finite differences) or GPU (uses 3D convolutions, better
+    for parallelism).
+    Considering that torch.conv3d can take quite some time when computed on CPU, that is why we choose two different
+    styles of implementation for computing the differential operators, one for device='cpu' and the other one for
+    device='cuda'.
+
     """
 
     def __init__(self, delta=1.,):
         self.delta = delta
         if device == 'cuda':
             self.build_kernels()
+
+    # pytorch conv need 5 dimensional tensors:
+    @staticmethod
+    def _to_5d(f): return f.unsqueeze(0).unsqueeze(0)
+    @staticmethod
+    def _from_5d(f): return f.squeeze(0).squeeze(0)
 
     def build_kernels(self):
         """
@@ -84,7 +93,6 @@ class DifferentialOperators:
         k_dxy[1, 0, 2] = -1
         k_dxy[1, 2, 0] = -1
         k_dxy *= 0.25
-
         ##### pre-stacked kernels: (C_out, C_in, 3, 3, 3)
         # for gradient:  (C_out=3, C_in=1, 3, 3, 3)
         self.grad_kernel = torch.stack([
@@ -109,13 +117,6 @@ class DifferentialOperators:
             k_dxz.unsqueeze(0),
             k_dxy.unsqueeze(0)
         ], dim=0)
-
-    # pytorch conv need 5 dimensional tensors:
-    @staticmethod
-    def _to_5d(f): return f.unsqueeze(0).unsqueeze(0)
-    @staticmethod
-    def _from_5d(f): return f.squeeze(0).squeeze(0)
-
 
     ############ Differential Operators:
 
