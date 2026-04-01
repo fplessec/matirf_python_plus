@@ -1,149 +1,193 @@
-from os import makedirs
-from os.path import join
-
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QStackedWidget, \
-    QSizePolicy
+from PyQt5.QtCore import Qt, QObject, pyqtSignal
+from PyQt5.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QStackedWidget, QSizePolicy, QAction
+)
 from tomli_w import dumps
 
-from algorithms import ALGORITHMS
-from gui.display_window.sections.figures_section import FiguresSection
-from gui.display_window.sections.message_section import MessageSection
+from .sections import FiguresSection, MessageSection, SyntheticTruthSection
+from gui.utils import close_active_window
+from gui.control_window import DisplayWindowManager
+from core import PipelineManager
+from in_out import RESULTS_DIR
 import settings
-from in_out import load_tif, load_json, RESULTS_DIR, save_tif, save_toml, save_txt
-from preprocess_measurement import preprocess_measurement_stack
-from operations import compute_matirf_operator_from_params, apply_matirf_operator
-from .synthetic_truth_layout import SyntheticTruthSection
+
+
+class PipelineQtBridge(QObject):
+    message = pyqtSignal(str)
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
 
 
 class DisplayWindow(QMainWindow):
-    def __init__(self, config, f=None):
+    def __init__(self, pipeline):
         super().__init__()
+
         self.setAttribute(Qt.WA_DeleteOnClose)
-        self.f = f
-        self.config = config
         self.setWindowTitle("Display Window")
         self.resize(settings.width_dw, settings.height_dw)
+
+        self.pipeline = pipeline
+        self.config = pipeline.config
+
+        self.qt_bridge = PipelineQtBridge()
+
+        self.qt_bridge.message.connect(self._print, Qt.QueuedConnection)
+        self.qt_bridge.finished.connect(self.on_finished, Qt.QueuedConnection)
+        self.qt_bridge.error.connect(self.on_error, Qt.QueuedConnection)
+
+        self._connect_pipeline_callbacks()
+
         self.setup_ui()
-        self.setup_reconstruction()
 
-    def get_config(self):
-        return self.config
-    def set_f(self, f):
-        self.f = f
+    def initialize_from_existing_data(self):
+        self.update_plot()
+        self._print(self.pipeline.messages)
+        self.save_btn.setEnabled(True)
 
+        if self.switch_btn:
+            self.switch_btn.setEnabled(True)
+
+    # =========================
+    # PIPELINE
+    # =========================
+    def _connect_pipeline_callbacks(self):
+        def emit_message(msg):
+            self.qt_bridge.message.emit(msg)
+        def emit_finished(result):
+            self.qt_bridge.finished.emit(result)
+        def emit_error(err):
+            self.qt_bridge.error.emit(err)
+        self.pipeline.callbacks = {
+            "message": emit_message,
+            "finished": emit_finished,
+            "error": emit_error,
+        }
+
+    # =========================
+    # CALLBACKS
+    # =========================
+    def on_finished(self, result):
+        self.update_plot()
+        self.save_btn.setEnabled(True)
+        self.save_action.setEnabled(True)
+        if self.switch_btn:
+            self.switch_btn.setEnabled(True)
+
+    def on_error(self, err):
+        self._print(f"Error: {err}")
+
+    def _print(self, msg):
+        if hasattr(self, "messages_section"):
+            self.messages_section._print(msg)
+
+    # =========================
+    # UI
+    # =========================
     def setup_ui(self):
-        self.menuBar()
+        self.create_menu_bar()
         # the base objects:
         central_widget = QWidget()
         main_layout = QHBoxLayout()
         # create the specifics layouts/sections one after another:
-        right_column = self.create_right_column()
-        left_column = self.create_left_column()
+        main_layout.addLayout(self.create_left_column(), 2)  # 2/7 of the width
+        main_layout.addLayout(self.create_right_column(), 5)  # 5/7 of the width
         # build the objects together to make the window:
-        main_layout.addLayout(left_column, 2)  # 2/7ieme de la largeur
-        main_layout.addLayout(right_column, 5)  #5/7ieme tiers de la largeur
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
+    def create_menu_bar(self):
+        menubar = self.menuBar()
+        # file menu:
+        file_menu = menubar.addMenu("File")
+            # save reconstruction action:
+        self.save_action = QAction("Save reconstruction", self)
+        self.save_action.setShortcut("Ctrl+S")
+        self.save_action.setEnabled(False)
+        self.save_action.triggered.connect(self.save_reconstruction)
+        file_menu.addAction(self.save_action)
+        # window menu:
+        window_menu = menubar.addMenu("Window")
+            # close active window action:
+        close_action = QAction("Close this window", self)
+        close_action.setShortcut("Ctrl+W")
+        close_action.setShortcutContext(Qt.WidgetShortcut)
+        close_action.triggered.connect(close_active_window)
+        window_menu.addAction(close_action)
+            # interrupt reconstruction action:
+        interrupt_action = QAction("Interrupt the reconstruction", self)
+        interrupt_action.setShortcut("Ctrl+Shift+C")
+        interrupt_action.triggered.connect(self.pipeline.stop)
+        window_menu.addAction(interrupt_action)
+
     def create_left_column(self):
         left_layout = QVBoxLayout()
-        # config section (1-third of the height)
+        # config section:
         config_section = MessageSection("Config")
         config_section._print(dumps(self.config))
-        # messages section (2-third of the height)
+        # messages section
         self.messages_section = MessageSection("Messages")
-        self.bottom_bar = self.create_bottom_bar()
         # build the section together in one column:
-        left_layout.addWidget(config_section, 1)  # (1-third of the height)
-        left_layout.addWidget(self.messages_section, 2)  # (2-third of the height)
-        left_layout.addWidget(self.bottom_bar)
+        left_layout.addWidget(config_section, 1)  # 1/3 of the height
+        left_layout.addWidget(self.messages_section, 2)  # 2/3 of the height
+        left_layout.addWidget(self.create_bottom_bar())
         return left_layout
 
     def create_right_column(self):
         right_layout = QVBoxLayout()
         # right column is a QStackedWidget and can switch between some sections:
-        self.right_column_stack = QStackedWidget()
+        # if working with real data: only figures_section
+        # if working with synth data: also a synthetic_truth_section
+        self.stack = QStackedWidget()
         self.figures_section = FiguresSection(parent=self)
-        self.right_column_stack.addWidget(self.figures_section)  # index = 0
-        if self._is_synthetic_data():
-            self.synthetic_truth_section = SyntheticTruthSection()
-            self.right_column_stack.addWidget(self.synthetic_truth_section)  # index = 1
-        right_layout.addWidget(self.right_column_stack)
+        self.stack.addWidget(self.figures_section)   # index = 0
+        if self.pipeline.is_synthetic_data():
+            self.synthetic_section = SyntheticTruthSection(self.pipeline)
+            self.stack.addWidget(self.synthetic_section)   # index = 1
+        else:
+            self.synthetic_section = None
+        right_layout.addWidget(self.stack)
         return right_layout
 
     def create_bottom_bar(self):
-        bottom_widget = QWidget()
-        bottom_layout = QVBoxLayout()
-        self.save_recons_button = QPushButton("Save reconstruction")
-        self.save_recons_button.setEnabled(self._is_button_enable())
-        self.save_recons_button.clicked.connect(self.save_reconstruction)
-        self.save_recons_button.setSizePolicy(
-            QSizePolicy.Fixed,  # horizontally: does not stretch
-            QSizePolicy.Preferred  # vertically: does stretch
-        )
-        bottom_layout.addWidget(self.save_recons_button, alignment=Qt.AlignCenter)
-        bottom_layout.addStretch()
-        if self._is_synthetic_data():
-            self.change_right_column_stack_button = QPushButton("Go To Truth →")
-            self.change_right_column_stack_button.setEnabled(self._is_button_enable())
-            self.change_right_column_stack_button.clicked.connect(self.change_right_column)
-            self.change_right_column_stack_button.setSizePolicy(
-                QSizePolicy.Fixed,  # horizontally: does not stretch
-                QSizePolicy.Preferred  # vertically: does stretch
-            )
-            bottom_layout.addWidget(self.change_right_column_stack_button, alignment=Qt.AlignCenter)
-        bottom_widget.setLayout(bottom_layout)
-        return bottom_widget
-
-    def _is_button_enable(self):
-        return self.f is not None
-
-    def _is_synthetic_data(self):
-        return self.config['input-paths']['mode'] == 'synthetic-data'
-
-    def setup_reconstruction(self):
-        if self.f is not None:
-            # no need to setup the reconstruction: just need to update the f in the figures
-            # ie happens when user clicked on 'Open reconstruction'
-            self.update_plot()
+        widget = QWidget()
+        bottom_bar_layout = QVBoxLayout()
+        # a save button: (enable on algo finished)
+        self.save_btn = QPushButton("Save reconstruction")
+        self.save_btn.setEnabled(False)
+        self.save_btn.clicked.connect(self.save_reconstruction)
+        self.save_btn.setSizePolicy(QSizePolicy.Fixed,      # horizontally: does not stretch
+                                    QSizePolicy.Preferred)  # vertically: does stretch
+        bottom_bar_layout.addWidget(self.save_btn, alignment=Qt.AlignCenter)
+        bottom_bar_layout.addStretch()
+        # a button to acces to synthetic_truth_section: (enable on algo finished)
+        if self.pipeline.is_synthetic_data():
+            self.switch_btn = QPushButton("Go To Truth →")
+            self.switch_btn.setEnabled(False)
+            self.switch_btn.clicked.connect(self.change_right_column)
+            self.switch_btn.setSizePolicy(QSizePolicy.Fixed,      # horizontally: does not stretch
+                                          QSizePolicy.Preferred)  # vertically: does stretch
+            bottom_bar_layout.addWidget(self.switch_btn, alignment=Qt.AlignCenter)
         else:
-            tif_path = self.config['input-paths']['tif']
-            json_path = self.config['input-paths']['json']
-            measurement_params = load_json(json_path)
-            oper_params = self.config['oper-params']
-            add_noise_params = self.config['add-noise']
-            self.algo_params = self.config['algo-params']
-            if not self._is_synthetic_data():  # working with real MA-TIRF measurement
-                g = load_tif(tif_path)
-                self.g, measurement_params = preprocess_measurement_stack(g, measurement_params, add_noise_params)
-                self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
-                self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"](measurement_params=measurement_params,
-                                                                                oper_params=oper_params)
-            else:  # working with synthetic data
-                self.f_true = load_tif(tif_path)
-                nz_true = self.f_true.shape[0]
-                nz = oper_params['nz']
-                assert nz == nz_true, (
-                    f"\nWhile computing the synthetic MA-TIRF measurement:\nThe parameter 'nz' in 'oper-params' (nz = "
-                    f"{nz}) must be equal to the number of plans in the synthetic truth ({nz_true})."
-                )
-                self.H = compute_matirf_operator_from_params(measurement_params, oper_params)
-                g = apply_matirf_operator(self.H, self.f_true)
-                self.g, _ = preprocess_measurement_stack(g, measurement_params, add_noise_params)
-                self.algo_params = self.config['algo-params']
-                self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"](measurement_params=measurement_params,
-                                                                                oper_params=oper_params)
+            self.switch_btn = None
+        widget.setLayout(bottom_bar_layout)
+        return widget
 
-    def update_f(self, f):
-        self.f = f
-
+    # =========================
+    # DISPLAY
+    # =========================
     def update_plot(self):
-        self.figures_section.update_plot(self.f, self.config)
-        self.save_recons_button.setEnabled(self._is_button_enable())
-        if self._is_synthetic_data():
-            self.change_right_column_stack_button.setEnabled(self._is_button_enable())
-            self.synthetic_truth_section.update_plot(self.f, self.f_true, self.config)
+        self.figures_section.update_plot(self.pipeline.f, self.config)
+        if self.pipeline.is_synthetic_data() and self.synthetic_section:
+            self.synthetic_section.update_plot()
+
+    def change_right_column(self):
+        if self.stack.currentIndex() == 0:
+            self.stack.setCurrentIndex(1)
+            self.switch_btn.setText("← Go to Reconstruction")
+        else:
+            self.stack.setCurrentIndex(0)
+            self.switch_btn.setText("Go To Truth →")
+
 
     def save_reconstruction(self):
         """
@@ -152,63 +196,25 @@ class DisplayWindow(QMainWindow):
         """
         save_dir, _ = QFileDialog.getSaveFileName(self, "Name the Save Directory",
                                                   str(RESULTS_DIR), "Folder Selection (*.*)")
-        if save_dir not in ['', RESULTS_DIR, None]:
-            makedirs(save_dir)
-            save_tif(self.f, join(save_dir, 'f.TIF'))
-            save_toml(self.config, join(save_dir, 'config.toml'))
-            messages_section_content = self.messages_section.get_text()
-            save_txt(messages_section_content, join(save_dir, 'messages.txt'))
-            if self._is_synthetic_data():
-                save_tif(self.f_true, join(save_dir, 'f_true.TIF'))
-            self._print(f"Saved reconstruction in {save_dir}")
-
-    def run(self):
-        """
-        After the reconstruction setup is done (see setup_reconstruction method), this function can be called to lunch
-        the desired algorithm inside the DisplayWindow, calling the _run methode of the Algorithm object from the
-        abstract_algo.py module.
-        """
-        if hasattr(self, 'algorithm'):
-            print("Running started.\n")
-            self.f = self.algorithm._run(self.g, self.H, self.algo_params, window=self)
-            # see on algo finished
-
-    def change_right_column(self):
-        if self.right_column_stack.currentIndex() == 0:
-            self.right_column_stack.setCurrentIndex(1)
-            self.change_right_column_stack_button.setText("← Go to Reconstruction")
-        else:
-            self.right_column_stack.setCurrentIndex(0)
-            self.change_right_column_stack_button.setText("Go To Truth →")
-
-    @pyqtSlot(str)
-    def _print(self, string):
-        """
-        This function is called by the Algorithm object from the abstract_algo.py module, it can be used for example
-        to print the loss of the algorithm at a certain point inside the DisplayWindow (in the messages section).
-        """
-        if hasattr(self, 'messages_section'):
-            self.messages_section._print(string)
-        else:
-            print(string)
+        if not save_dir:
+            return
+        self.pipeline.save_results(save_dir)
 
     def closeEvent(self, event):
-        """Rewrites the closeEvent to stop the algorithm correctly and communicate with the DisplayWindowManager."""
-        if hasattr(self, 'algorithm') and self.algorithm:
-            self.algorithm.stop_running()
-        from ..control_window import DisplayWindowManager
+        """Rewrites the closeEvent to stop the algorithm correctly and communicate with the managers."""
+        if self.synthetic_section:
+            if self.synthetic_section.viewer_window:
+                self.synthetic_section.viewer_window.close()
+        if self.pipeline:
+            self.pipeline.stop()
+            PipelineManager.remove(self.pipeline)
         DisplayWindowManager.remove(self)
         super().closeEvent(event)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:  # escape is clicked
+        if event.key() == Qt.Key_Escape:  # escape is pressed
             widget = self.focusWidget()
             if widget is not None:
                 widget.clearFocus()
-        elif event.key() == Qt.Key_W and event.modifiers() & Qt.ControlModifier:  # Ctrl+W is clicked
-            self.close()
-        elif event.key() == Qt.Key_A:
-            print("A pressed")
-            self.update_plot()
         else:
             super().keyPressEvent(event)

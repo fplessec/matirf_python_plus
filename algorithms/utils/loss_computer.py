@@ -2,8 +2,7 @@ import torch
 import torch.nn.functional as F
 
 from algorithms.utils.differential_operators import DifferentialOperators
-from operations import apply_matirf_operator
-from settings import device, dtype
+from core.operations import apply_matirf_operator
 
 
 class LossComputer:

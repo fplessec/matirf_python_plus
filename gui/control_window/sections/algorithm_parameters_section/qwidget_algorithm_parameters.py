@@ -1,10 +1,10 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 
-from settings import FontSize
+from gui import SimpleParameterWidget
+from gui.more_widgets import QSeparator
 from cache import update_cache
 from in_out import CONFIG_PATH
-from gui.more_widgets import QSeparator
-from gui.control_window import SimpleParameterWidget
+from settings import FontSize
 
 
 class AlgoParamsWidget(QWidget):
@@ -14,6 +14,9 @@ class AlgoParamsWidget(QWidget):
     SimpleParameterWidget(s).
     When implementing a new algorithm, a new dictionary should be written in the same structure as those already
     written in the algorithms.ui_params_dicts module.
+
+    This QWidget focus on registering the desired algorithm parameters set of the chosen algorithm inside the
+    [algo-params] set key of the cached config.toml file.
     """
     def __init__(self, algo_dict):
         super().__init__()
@@ -52,15 +55,15 @@ class AlgoParamsWidget(QWidget):
             elif param_config["type"] == 'option':
                 default_value = param_config["param_info"]["options_list"][0]
             # write the default value in cache:
-            update_cache(['algo-params', param_name], default_value)
+            update_cache(['algo-params', param_name], default_value)  # -> to cache
             # update ui from cache:
             widget = self.parameter_widgets[param_name]
-            widget.update_ui_from_toml(CONFIG_PATH)
+            widget.update_ui_from_toml(CONFIG_PATH)  # <- from cache
 
     def update_ui_from_toml(self, toml_path):
         for param_name, param_config in self.algo_dict.items():
             widget = self.parameter_widgets[param_name]
-            widget.update_ui_from_toml(toml_path)
+            widget.update_ui_from_toml(toml_path)  # <- from cache/ or any config
 
 
 class NoneAlgoWidget(QWidget):

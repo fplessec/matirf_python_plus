@@ -1,6 +1,6 @@
 from .differential_operators import DifferentialOperators
 from .loss_computer import LossComputer
-from .regularization_list import REGULARIZATION_LIST
+from .regularization_list import REGULARIZATION_LIST, PPXA_REGULARIZATION_LIST
 
 """
 δ = Δz / Δxy << 1

@@ -1,4 +1,4 @@
-from ..option_lists import DENOISER_LIST
+from ..denoisers import DENOISER_LIST
 
 
 PNP_UI_PARAMETERS = {

@@ -1,13 +1,19 @@
 """
-This package contains four files :
+This package contains four files and one subpackage :
     > ‘qgroup_input_file.py’ with the InputFilesSection class, a qgroup for the 'input-paths' parameter set
     > 'qwidget_tif_fil_selector.py' with the TifFileSelector, a qwidget to manage the selection of the tif file, which can
       be either a MA-TIRF measurement stack or a 3D image corresponding to a ground truth, depending on the ‘mode’
       parameter of the ‘input-paths’ parameter set
     > 'qwidget_json_fil_selector.py' with the JsonFileSelector, a qwidget to manage the selection of the json file,
       which is the measurement parameters file in order to compute all the physical inside the MA-TIRF operator
-    > 'measurement_parameters_editor.py' with the MeasurementParametersEditor, a qwidget allowing the user to write or
-      edit the measurement parameters file
+    > 'tif_file_preprocess_viewer.py': with the TifFilePreprocessViewer class, a qwidget allowing the user to see the
+      preprocessing of its data (the tif file data, but the preprocessing also uses the parameters of the measurement
+      from the json file)
+    > the subpackage 'measurement_parameters_editor, which contains:
+        > 'qwidget_measurement_parameters_editor.py' with the MeasurementParametersEditor, a qwidget allowing the user
+        to write or edit the measurement parameters file
+        > 'measurement_parameters_ui_dictionary.py' with MEASUREMENT_PARAMETERS_UI that is written to build
+        SimpleParameterWidget qwidgets (single_parameter_widget.py)
 
 The 'input-paths' parameter set contains the following parameters:
     > mode: as explained bellow

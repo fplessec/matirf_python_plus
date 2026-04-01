@@ -1,9 +1,7 @@
-from .optim_adam import AdamAlgo
-from .optim_ppxa import PpxaAlgo
-from .optim_admm import AdmmAlgo
-from .optim_pnp import PnpAlgo
-
-from gui_dictionnaries.algorithms import ADAM_UI_PARAMETERS, PPXA_UI_PARAMETERS, ADMM_UI_PARAMETERS, PNP_UI_PARAMETERS
+from .optim_adam import AdamAlgo, ADAM_UI_PARAMETERS
+from .optim_ppxa import PpxaAlgo, PPXA_UI_PARAMETERS
+from .optim_admm import AdmmAlgo, ADMM_UI_PARAMETERS
+from .optim_pnp import PnpAlgo, PNP_UI_PARAMETERS
 
 
 # this super mega dictionnary is imported in qgroup_algorithm_and_algo_params.py and makes the link between the ui and

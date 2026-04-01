@@ -35,7 +35,4 @@ parameters. The U.I. looks like this:
     > a qgroup for the 'algo-params' parameters and also the main parameter 'algorithm'
 """
 
-
-from .single_parameter_widget import SimpleParameterWidget
-from .control_window import ControlWindow
-from .display_window_manager import DisplayWindowManager
+from .control_window import ControlWindow, DisplayWindowManager

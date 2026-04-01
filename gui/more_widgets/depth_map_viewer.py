@@ -1,6 +1,5 @@
-import torch
 from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QVBoxLayout, QWidget, QLabel
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -9,7 +8,6 @@ from matplotlib.cm import ScalarMappable
 import matplotlib.pyplot as plt
 import numpy as np
 
-import settings
 
 
 class DepthMapViewer(QWidget):

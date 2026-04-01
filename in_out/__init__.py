@@ -1,3 +1,11 @@
+"""
+Utility package for handling file input/output operations within the project.
+
+This module centralizes functions for reading and writing common file formats
+(TIF, JSON, TOML, TXT, CSV), and defines key project paths that can be used throughout the rest of the code.
+"""
+
+
 from pathlib import Path
 from os.path import dirname
 
@@ -5,6 +13,7 @@ from .tif_file import load_tif, save_tif
 from .json_file import load_json, save_json
 from .toml_file import load_or_create_toml, save_toml
 from .txt_file import load_txt, save_txt
+from .csv_file import load_csv,save_csv
 
 
 PROJECT_DIR = Path(dirname(dirname(__file__)))

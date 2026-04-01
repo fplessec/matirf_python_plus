@@ -5,20 +5,9 @@ from .custom_palette import dark_palette, light_palette
 
 device = 'cpu'
 dtype = torch.float32
-#dtype = torch.float64
-
-
 
 app_style = "fusion"
-dark = 0
-
-if dark==0:
-    app_palette = dark_palette
-elif dark==1:
-    app_palette = light_palette
-else:
-    app_palette = dark_palette
-
+dark_style = True
 
 class FontSize:
     SMALL = 11
@@ -45,18 +34,10 @@ height_cw = 700
 width_dw = 1200
 height_dw = 800
 
-
 # the integrals in the computation of H are approximated by a sum of finite elements, the number of elements is
 # 'precision' ; this number impacts the computation time when we calculate each element of H but doesn't impact
-# the overall computation time. 100 is way enough to compute precisely the integrals and doesnt take much time.
-precision = 100
+# the overall computation time. 100 is way enough to compute precisely the integrals and does'nt take much time.
+precision = 100  # same value as in the work of Jérôme Boulanger from https://doi.org/10.1073/pnas.1414106111
 
 
-# if sys.platform.startswith("linux"):
-#     os_name = "linux"
-# elif sys.platform == "darwin":
-#     os_name = "mac"
-# elif sys.platform.startswith("win"):
-#     os_name = "windows"
-# else:
-#     raise RuntimeError("Your OS is not supported. It should be Linux/MacOS/Windows.")
+normalization = 1  # normalization type for preprocessing the data file

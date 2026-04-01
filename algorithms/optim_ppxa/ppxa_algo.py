@@ -3,7 +3,7 @@ import time
 import torch
 
 from algorithms.abstract_algo import Algorithm
-from operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
+from core.operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
 from settings import device, dtype
 from algorithms.utils.loss_computer import LossComputer
 from algorithms.utils.proximal_operators import ProximalOperators
@@ -12,6 +12,8 @@ from algorithms.utils.proximal_operators import ProximalOperators
 class PpxaAlgo(Algorithm):
 
     def run(self, g, H, params: Dict[str, Any]):
+        self.fixe_randomness()
+
         (max_iter, lambda_relax, K, EPS, gamma, reg, lambda_reg, delta, rho) = get_variables_from_dict(
             params,['max_iter', 'lambda_relax', 'K', 'EPS', 'gamma', 'reg', 'lambda_reg', 'delta', 'rho']
         )
@@ -56,6 +58,7 @@ class PpxaAlgo(Algorithm):
 
         for iter in range(max_iter):
             if self.is_stop_requested():
+                print("self.is_stop_requested() =", self.is_stop_requested())
                 return None
 
             p[0] = apply_matirf_operator(P, u[0] + gamma * (1 - lambda_reg) * Htg)  # data fidelity prox

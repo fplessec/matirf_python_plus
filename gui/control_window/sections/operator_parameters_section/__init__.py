@@ -2,7 +2,7 @@
 This package contains two files:
     > ‘qgroup_operator_parameters.py’ with the OperatorParametersSection class, a qgroup for the 'oper-params'
       parameter set
-    > 'operator_ui_dictionary.py' with OPERATOR_PARAMETERS_UI, a specific dictionary for the uses of
+    > 'operator_parameters_ui_dictionary.py' with OPERATOR_PARAMETERS_UI, a specific dictionary for the uses of
       SimpleParameterWidget objects (see single_parameter_widget.py from the control_window package)
 
 The 'oper-params' parameter set contains the following parameters:

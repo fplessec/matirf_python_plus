@@ -1,4 +1,0 @@
-from .adam_ui_dictionnary import ADAM_UI_PARAMETERS
-from .ppxa_ui_dictionnary import PPXA_UI_PARAMETERS
-from .admm_ui_dictionnary import ADMM_UI_PARAMETERS
-from .pnp_ui_dictionnary import PNP_UI_PARAMETERS

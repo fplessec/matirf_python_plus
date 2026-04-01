@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QVBoxLayout, QGroupBox
 
-from gui.control_window import SimpleParameterWidget
-from gui.more_widgets import QSeparator
 from .add_noise_ui_dictionary import ADD_NOISE_PARAMETERS_UI
+from gui import SimpleParameterWidget
+from gui.more_widgets import QSeparator
 
 
 class AddNoiseSection(QGroupBox):
@@ -13,6 +13,9 @@ class AddNoiseSection(QGroupBox):
         For example, additive Gaussian noise 'n' as follows:  g = H * f_true + n
     We use the SimpleParameterWidget class, and a dedicated dictionary ADD_NOISE_PARAMETERS_UI that stores all the
     attributes for each SimpleParameterWidget.
+
+    This QGroup focus on registering the desired noise parameters set inside the [add-noise] set key of the cached
+    config.toml file.
     """
     def __init__(self, parent):
         super().__init__("Add noise to measurement")
@@ -44,4 +47,4 @@ class AddNoiseSection(QGroupBox):
         """Updates the current U.I. to match its value from a config file."""
         for param_name, param_config in self.params_ui_dict.items():
             widget = self.parameter_widgets[param_name]
-            widget.update_ui_from_toml(toml_path)
+            widget.update_ui_from_toml(toml_path)  # <- from cache/ or any config

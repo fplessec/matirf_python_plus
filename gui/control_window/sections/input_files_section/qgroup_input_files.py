@@ -1,12 +1,12 @@
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QHBoxLayout, QGroupBox, QVBoxLayout, QLabel
 
-from settings import FontSize
-from cache import update_cache
-from in_out import load_or_create_toml, CONFIG_PATH
 from .qwidget_tif_file_selector import TifFileSelector
 from .qwidget_json_file_selector import JsonFileSelector
 from gui.more_widgets import QSeparator, QSwitchButton
+from in_out import load_or_create_toml, CONFIG_PATH
+from cache import update_cache
+from settings import FontSize
 
 
 class InputFilesSection(QGroupBox):
@@ -18,6 +18,11 @@ class InputFilesSection(QGroupBox):
         > mode2 (not mode1): the data are synthetic measurements ; the user needs to choose a tif file which is the
                  ground truth object, a 3D image, and a json file which is a fake measurement parameters file, in order
                  to compute the operator a fake MA-TIRF measurement
+
+    This QGroupBox focus on registering what type of data is the desired TIF file path:
+    MA-TIRF multi-stack data or synthetic 3D truth, and registers 'real-data' or 'synthetic-data' inside the
+    [input-paths][mode] key of the cached config.toml file.
+    This QGroupBox contains all the widget to register the entirety of the parameter set [input-paths].
     """
     def __init__(self, parent=None):
         super().__init__("Input Files")
@@ -31,7 +36,7 @@ class InputFilesSection(QGroupBox):
     @staticmethod
     def get_cached_mode():
         try:
-            mode = load_or_create_toml(CONFIG_PATH)['input-paths']['mode']
+            mode = load_or_create_toml(CONFIG_PATH)['input-paths']['mode']  # <- from cache
             return mode=='real-data'
         except:
             return True  # default is true
@@ -89,14 +94,14 @@ class InputFilesSection(QGroupBox):
         self.mode1 = not self.mode1
         self.update_labels()
         # update the cache:
-        if self.mode1: update_cache(['input-paths', 'mode'], 'real-data')
-        else: update_cache(['input-paths', 'mode'], 'synthetic-data')
+        if self.mode1: update_cache(['input-paths', 'mode'], 'real-data')  # -> to cache
+        else: update_cache(['input-paths', 'mode'], 'synthetic-data')  # -> to cache
         # update the file selectors:
         self.tif_selector.update_mode()
         self.json_selector.update_mode()
 
     def update_ui_from_toml(self, toml_path):
-        config = load_or_create_toml(toml_path)
+        config = load_or_create_toml(toml_path)  # <- from cache/ or any config
         mode = config['input-paths']['mode']
         self.mode1 = mode == 'real-data'
         self.update_labels()
@@ -107,3 +112,5 @@ class InputFilesSection(QGroupBox):
         self.tif_selector.update_selected_file(config['input-paths']['tif'])
         self.json_selector.update_selected_file(config['input-paths']['json'])
 
+    def are_both_file_selected(self):
+        return self.tif_selector.is_file_selected and self.json_selector.is_file_selected

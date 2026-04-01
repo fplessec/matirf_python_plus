@@ -6,7 +6,7 @@ import torch
 from ..denoisers import denoise_tv_bregman, denoise_NL_RIDGE
 from ..abstract_algo import Algorithm
 from settings import device, dtype
-from operations import apply_matirf_operator, get_variables_from_dict
+from core.operations import apply_matirf_operator, get_variables_from_dict
 
 from skimage.restoration import estimate_sigma
 
@@ -14,6 +14,7 @@ from skimage.restoration import estimate_sigma
 class PnpAlgo(Algorithm):
 
     def run(self, g: torch.Tensor, H: torch.Tensor, params: Dict[str, Any]):
+        self.fixe_randomness()
 
         (
             sigma,

@@ -2,12 +2,11 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QFileDialog
 
-from in_out import load_json, save_json, MEASUREMENTS_DIR
-from gui.control_window import SimpleParameterWidget
+from .measurement_parameters_ui_dictionary import MEASUREMENT_PARAMETERS_UI
+from gui import SimpleParameterWidget
 from gui.more_widgets import QSeparator, QTextEditTab2Switch
-from gui_dictionnaries import MEASUREMENT_PARAMETERS_UI
+from in_out import load_json, save_json, MEASUREMENTS_DIR
 import settings
-
 
 
 class MeasurementParametersEditor(QWidget):
@@ -162,8 +161,6 @@ class MeasurementParametersEditor(QWidget):
             widget = self.focusWidget()
             if widget is not None:
                 widget.clearFocus()
-        elif event.key() == Qt.Key_W and event.modifiers() & Qt.ControlModifier:  # Ctrl+W is clicked
-            self.close()
         else:
             super().keyPressEvent(event)
 

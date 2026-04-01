@@ -1,10 +1,11 @@
 import torch
 
-from operations import compute_min_max_angles_from_params
-from settings import device
+from .add_noise import add_noise_to_measurement
+from .operations import compute_min_max_angles_from_params
+import settings
 
 
-def preprocess_measurement_stack(g, measurement_params, add_noise_params, normalization=1):
+def preprocess_measurement_stack(g, measurement_params, add_noise_params, normalization=settings.normalization):
     angles_deg = measurement_params['angles_deg']
     n_angles, n_stacks = len(angles_deg), g.shape[0]
     assert n_angles == n_stacks, (
@@ -26,9 +27,9 @@ def preprocess_measurement_stack(g, measurement_params, add_noise_params, normal
             g_list.append(g[i, :, :])
     if background_list:  # <-background_list is not empty: we have background stack(s)
         # we can do the mean of the stacks higher than the max angle to estimate the background:
-        estimated_background = torch.stack(background_list, dim=0).to(device).mean(dim=0).unsqueeze(0)
+        estimated_background = torch.stack(background_list, dim=0).to(settings.device).mean(dim=0).unsqueeze(0)
         # then we just have to subtract the estimated background from the useful stacks:
-        g = torch.stack(g_list, dim=0).to(device) - estimated_background
+        g = torch.stack(g_list, dim=0).to(settings.device) - estimated_background
         angles_deg = [angle for angle in angles_deg if angle != 'background-angle']  # <-only keep the useful angles
         measurement_params['angles_deg'] = angles_deg  # <-update the measurement parameters with the non-background
                                                        # angles to compute the right the MA-TIRF operator
@@ -38,6 +39,7 @@ def preprocess_measurement_stack(g, measurement_params, add_noise_params, normal
     if add_noise_params['add_noise']:
         g = add_noise_to_measurement(g, add_noise_params)
     return g, measurement_params
+
 
 def normalize_measurement(g, normalization=1):
     if normalization == 0:  # no normalisation
@@ -52,11 +54,4 @@ def normalize_measurement(g, normalization=1):
         g = g / g.mean()
     return g
 
-def add_noise_to_measurement(g, add_noise_params):
-    if add_noise_params['is_gaussian']:
-        noise = torch.randn_like(g) * add_noise_params['sigma']
-        g_noisy = g + noise
-    else:
-        raise Exception('To be implemented')
-    return g_noisy
 

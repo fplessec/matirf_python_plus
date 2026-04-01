@@ -2,10 +2,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QStackedLayout, QWidget, QVBoxLayout
 
 from gui.more_widgets import QSwitchButton
-from gui.more_widgets.depth_map_viewer import DepthMapViewer
-from gui.more_widgets.histogram_3d_object import HistogramWidget
-from gui.more_widgets.image_3d_viewer import Image3DViewer
-from gui.more_widgets.profiles_viewer import ProfilesViewer
+from gui.more_widgets import DepthMapViewer, HistogramWidget, Image3DViewer, ProfilesViewer
 import settings
 
 

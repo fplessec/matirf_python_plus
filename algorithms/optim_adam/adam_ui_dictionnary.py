@@ -1,4 +1,4 @@
-from ..option_lists import REGULARIZATION_LIST
+from ..utils import REGULARIZATION_LIST
 
 
 ADAM_UI_PARAMETERS = {

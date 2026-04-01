@@ -1,2 +1,0 @@
-from .operator_parameters_ui_dictionary import OPERATOR_PARAMETERS_UI
-from .measurement_parameters_ui_dictionary import MEASUREMENT_PARAMETERS_UI

@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import QVBoxLayout, QGroupBox, QComboBox, QStackedWidget, QHBoxLayout, QPushButton
 
-from cache import update_cache
-from in_out import load_or_create_toml, CONFIG_PATH, save_toml
-from algorithms import ALGORITHMS
 from .qwidget_algorithm_parameters import AlgoParamsWidget, NoneAlgoWidget
+from algorithms import ALGORITHMS
+from in_out import load_or_create_toml, CONFIG_PATH, save_toml
+from cache import update_cache
 
 
 class AlgorithmAndAlgoParamsSection(QGroupBox):
@@ -11,6 +11,10 @@ class AlgorithmAndAlgoParamsSection(QGroupBox):
     This section of the UI allows the user to select with a QComboBox one reconstruction algorithm among the available
     algorithms. A QStackedWidget switch between AlgoParamsWidget(s), that allows the user to select the specific
     selected algorithm's parameters. A button can be used to reset the algorithm's parameters to its default values.
+
+    This QGroupBox focus on registering what the chosen algorithm is among those who are implemented in this project,
+    and registers this algorithm name in the [algorithm] key of the cached config.toml file.
+    This QGroupBox contains all the widget to register the entirety of the parameter set [algo-params].
     """
     def __init__(self, parent):
         super().__init__("Select Algorithm")
@@ -68,20 +72,20 @@ class AlgorithmAndAlgoParamsSection(QGroupBox):
         self.stacked_widget.setCurrentWidget(self.algo_params_ui_dict[self.algo_combo.currentText()])
         self.update_reset_button()
         # writes in the cached config file the new selected algorithm
-        update_cache(['algorithm'], self.selected_algo_name)
+        update_cache(['algorithm'], self.selected_algo_name)  # -> to cache
         selected_algo_widget = self.algo_params_ui_dict[self.selected_algo_name]
         # replaces all the previous algo-parameters with the new selected algorithm's algo-parameters
-        config = load_or_create_toml(CONFIG_PATH)
-        config['algo-params'] = selected_algo_widget.get_parameters()
-        save_toml(config, CONFIG_PATH)
+        config = load_or_create_toml(CONFIG_PATH)  # <- from cache, the parameter names
+        config['algo-params'] = selected_algo_widget.get_parameters()  # widget to choose the specified algo-params
+        save_toml(config, CONFIG_PATH)  # -> to cache
         # update the ui when algo switch:
-        self.parent.load_cached_config()
+        self.parent.load_cached_config()  # <- from cache
 
     def update_ui_from_toml(self, toml_path):
-        selected_algo_name = load_or_create_toml(toml_path)['algorithm']
+        selected_algo_name = load_or_create_toml(toml_path)['algorithm']  # <- from cache/ or any config
         self.selected_algo_name = selected_algo_name
         selected_algo_widget = self.algo_params_ui_dict[selected_algo_name]
-        selected_algo_widget.update_ui_from_toml(toml_path)
+        selected_algo_widget.update_ui_from_toml(toml_path)  # <- from cache/ or any config
         self.stacked_widget.setCurrentWidget(self.algo_params_ui_dict[selected_algo_name])
         self.algo_combo.setCurrentText(selected_algo_name)
         self.update_reset_button()

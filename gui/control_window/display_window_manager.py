@@ -5,12 +5,18 @@ class DisplayWindowManager:
     themselves are closed.
     """
     _windows = []  # <-a list to store the instances
+
     @classmethod
-    def add(cls, window):
+    def create(cls, pipeline):
+        from gui.display_window import DisplayWindow
+        window = DisplayWindow(pipeline)
         cls._windows.append(window)
+        return window
+
     @classmethod
     def remove(cls, window):
-        cls._windows.remove(window)
+        if window in cls._windows:
+            cls._windows.remove(window)
 
     @classmethod
     def close_all(cls):
@@ -18,6 +24,7 @@ class DisplayWindowManager:
         for window in cls._windows[:]:  # <-copy of the list
             window.close()
         cls._windows.clear()
+
     @classmethod
-    def get_count(cls):
-        return len(cls._windows)
+    def get_all(cls):
+        return cls._windows

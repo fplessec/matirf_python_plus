@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QVBoxLayout, QGroupBox
 
+from .operator_parameters_ui_dictionary import OPERATOR_PARAMETERS_UI
+from gui import SimpleParameterWidget
 from gui.more_widgets import QSeparator
-from gui.control_window import SimpleParameterWidget
-from gui_dictionnaries import OPERATOR_PARAMETERS_UI
 
 
 class OperatorParametersSection(QGroupBox):
@@ -11,6 +11,9 @@ class OperatorParametersSection(QGroupBox):
     image 'inside' the operator, this set of parameter is named 'oper-params' in the config.toml file.
     We use the SimpleParameterWidget class, and a dedicated dictionary OPERATOR_PARAMETERS_UI that stores all the
     attributes for each SimpleParameterWidget.
+
+    This QGroup focus on registering the desired operator parameters set inside the [oper-params] set key of the cached
+    config.toml file.
     """
     def __init__(self, parent):
         super().__init__("Operator Parameters")
@@ -42,4 +45,4 @@ class OperatorParametersSection(QGroupBox):
         """Updates the current U.I. to match its value from a config file."""
         for param_name, param_config in self.params_ui_dict.items():
                 widget = self.parameter_widgets[param_name]
-                widget.update_ui_from_toml(toml_path)
+                widget.update_ui_from_toml(toml_path)  # <- from cache/ or any config

@@ -4,7 +4,7 @@ import time
 import torch
 
 from algorithms.abstract_algo import Algorithm
-from operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
+from core.operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
 from settings import device, dtype
 from ..utils import LossComputer
 
@@ -16,6 +16,7 @@ def get_lr(optimizer):
 class AdamAlgo(Algorithm):
 
     def run(self, g, H, params: Dict[str, Any]):
+        self.fixe_randomness()
 
         (max_iter, lr, K, EPS, reg, lambda_reg, delta, rho) = get_variables_from_dict(
             params, ['max_iter', 'lr', 'K', 'EPS', 'reg', 'lambda_reg', 'delta', 'rho'])

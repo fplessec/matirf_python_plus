@@ -2,8 +2,7 @@ import numpy as np
 import torch
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
-
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QSlider, QHBoxLayout, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QSlider, QHBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -16,7 +15,7 @@ class Image3DViewer(QWidget):
         super().__init__()
         self.parent = parent
         assert image.ndim == 3, "Image must be 3D (Z,Y,X)"
-        self.image = image.cpu().detach()
+        self.image = image.detach().cpu()
         self.cmap = cmap
         self.nz, self.h, self.w = self.image.shape
         self.current_slice = 0

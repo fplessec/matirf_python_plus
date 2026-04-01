@@ -4,12 +4,11 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
 
-from settings import FontSize
-from cache import update_cache
-from in_out import MEASUREMENTS_DIR, load_json
-from gui.more_widgets import QCrossButton
 from .measurement_parameters_editor import MeasurementParametersEditor, MEASUREMENT_PARAMETERS_UI
-
+from gui.more_widgets import QCrossButton
+from in_out import MEASUREMENTS_DIR, load_json
+from cache import update_cache
+from settings import FontSize
 
 
 def check_measurement_parameters_file_format(filepath):
@@ -34,6 +33,9 @@ class JsonFileSelector(QWidget):
     A widget that allows the user to select a measurement parameters file with a button. The labelling of the widget
     changes with its parent attribute 'mode1', and its parent is InputFilesSection. A second button allows the user to
     open a MeasurementParametersEditor to edit or create a measurement parameters file.
+
+    This QWidget focus on registering the desired JSON file path (measurement parameters of the data) inside the
+    [input-paths][json] key of the cached config.toml file.
     """
     def __init__(self, parent):
         super().__init__()
@@ -82,13 +84,13 @@ class JsonFileSelector(QWidget):
 
     def update_selected_file(self, file_path):
         self.json_path = file_path
-        update_cache(["input-paths", "json"], file_path)
+        update_cache(["input-paths", "json"], file_path)  # -> to cache
         file_name = os.path.basename(file_path)
         self.is_file_selected = file_path != 'None'
         self.update_ui(file_name)
 
     def unselect_file(self):
-        update_cache(["input-paths", "json"], 'None')
+        update_cache(["input-paths", "json"], 'None')  # -> to cache
         self.is_file_selected = False
         self.update_ui('None')
 
@@ -98,6 +100,7 @@ class JsonFileSelector(QWidget):
         font.setBold(self.is_file_selected)
         self.file_label.setFont(font)
         self.update_create_modify_button_text()
+        self.parent.tif_selector.preprocess_button.setVisible(self.parent.are_both_file_selected())
 
     def update_create_modify_button_text(self):
         self.create_modify_button.setText("Modify .json file" if self.is_file_selected else "Create .json file")

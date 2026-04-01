@@ -1,4 +1,4 @@
-from ..option_lists import PPXA_REGULARIZATION_LIST
+from ..utils import PPXA_REGULARIZATION_LIST
 
 
 PPXA_UI_PARAMETERS = {

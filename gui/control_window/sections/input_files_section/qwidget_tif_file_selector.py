@@ -4,11 +4,11 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
 
-from gui.control_window.sections.input_files_section.tif_file_preprocess_editor import TifFilePreprocessEditor
+from .qwidget_tif_file_preprocess_viewer import TifFilePreprocessViewer
 from gui.more_widgets import QCrossButton
-from settings import FontSize
-from cache import update_cache
 from in_out import MEASUREMENTS_DIR
+from cache import update_cache
+from settings import FontSize
 
 
 class TifFileSelector(QWidget):
@@ -17,6 +17,9 @@ class TifFileSelector(QWidget):
     parent attribute 'mode1', and its parent is InputFilesSection. In mode1, the user have to select a real MA-TIRF
     measurement. In mode2 (no mode1), the user have to select a 3D image that will be used as a ground truth in order
     to create a synthetic MA-TIRF measurement.
+
+    This QWidget focus on registering the desired TIF file path (MA-TIRF multi-stack data or synthetic 3D truth) inside
+    the [input-paths][tif] key of the cached config.toml file.
     """
     def __init__(self, parent):
         super().__init__()
@@ -34,11 +37,9 @@ class TifFileSelector(QWidget):
         self.title_label.setStyleSheet(f"font-size: {FontSize.NORMAL}pt;")
         choose_button = QPushButton("Choose .tif file")
         choose_button.clicked.connect(self.choose_file)
-
-        self.info_button = QPushButton("Info ...")
-        self.info_button.clicked.connect(self.open_tif_file_preprocess_editor)
-        self.info_button.setVisible(False)  # hidden by default
-
+        self.preprocess_button = QPushButton("See preprocessed file")
+        self.preprocess_button.clicked.connect(self.open_tif_file_preprocess_editor)
+        self.preprocess_button.setVisible(False)  # hidden by default
         self.file_label = QLabel("No .tif file selected")
         file_label_color = self.palette().color(QPalette.PlaceholderText).name()
         self.file_label.setStyleSheet(f"color: {file_label_color}; font-style: italic; font-size: {FontSize.NORMAL}pt;")
@@ -49,7 +50,7 @@ class TifFileSelector(QWidget):
         layout.addWidget(self.title_label, alignment=Qt.AlignHCenter)
         layout.addStretch()
         layout.addWidget(choose_button, alignment=Qt.AlignHCenter)
-        layout.addWidget(self.info_button, alignment=Qt.AlignHCenter)
+        layout.addWidget(self.preprocess_button, alignment=Qt.AlignHCenter)
         layout.addStretch()
         last_line.addStretch()
         last_line.addWidget(self.file_label, alignment=Qt.AlignHCenter)
@@ -66,13 +67,13 @@ class TifFileSelector(QWidget):
 
     def update_selected_file(self, file_path):
         self.tif_path = file_path
-        update_cache(["input-paths", "tif"], file_path)
+        update_cache(["input-paths", "tif"], file_path)  # -> to cache
         file_name = os.path.basename(file_path)
         self.is_file_selected = file_path != 'None'
         self.update_ui(file_name)
 
     def unselect_file(self):
-        update_cache(["input-paths", "tif"], 'None')
+        update_cache(["input-paths", "tif"], 'None')  # -> to cache
         self.is_file_selected = False
         self.update_ui('None')
 
@@ -81,12 +82,12 @@ class TifFileSelector(QWidget):
         font = self.file_label.font()
         font.setBold(self.is_file_selected)
         self.file_label.setFont(font)
-        self.info_button.setVisible(self.is_file_selected)
+        self.preprocess_button.setVisible(self.parent.are_both_file_selected())  # method from InputFilesSection
 
     def open_tif_file_preprocess_editor(self):
         if self.tif_file_preprocess_editor is not None:
             self.tif_file_preprocess_editor.close()
-        self.tif_file_preprocess_editor = TifFilePreprocessEditor(parent=self)
+        self.tif_file_preprocess_editor = TifFilePreprocessViewer(parent=self)
         self.tif_file_preprocess_editor.show()
 
     def mode_dependent_text_update(self):
