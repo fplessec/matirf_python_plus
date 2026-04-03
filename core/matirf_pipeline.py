@@ -270,7 +270,7 @@ class MaTirfPipeline:
                 g, measurement_params, add_noise_params
             )
 
-        # 🔥 create algorithm
+        # create algorithm
         self.algorithm = ALGORITHMS[self.config["algorithm"]]["object"](
             measurement_params, oper_params
         )
@@ -288,7 +288,13 @@ class MaTirfPipeline:
             self.f = result
 
             if self.is_synthetic_data():
-                self.metrics = compute_all_metrics(self.f, self.f_true)
+                from .operations import estimate_delta_anisotropy_from_params
+                measurement_params = load_json(self.config['input-paths']['json'])
+                operator_params = self.config['oper-params']
+                delta = estimate_delta_anisotropy_from_params(measurement_params, operator_params)
+                print('delta from config', delta)
+
+                self.metrics = compute_all_metrics(self.f, self.f_true, delta=delta)
 
             self._running = False
             self._emit("finished", result)
@@ -297,7 +303,7 @@ class MaTirfPipeline:
             self._running = False
             self._emit("error", err)
 
-        # 🔥 branch callbacks to algorithm
+        # branch callbacks to algorithm
         self.algorithm.callbacks = {
             "message": on_message,
             "finished": on_finished,

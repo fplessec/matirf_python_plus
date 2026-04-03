@@ -7,8 +7,14 @@ import numpy as np
 
 
 class ProfilesViewer(QWidget):
-    """Viewer for 3D profile data with two projections: yz and zx."""
-
+    """
+    An object that visualizes 3D image profiles through two orthogonal projections:
+        > top: yz projection (average over x)
+        > bottom: zx projection (average over y)
+        > uses consistent color scaling across both projections
+        > displays axes in physical units (z) and pixel coordinates (x, y)
+        > provides an overview of structural variations along depth and lateral dimensions
+    """
     def __init__(self, image, z0, zN, unit='nm', title='Profiles', cmap='viridis'):
         super().__init__()
         self.image = image
@@ -77,14 +83,29 @@ class ProfilesViewer(QWidget):
         ax2.set_title("zx", color=self.text1_color)
 
 
-if __name__=="__main__":
+if __name__=="__main__":  # test
     import sys
-    from in_out import load_tif, RESULTS_DIR
-    from PyQt5.QtWidgets import QApplication
+    from pathlib import Path
+
+    from PyQt5.QtWidgets import QApplication, QStyleFactory, QGroupBox
+
+    import gui.more_widgets as more_widgets
+    from in_out import load_tif
+    import settings
+
 
     app = QApplication(sys.argv)
-    f = load_tif(RESULTS_DIR / 'ADMM'/ 'f.tif')
-    window = ProfilesViewer(image=f, z0=0, zN=300)
-    window.resize(450, 900)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+    palette = settings.dark_palette if settings.dark_style else settings.light_palette
+
+    package_path = Path(more_widgets.__file__).parent
+    image3d = load_tif(package_path / "_image_for_test.TIF")
+
+    window = QGroupBox(title='test of object: ProfilesViewer')
+    layout = QVBoxLayout()
+    layout.addWidget(ProfilesViewer(image=image3d, z0=0, zN=300))
+    window.setLayout(layout)
+    window.resize(600, 900)
     window.show()
+
     sys.exit(app.exec_())

@@ -1,5 +1,5 @@
-import numpy as np
 import torch
+import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QSlider, QHBoxLayout
@@ -10,7 +10,15 @@ import settings
 
 
 class Image3DViewer(QWidget):
-
+    """
+    An object that allows interactive visualization of a 3D image (Z,Y,X) slice by slice:
+        > displays a 2D slice along Z with a slider to navigate through slices
+        > shows pixel intensity under the mouse cursor in real time
+        > provides callbacks:
+            - slice_changed_callback(slice_index): triggered when the slice changes
+            - mouse_moved_callback(x, y): triggered when the mouse moves over a valid pixel
+        > supports mouse wheel (middle mouse) scrolling to navigate through slices
+    """
     def __init__(self, image: torch.tensor, parent=None, cmap='gray'):
         super().__init__()
         self.parent = parent
@@ -20,6 +28,10 @@ class Image3DViewer(QWidget):
         self.nz, self.h, self.w = self.image.shape
         self.current_slice = 0
         self.current_slice_raw = None
+        self.current_x = None
+        self.current_y = None
+        self.slice_changed_callback = None
+        self.mouse_moved_callback = None
         self.setup_ui()
         self.update_slice()
 
@@ -66,6 +78,8 @@ class Image3DViewer(QWidget):
     def on_slice_changed(self, value):
         self.current_slice = value
         self.update_slice()
+        if self.slice_changed_callback is not None:
+            self.slice_changed_callback(value)
 
     def update_slice(self):
         slice_2d = self.image[self.current_slice].numpy()
@@ -90,16 +104,32 @@ class Image3DViewer(QWidget):
             return
         if event.xdata is None or event.ydata is None:  # <- mouse on the canvas margins
             self.pixel_label.setText("Pixel: (x, y) = -, value = -")
+            self.current_x = None
+            self.current_y = None
+            if self.mouse_moved_callback is not None:
+                self.mouse_moved_callback(None, None)
             return
         x = int(event.xdata + 0.5)
         y = int(event.ydata + 0.5)
-        if 0 <= x < self.w and 0 <= y < self.h:
-            value = self.current_slice_raw[y, x]
-            self.pixel_label.setText(f"Pixel: (x={x}, y={y}) → value = {value:.3g}")
+        if not (0 <= x < self.w and 0 <= y < self.h):
+            self.pixel_label.setText("Pixel: (x, y) = -, value = -")
+            if self.mouse_moved_callback is not None:
+                self.mouse_moved_callback(None, None)
+            return
+        self.current_x = x
+        self.current_y = y
+        value = self.current_slice_raw[y, x]
+        self.pixel_label.setText(f"Pixel: (x={x}, y={y}) → value = {value:.3g}")
+        if self.mouse_moved_callback is not None:
+            self.mouse_moved_callback(x, y)
 
     def on_mouse_leave(self, event):
         """Resets the label when the mouse leaves the canvas."""
         self.pixel_label.setText("Pixel: (x, y) = -, value = -")
+        self.current_x = None
+        self.current_y = None
+        if self.mouse_moved_callback is not None:
+            self.mouse_moved_callback(None, None)
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
@@ -117,7 +147,7 @@ if __name__=="__main__":
 
     app = QApplication(sys.argv)
     app.setStyle("macintosh")  # <- force the style for any OS to macintosh
-    window = Image3DViewer(image=load_tif(MEASUREMENTS_DIR / 'esoubies.tif'))
+    window = Image3DViewer(image=load_tif(MEASUREMENTS_DIR / '_esoubies.tif'))
     window.resize(1200, 600)
     window.show()
     sys.exit(app.exec_())

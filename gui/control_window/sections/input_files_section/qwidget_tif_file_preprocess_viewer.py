@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QHBoxLayout
 
-from gui.more_widgets import HistogramWidget, Image3DViewer
+from gui.more_widgets import ImageAndHisto3DViewer
 from core.preprocess_measurement import preprocess_measurement_stack
 from in_out import load_tif, load_or_create_toml, CONFIG_PATH, load_json
 import settings
@@ -26,34 +26,15 @@ class TifFilePreprocessViewer(QWidget):
         self.resize(700, 900)
         self.setup_ui()
 
-
     def setup_ui(self):
         main_layout = QHBoxLayout()
-
-        group_f = QGroupBox("tif file raw")
-        layout_f = QVBoxLayout()
-
-        viewer_f = Image3DViewer(self.f)
-        hist_f = HistogramWidget(self.f)
-
-        layout_f.addWidget(viewer_f)
-        layout_f.addWidget(hist_f)
-        group_f.setLayout(layout_f)
-
-        group_g = QGroupBox("tif file preprocessed")
-        layout_g = QVBoxLayout()
-
-        viewer_g = Image3DViewer(self.g)
-        hist_g = HistogramWidget(self.g)
-
-        layout_g.addWidget(viewer_g)
-        layout_g.addWidget(hist_g)
-        group_g.setLayout(layout_g)
-
-        # order :
+        # a qgroup with ImageAndHisto3DViewer:
+        group_f = ImageAndHisto3DViewer(self.f, title="tif file raw")
+        # a qgroup with ImageAndHisto3DViewer:
+        group_g = ImageAndHisto3DViewer(self.g, title="tif file preprocessed + add noise")
+        # assemble :
         main_layout.addWidget(group_f)
         main_layout.addWidget(group_g)
-
         self.setLayout(main_layout)
 
     def closeEvent(self, event):

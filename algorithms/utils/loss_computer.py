@@ -54,7 +54,15 @@ class LossComputer:
 
     def __call__(self, f):
         Hf = apply_matirf_operator(self.H, f)
-        data_term = 0.5 * F.mse_loss(Hf, self.g, reduction='mean')
+        #data_term = 0.5 * F.mse_loss(Hf, self.g, reduction='mean')
+        residual = Hf - self.g
+        # norme L2²
+        num = (residual ** 2).mean()
+        # norme de g (même scaling que mse)
+        denom = (self.g ** 2).mean()
+        eps = 1e-12
+        data_term = 0.5 * num / (denom + eps)
+
         REGULARIZATION_LIST = ["no regularization",
                                "L2 norm",
                                "L1 norm",

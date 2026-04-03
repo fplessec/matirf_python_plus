@@ -4,6 +4,12 @@ from PyQt5.QtCore import pyqtSignal, Qt
 
 class QSwitchButton(QWidget):
     """
+    A custom toggle switch widget that mimics an on/off slider:
+        > displays a movable circular button inside a rounded container
+        > toggles state on click, switching position (left/right) and color
+        > emits a boolean signal (toggled) when the state changes
+        > provides methods to programmatically switch state (left/right)
+
     I rewrote this code https://pypi.org/project/pyqt-switch/ from  Jung Gyu Yoon.
     """
     toggled = pyqtSignal(bool)
@@ -15,23 +21,23 @@ class QSwitchButton(QWidget):
         self.setup_ui()
 
     def setup_ui(self):
+        # a circle:
         self.circle = QPushButton()
         self.circle.setCheckable(True)
         self.circle.toggled.connect(self._toggled)
         self.set_color(255)
-
+        # switch button layout:
         self.layout = QHBoxLayout()
         self.layout.setAlignment(Qt.AlignLeft)
         self.layout.addWidget(self.circle)
         self.layout.setContentsMargins(0, 0, 0, 0)
-
+        # inner widget:
         innerWidgetForStyle = QWidget()
         innerWidgetForStyle.setLayout(self.layout)
-
+        # main layout:
         main_layout = QGridLayout()
         main_layout.addWidget(innerWidgetForStyle)
         main_layout.setContentsMargins(0, 0, 0, 0)
-
         self.setLayout(main_layout)
         self.set_style()
 
@@ -71,8 +77,49 @@ class QSwitchButton(QWidget):
             if no_signal: self.blockSignals(True)
             self.circle.toggle()
             if no_signal: self.blockSignals(False)
+
     def switch_to_right(self, no_signal=False):
         if self._positioned_to_left:
             if no_signal: self.blockSignals(True)
             self.circle.toggle()
             if no_signal: self.blockSignals(False)
+
+
+if __name__=="__main__":  # test
+    import sys
+    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QLabel, QGroupBox, QPushButton, QStyleFactory
+
+    import settings
+
+    class SwitchTestWidget(QGroupBox):
+        def __init__(self, title='title'):
+            super().__init__(title=title)
+            self.setup_ui()
+
+        def setup_ui(self):
+            layout = QVBoxLayout()
+            self.label = QLabel("State: OFF")
+            self.switch = QSwitchButton()
+            self.switch.toggled.connect(self.on_toggle)
+            btn_left = QPushButton("force left")
+            btn_left.clicked.connect(lambda: self.switch.switch_to_left())
+            btn_right = QPushButton("force right")
+            btn_right.clicked.connect(lambda: self.switch.switch_to_right())
+            layout.addWidget(self.switch)
+            layout.addWidget(self.label)
+            layout.addWidget(btn_left)
+            layout.addWidget(btn_right)
+            self.setLayout(layout)
+
+        def on_toggle(self, state):
+            self.label.setText(f"State: {'ON' if state else 'OFF'}")
+
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+
+    window = SwitchTestWidget(title="test of object: QSwitchButton")
+    window.resize(200, 200)
+    window.show()
+
+    sys.exit(app.exec_())

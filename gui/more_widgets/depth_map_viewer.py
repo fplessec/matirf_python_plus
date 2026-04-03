@@ -9,9 +9,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-
 class DepthMapViewer(QWidget):
-
+    """
+    An object that renders a 2D depth map projection from a 3D image:
+        > computes a color-coded projection along the Z axis using a colormap
+        > displays a horizontal colorbar mapping depth values (z0 → zN)
+        > shows the estimated depth at each (x, y) position using a weighted average
+        > displays depth values interactively in the matplotlib toolbar when hovering the image
+    """
     def __init__(self, image, z0, zN, unit='nm', title='Depths map', cmap='jet_r'):
         super().__init__()
         self.image = image
@@ -50,7 +55,7 @@ class DepthMapViewer(QWidget):
         self.canvas.draw()
 
     def plot_depths_map(self, num_ticks=7):
-        """Affiche la depth map sur l'axe 0 (f est une image 3D format ZYX)."""
+        """Plots the depth map on the 0-axis ie z-axis (f is 3D image with format ZYX)."""
         ax = self.figure.add_subplot(111)
         image = self.image.clone().cpu().detach().numpy()
         ### plot the depths map:
@@ -98,15 +103,30 @@ class DepthMapViewer(QWidget):
         ax.format_coord = format_coord
 
 
-if __name__=="__main__":
+if __name__=="__main__":  # test
     import sys
-    from in_out import load_tif, RESULTS_DIR
-    from PyQt5.QtWidgets import QApplication
+    from pathlib import Path
+
+    from PyQt5.QtWidgets import QApplication, QStyleFactory, QGroupBox
+
+    import gui.more_widgets as more_widgets
+    from in_out import load_tif
+    import settings
+
 
     app = QApplication(sys.argv)
-    f = load_tif(RESULTS_DIR / 'ADMM'/ 'f.tif')
-    window = DepthMapViewer(image=f, z0=0, zN=300)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+    palette = settings.dark_palette if settings.dark_style else settings.light_palette
+
+    package_path = Path(more_widgets.__file__).parent
+    image3d = load_tif(package_path / "_image_for_test.TIF")
+
+    window = QGroupBox(title='test of object: ImageAndHisto3DViewer')
+    layout = QVBoxLayout()
+    layout.addWidget(DepthMapViewer(image=image3d, z0=0, zN=300))
+    window.setLayout(layout)
     window.resize(600, 600)
     window.show()
+
     sys.exit(app.exec_())
 

@@ -2,7 +2,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QStackedLayout, QWidget, QVBoxLayout
 
 from gui.more_widgets import QSwitchButton
-from gui.more_widgets import DepthMapViewer, HistogramWidget, Image3DViewer, ProfilesViewer
+from gui.more_widgets import DepthMapViewer, ImageAndHisto3DViewer, ProfilesViewer
 import settings
 
 
@@ -94,12 +94,10 @@ class FiguresSection(QGroupBox):
         self.view1_layout.addWidget(profiles_widget, 1)  # 1/3 of the width
         # clear the view2 layout:
         self.clear_layout(self.view2_layout)
-        # create the objects for view1:
-        viewer_3d = Image3DViewer(f)
-        hist = HistogramWidget(f, bins=64)
+        # create the object for view1:
+        viewer_3d = ImageAndHisto3DViewer(f, title='')
         # build the widgets together to make the view1 layout:
-        self.view2_layout.addWidget(viewer_3d, 2)  # 2/3 of the height
-        self.view2_layout.addWidget(hist, 1)  # 1/3 of the height
+        self.view2_layout.addWidget(viewer_3d)  # full height (already contains histogram)
 
     @staticmethod
     def clear_layout(layout):

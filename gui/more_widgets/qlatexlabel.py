@@ -89,3 +89,39 @@ class QLatexLabel(QWidget):
         pixmap.loadFromData(buf.getvalue(), "PNG")
         self.label.setPixmap(pixmap)
         self.setFixedSize(pixmap.size())
+
+
+if __name__=="__main__":  # test
+    import sys
+    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QGroupBox, QPushButton, QStyleFactory
+
+    import settings
+
+    class LatexTestWidget(QGroupBox):
+        def __init__(self, title='title'):
+            super().__init__(title=title)
+            self.setup_ui()
+
+        def setup_ui(self):
+            layout = QVBoxLayout()
+            self.latex = QLatexLabel("3.67e-07 + x^2")
+            btn = QPushButton("update latex")
+            btn.clicked.connect(self.update_formula)
+            layout.addWidget(self.latex)
+            layout.addWidget(btn)
+            self.setLayout(layout)
+
+        def update_formula(self):
+            import numpy as np
+            val = np.random.rand() * 1e-5
+            self.latex.update_latex(f"{val} + x^2")
+
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+
+    window = LatexTestWidget(title="test of object: QLatexLabel")
+    window.resize(300, 150)
+    window.show()
+
+    sys.exit(app.exec_())
