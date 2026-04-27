@@ -291,10 +291,9 @@ class MaTirfPipeline:
                 from .operations import estimate_delta_anisotropy_from_params
                 measurement_params = load_json(self.config['input-paths']['json'])
                 operator_params = self.config['oper-params']
-                delta = estimate_delta_anisotropy_from_params(measurement_params, operator_params)
-                print('delta from config', delta)
+                self.delta = estimate_delta_anisotropy_from_params(measurement_params, operator_params)
 
-                self.metrics = compute_all_metrics(self.f, self.f_true, delta=delta)
+                self.metrics = compute_all_metrics(self.f, self.f_true, delta=self.delta)
 
             self._running = False
             self._emit("finished", result)

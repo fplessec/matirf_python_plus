@@ -2,6 +2,7 @@ from .optim_adam import AdamAlgo, ADAM_UI_PARAMETERS
 from .optim_ppxa import PpxaAlgo, PPXA_UI_PARAMETERS
 from .optim_admm import AdmmAlgo, ADMM_UI_PARAMETERS
 from .optim_pnp import PnpAlgo, PNP_UI_PARAMETERS
+from .mcmc_mmse_estimator import McmcAlgo, MCMC_UI_PARAMETERS
 
 
 # this super mega dictionnary is imported in qgroup_algorithm_and_algo_params.py and makes the link between the ui and
@@ -22,6 +23,10 @@ ALGORITHMS = {
     "PNP": {
         'object': PnpAlgo,
         'ui_params': PNP_UI_PARAMETERS
+    },
+    "MCMC": {
+        'object': McmcAlgo,
+        'ui_params': MCMC_UI_PARAMETERS
     }
 }
 

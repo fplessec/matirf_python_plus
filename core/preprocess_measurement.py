@@ -17,7 +17,6 @@ def preprocess_measurement_stack(g, measurement_params, add_noise_params, normal
     background_list = []  # <-to store each background stack
     g_list = []  # <-to store each non-background stacks
     _, theta_max_deg = compute_min_max_angles_from_params(measurement_params)
-    print(f"theta crit = {_}°\ntheta max = {theta_max_deg}°")
     for i in range(n_stacks):
         if angles_deg[i] > theta_max_deg:  # <-background
             background_list.append(g[i, :, :])

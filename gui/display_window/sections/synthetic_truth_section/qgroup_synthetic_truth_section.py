@@ -40,6 +40,7 @@ class SyntheticTruthSection(QGroupBox):
             metrics = self.pipeline.metrics
         else:
             from core.reconstruction_metrics import compute_all_metrics
+            delta = self.pipeline.delta
             metrics = compute_all_metrics(f, f_true)
         self.populate_table(metrics)
 
