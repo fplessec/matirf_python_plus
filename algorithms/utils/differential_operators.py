@@ -12,7 +12,6 @@ class DifferentialOperators:
     Considering that torch.conv3d can take quite some time when computed on CPU, that is why we choose two different
     styles of implementation for computing the differential operators, one for device='cpu' and the other one for
     device='cuda'.
-
     """
 
     def __init__(self, delta=1.,):
@@ -21,10 +20,6 @@ class DifferentialOperators:
             self.build_kernels()
 
     # pytorch conv need 5 dimensional tensors:
-    @staticmethod
-    def _to_5d(f): return f.unsqueeze(0).unsqueeze(0)
-    @staticmethod
-    def _from_5d(f): return f.squeeze(0).squeeze(0)
 
     def build_kernels(self):
         """
@@ -35,7 +30,7 @@ class DifferentialOperators:
         This function precompute all convolution kernels for first and second order derivatives.
         Kernels are stored in pre-stacked tensors to avoid runtime concatenations.
         """
-        delta = self.delta
+        delta = self.delta  # anisotropy ratio = Δz / Δxy
         def zero():
             return torch.zeros((3, 3, 3), device=device, dtype=dtype)
         ###### first order

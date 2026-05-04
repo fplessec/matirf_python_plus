@@ -26,7 +26,6 @@ by the user for a given reconstruction.
 from math import pi
 import torch
 import numpy as np
-from torch.optim import NAdam
 
 import settings
 
