@@ -1,7 +1,7 @@
 import tomli_w
 import tomli
 
-from in_out.utils import isfile
+from .utils import isfile
 from settings import DEFAULT_CONFIG
 
 

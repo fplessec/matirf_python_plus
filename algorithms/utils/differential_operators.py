@@ -20,6 +20,10 @@ class DifferentialOperators:
             self.build_kernels()
 
     # pytorch conv need 5 dimensional tensors:
+    @staticmethod
+    def _to_5d(f): return f.unsqueeze(0).unsqueeze(0)
+    @staticmethod
+    def _from_5d(f): return f.squeeze(0).squeeze(0)
 
     def build_kernels(self):
         """

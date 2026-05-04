@@ -1,0 +1,29 @@
+Metadata-Version: 2.4
+Name: matirf_python_plus
+Version: 0.1.0
+Summary: Algorithme de reconstruction MA-TIRF (problème inverse)
+Author-email: Ferdinand Plesse--Costa <ferdinand.plesse--costa@hotmail.fr>
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: torch>=2.7.1
+Requires-Dist: numpy>=2.0
+Requires-Dist: matplotlib>=3.10.3
+Requires-Dist: PyQt5>=5.15.11
+Requires-Dist: tifffile>=2025.5.10
+Requires-Dist: tomli>=2.2.1
+Requires-Dist: tomli_w>=1.2.0
+Requires-Dist: Pillow>=10.0
+Requires-Dist: scikit-image>=0.22
+Requires-Dist: einops>=0.7
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+
+bonjour
+
+
+```
+python3.10 -m venv env
+source env/bin/activate
+pip install -r requirements.txt
+python main.py gui
+```

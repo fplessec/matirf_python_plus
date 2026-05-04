@@ -1,8 +1,8 @@
 import torch
 from pathlib import Path
 
-from .. import denoise_gaussian, denoise_bilateral, denoise_wiener, denoise_dct
-from . import load_2d_png_image, add_noise, psnr
+from algorithms.denoisers import denoise_gaussian, denoise_bilateral, denoise_wiener, denoise_dct
+from algorithms.denoisers.tests import load_2d_png_image, add_noise, psnr
 
 
 def main():

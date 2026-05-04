@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from algorithms.utils.differential_operators import DifferentialOperators
+from .differential_operators import DifferentialOperators
 from core.operations import apply_matirf_operator
 
 

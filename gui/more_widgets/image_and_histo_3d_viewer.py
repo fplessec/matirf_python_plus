@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QComboBox
 
-from gui.more_widgets import Image3DViewer, Histogram3DWidget
+from .image_3d_viewer import Image3DViewer
+from .histogram_3d_widget import Histogram3DWidget
 
 
 class ImageAndHisto3DViewer(QGroupBox):

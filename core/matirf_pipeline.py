@@ -184,7 +184,10 @@ import os
 from os import makedirs
 from os.path import join
 
-from algorithms import ALGORITHMS
+# NOTE: `from algorithms import ALGORITHMS` est volontairement importé en LAZY (à l'intérieur
+# de setup()) pour éviter un import circulaire core <-> algorithms.
+# Les sous-algos importent core.operations, donc importer algorithms ici depuis core/__init__.py
+# créerait un cycle.
 from core.reconstruction_metrics import compute_all_metrics
 from in_out import (
     save_tif, save_toml, save_txt, save_csv,
@@ -238,6 +241,9 @@ class MaTirfPipeline:
     # SETUP
     # =========================
     def setup(self):
+        # Import lazy pour éviter le cycle core <-> algorithms (cf. note en haut du fichier).
+        from algorithms import ALGORITHMS
+
         tif_path = self.config['input-paths']['tif']
         json_path = self.config['input-paths']['json']
 

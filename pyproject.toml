@@ -1,0 +1,118 @@
+# =============================================================================
+# pyproject.toml - matirf_python_plus
+# =============================================================================
+# Ce fichier transforme le projet en un package Python installable.
+#
+# Une fois installé en mode "editable" :
+#     source env/bin/activate
+#     pip install -e .
+#
+# Tu peux importer tes modules depuis n'importe où dans le venv :
+#     from algorithms.denoisers import denoise_gaussian
+#     from core import PipelineManager
+#     ...
+#
+# Et tu peux lancer n'importe quel script :
+#     python algorithms/denoisers/tests/main.py
+#     python -m algorithms.denoisers.tests.main
+# Les deux marchent.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Build system : indique à pip comment construire le package.
+# setuptools est l'outil standard, ça marche partout.
+# -----------------------------------------------------------------------------
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+# -----------------------------------------------------------------------------
+# Métadonnées du projet (PEP 621)
+# -----------------------------------------------------------------------------
+[project]
+name = "matirf_python_plus"
+version = "0.1.0"
+description = "Algorithme de reconstruction MA-TIRF (problème inverse)"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Ferdinand Plesse--Costa", email = "ferdinand.plesse--costa@hotmail.fr" },
+]
+
+# -----------------------------------------------------------------------------
+# Dépendances runtime - strict minimum nécessaire au fonctionnement du projet.
+# Chaque ligne correspond à un module réellement importé dans le code.
+# -----------------------------------------------------------------------------
+dependencies = [
+    "torch>=2.7.1",            # tenseurs, calculs sur CPU/GPU (utilisé partout)
+    "numpy>=2.0",              # nlridge.py, abstract_algo.py, viewers, etc.
+    "matplotlib>=3.10.3",      # viewers GUI, qlatexlabel
+    "PyQt5>=5.15.11",          # interface graphique
+    "tifffile>=2025.5.10",     # in_out/tif_file.py
+    "tomli>=2.2.1",            # in_out/toml_file.py (lecture)
+    "tomli_w>=1.2.0",          # in_out/toml_file.py + display_window.py (écriture)
+    "Pillow>=10.0",            # algorithms/denoisers/tests/__init__.py + denoise_tv_bregman.py
+    "scikit-image>=0.22",      # reconstruction_metrics (SSIM), pnp_algo, nlridge, denoise_tv_bregman (estimate_sigma)
+    "einops>=0.7",             # algorithms/denoisers/nlridge.py (rearrange, repeat)
+]
+
+
+# -----------------------------------------------------------------------------
+# Dépendances optionnelles (dev, tests, ...)
+# Installables avec : pip install -e ".[dev]"
+# -----------------------------------------------------------------------------
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+
+# -----------------------------------------------------------------------------
+# Points d'entrée console
+# Permet d'invoquer le projet via une commande directe :
+#     matirf gui
+#     matirf cli -c config.toml -o output_dir/
+# (à condition que main.py expose une fonction main())
+# -----------------------------------------------------------------------------
+[project.scripts]
+matirf = "main:main"
+
+
+# -----------------------------------------------------------------------------
+# Découverte automatique des packages
+# - on garde uniquement les vrais packages (dossiers avec __init__.py)
+# - on exclut env/, data/, cache/ (cache au sens "données mises en cache" pas
+#   le sous-package python).
+#
+# ATTENTION : tu as un PACKAGE Python nommé "cache/" (avec __init__.py),
+# qu'on garde. Le DOSSIER de données s'appelle aussi cache/ et contient
+# le config.toml — c'est le même dossier, ce n'est pas un souci pour
+# setuptools puisqu'il regarde juste les __init__.py.
+# -----------------------------------------------------------------------------
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "algorithms*",
+    "cache*",
+    "core*",
+    "gui*",
+    "in_out*",
+    "settings*",
+]
+exclude = [
+    "env*",
+    "data*",
+    "__pycache__*",
+    "*.tests.*",  # exclut les sous-packages de tests si tu en as
+]
+
+# -----------------------------------------------------------------------------
+# Modules Python "top-level" à installer en plus des packages.
+# main.py est un fichier autonome à la racine du projet (pas dans un package),
+# il faut donc explicitement dire à setuptools de l'inclure pour que la
+# commande `matirf` puisse faire `from main import main`.
+# -----------------------------------------------------------------------------
+[tool.setuptools]
+py-modules = ["main"]

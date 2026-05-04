@@ -4,7 +4,7 @@ from PyQt5.QtGui import QFont
 from settings import FontSize
 from cache import update_cache
 from in_out import load_or_create_toml
-from gui.more_widgets import QLatexLabel
+from .more_widgets import QLatexLabel
 
 
 class SimpleParameterWidget(QWidget):

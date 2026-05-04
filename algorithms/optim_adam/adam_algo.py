@@ -3,10 +3,10 @@ import time
 
 import torch
 
-from algorithms.abstract_algo import Algorithm
+from ..abstract_algo import Algorithm
+from ..utils.loss_computer import LossComputer
 from core.operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
 from settings import device, dtype
-from ..utils import LossComputer
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:

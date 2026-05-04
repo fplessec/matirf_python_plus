@@ -2,11 +2,11 @@ from typing import Dict, Any
 import time
 import torch
 
-from algorithms.abstract_algo import Algorithm
+from ..abstract_algo import Algorithm
+from ..utils.loss_computer import LossComputer
+from ..utils.proximal_operators import ProximalOperators
 from core.operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
 from settings import device, dtype
-from algorithms.utils.loss_computer import LossComputer
-from algorithms.utils.proximal_operators import ProximalOperators
 
 
 class PpxaAlgo(Algorithm):

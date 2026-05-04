@@ -1,6 +1,6 @@
 import torch
 
-from algorithms.utils.differential_operators import DifferentialOperators
+from .differential_operators import DifferentialOperators
 
 
 class ProximalOperators:
