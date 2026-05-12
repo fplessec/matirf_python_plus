@@ -8,7 +8,7 @@ from algorithms.denoisers.tests import load_2d_png_image, add_noise, psnr
 def main():
     torch.manual_seed(0)
 
-    data_dir = Path("tests/data")
+    data_dir = Path(__file__).parent / "data"
     images = list(data_dir.glob("*.png"))
 
     sigma = 0.1

@@ -7,8 +7,8 @@ def _dct_matrix(N):
     n = torch.arange(N, device=device, dtype=dtype).view(1, -1)
     k = torch.arange(N, device=device, dtype=dtype).view(-1, 1)
     M = torch.cos(torch.pi / N * (n + 0.5) * k)
-    M[0] *= 1.0 / torch.sqrt(torch.tensor(2.0, device=device, dtype=dtype))
-    return M * torch.sqrt(2.0 / N)
+    M[0] *= 1.0 / (2. ** 0.5)
+    return M * (2. / N) ** 0.5
 
 def _dct_nd(x):
     X = x.clone()

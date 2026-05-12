@@ -72,7 +72,7 @@ def compute_min_max_angles_from_params(measurement_params: dict) -> tuple[float,
     return theta_crit_deg, theta_max_deg
 
 
-def compute_tirf_intensity_at_interface(angle_deg: float, ni: float, nt: float) -> float:
+def compute_tirf_intensity_at_interface(angle_deg: torch.Tensor, ni: float, nt: float) -> torch.Tensor:
     """
     For a given incident angle 'angle_deg' in degrees, and using 'ni' (the optical index of the incident medium) and
     'nt' (the optical index of the sample medium), this function returns the value of the intensity of the transmitted

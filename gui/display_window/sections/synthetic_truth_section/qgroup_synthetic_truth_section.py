@@ -32,17 +32,13 @@ class SyntheticTruthSection(QGroupBox):
 
 
     def update_plot(self):
-        f = self.pipeline
-        f_true = self.pipeline.f_true
-        if f is None or f_true is None:
+        # Le pipeline garantit qu'en mode synth, result.metrics est calculé
+        # dans _on_algo_finished. Plus de fallback de calcul ici (qui était
+        # à la fois buggé et hors-sujet pour un widget).
+        result = self.pipeline.result
+        if result is None or not result.has_synthetic_truth() or result.metrics is None:
             return
-        if hasattr(self.pipeline, "metrics") and self.pipeline.metrics:
-            metrics = self.pipeline.metrics
-        else:
-            from core.reconstruction_metrics import compute_all_metrics
-            delta = self.pipeline.delta
-            metrics = compute_all_metrics(f, f_true)
-        self.populate_table(metrics)
+        self.populate_table(result.metrics)
 
     def populate_table(self, metrics: dict):
         self.table.setRowCount(len(metrics))
@@ -51,12 +47,12 @@ class SyntheticTruthSection(QGroupBox):
             self.table.setItem(row, 1, QTableWidgetItem(str(value)))
 
     def open_viewer(self):
-        f = self.pipeline.f
-        f_true = self.pipeline.f_true
-        if f is None or f_true is None:
+        # La diff est précalculée par le pipeline et stockée dans result.diff.
+        result = self.pipeline.result
+        if result is None or result.diff is None:
             return
         # to avoid having more than one window:
         if self.viewer_window is not None:
             self.viewer_window.close()
-        self.viewer_window = DifferenceViewer(f, f_true, parent=self)
+        self.viewer_window = DifferenceViewer(result.diff, parent=self)
         self.viewer_window.show()

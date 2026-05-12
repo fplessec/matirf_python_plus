@@ -41,8 +41,10 @@ class SimpleParameterWidget(QWidget):
                             "string3"]) the default value is the first element of the list
             }
     """
-    def __init__(self, title, type, param_info={}, fontsize=FontSize.NORMAL, toml_key_list=None):
+    def __init__(self, title, type, param_info=None, fontsize=FontSize.NORMAL, toml_key_list=None):
         super().__init__()
+        if param_info is None:
+            param_info = {}
         self.title = title
         self.type = type
         self.param_info = param_info
@@ -53,7 +55,7 @@ class SimpleParameterWidget(QWidget):
         self.checkbox = None
         self.combo = None
         self.value_label = None
-        self.update = None  # <- to store the callback
+        self.update_callback = None  # <- to store the callback
         self.setup_widget()
 
     def setup_widget(self):
@@ -99,7 +101,7 @@ class SimpleParameterWidget(QWidget):
                     self.value_display.update_latex(
                         f"{param_info['latex_name']} \\text{{ must be a {param_info['dtype'].__name__}}}")
                     self.param_value = None
-        self.update = update_value
+        self.update_callback = update_value
         self.input_widget.textChanged.connect(update_value)
         # update_value_display()
         self.layout.addWidget(self.value_display)
@@ -120,7 +122,7 @@ class SimpleParameterWidget(QWidget):
             if self.toml_key_list is not None:
                 # adding a specific action to the callback to update the parameter value in cache file:
                 update_cache(self.toml_key_list, self.param_value)
-        self.update = update_bool
+        self.update_callback = update_bool
         self.checkbox.stateChanged.connect(update_bool)
         bool_layout = QHBoxLayout()
         bool_layout.addWidget(self.checkbox)
@@ -139,7 +141,7 @@ class SimpleParameterWidget(QWidget):
             if self.toml_key_list is not None:
                 # adding a specific action to the callback to update the parameter value in cache file:
                 update_cache(self.toml_key_list, self.param_value)
-        self.update = update_option
+        self.update_callback = update_option
         self.combo.currentTextChanged.connect(update_option)
         self.layout.addWidget(self.combo)
 
@@ -176,7 +178,7 @@ class SimpleParameterWidget(QWidget):
         except (ValueError, TypeError):
             if config_value is None or config_value == "None":
                 update_cache(self.toml_key_list, "None")
-                self.update()
+                self.update_callback()
             else:
                 print(
                     f"Warning: Invalid value '{config_value}' for parameter '{self.title}'"
@@ -191,7 +193,7 @@ class SimpleParameterWidget(QWidget):
         except (ValueError, TypeError):
             if config_value is None or config_value == "None":
                 update_cache(self.toml_key_list, bool(self.param_info['default']))
-                self.update()
+                self.update_callback()
             else:
                 print(f"Warning: Invalid boolean value '{config_value}' for parameter '{self.title}'")
 

@@ -17,6 +17,8 @@ class FontSize:
 DEFAULT_CONFIG = {
     "algorithm": 'None',
     "input-paths": {
+        # NOTE : doit correspondre à core.enums.DataMode.REAL.value
+        # (on n'importe pas DataMode ici pour éviter un cycle avec core)
         "mode": "real-data",
         "tif": "None",
         "json": "None"

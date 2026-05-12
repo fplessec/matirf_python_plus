@@ -1,40 +1,46 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QHBoxLayout
+from PyQt5.QtWidgets import QWidget, QHBoxLayout
 
 from gui.more_widgets import ImageAndHisto3DViewer
-from core.preprocess_measurement import preprocess_measurement_stack
-from in_out import load_tif, load_or_create_toml, CONFIG_PATH, load_json
-import settings
+from core import DataMode
+from core.pipeline_steps import compute_preprocessing_preview
+from in_out import load_or_create_toml, CONFIG_PATH
 
 
 class TifFilePreprocessViewer(QWidget):
     """
-    A qwidget that allows the user to see the difference between its chosen raw data (tif file) and the preprocessed
-    version of this raw data that will be used for the reconstruction.
+    A qwidget that allows the user to visualize two versions of its chosen input file (tif file),
+    depending on the mode (REAL or SYNTHETIC):
+        - REAL :      [input file = raw MA-TIRF measurement g_raw]   vs   [its preprocessed version + noise]
+        - SYNTHETIC : [input file = ground truth f_true]    vs   [g_synth = H_synth @ f_true preprocessed + noise]
     """
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
         config = load_or_create_toml(CONFIG_PATH)
-        tif_path = config['input-paths']['tif']
-        json_path = config['input-paths']['json']
-        measurement_params = load_json(json_path)
-        add_noise_params = config['add-noise']
-        self.f = load_tif(tif_path)
-        self.g, measurement_params = preprocess_measurement_stack(self.f, measurement_params, add_noise_params,
-                                                                  normalization=settings.normalization)
-        self.setWindowTitle("See preprocessed file")
+        self.mode = DataMode.from_config(config['input-paths']['mode'])
+        # depending on the mode we visualize:
+        # left  = raw MA-TIRF measurement OR ground truth
+        # right = preprocessed+noise OR synthetic MA-TIRF measurement
+        self.left, self.right = compute_preprocessing_preview(config, self.mode)
+        self.setWindowTitle("Preview - Real measurement preprocessing" if self.mode == DataMode.REAL
+                            else "Preview - Synthetic data simulation")
         self.resize(700, 900)
         self.setup_ui()
 
     def setup_ui(self):
         main_layout = QHBoxLayout()
-        # a qgroup with ImageAndHisto3DViewer:
-        group_f = ImageAndHisto3DViewer(self.f, title="tif file raw")
-        # a qgroup with ImageAndHisto3DViewer:
-        group_g = ImageAndHisto3DViewer(self.g, title="tif file preprocessed + add noise")
-        # assemble :
-        main_layout.addWidget(group_f)
-        main_layout.addWidget(group_g)
+        if self.mode == DataMode.REAL:
+            left_title = "g_raw = input file (MA-TIRF image stack, raw measurement)"
+            right_title = "g = preprocessed g_raw + noise"
+        else:  # SYNTHETIC
+            left_title = "f_true = input file (3D object, synthetic truth)"
+            right_title = "g_synth = H_synth @ f_true (preprocessed + noise)"
+        # two ImageAndHisto3DViewer qgroups to visualize left and right:
+        group_left = ImageAndHisto3DViewer(self.left, title=left_title)
+        group_right = ImageAndHisto3DViewer(self.right, title=right_title)
+        # assemble:
+        main_layout.addWidget(group_left)
+        main_layout.addWidget(group_right)
         self.setLayout(main_layout)
 
     def closeEvent(self, event):

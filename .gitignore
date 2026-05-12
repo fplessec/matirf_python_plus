@@ -4,3 +4,10 @@ env
 **/__pycache__/
 /cache/config.toml
 import_log.txt
+
+# Artefacts d'installation Python (générés par pip/setuptools)
+*.egg-info/
+*.egg
+build/
+dist/
+*.pyc

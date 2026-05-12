@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QHBoxLayout, QGroupBox, QVBoxLayout, QLabel
 from .qwidget_tif_file_selector import TifFileSelector
 from .qwidget_json_file_selector import JsonFileSelector
 from gui.more_widgets import QSeparator, QSwitchButton
+from core import DataMode
 from in_out import load_or_create_toml, CONFIG_PATH
 from cache import update_cache
 from settings import FontSize
@@ -37,8 +38,8 @@ class InputFilesSection(QGroupBox):
     def get_cached_mode():
         try:
             mode = load_or_create_toml(CONFIG_PATH)['input-paths']['mode']  # <- from cache
-            return mode=='real-data'
-        except:
+            return mode == DataMode.REAL.value
+        except (KeyError, FileNotFoundError):
             return True  # default is true
 
     def setup_ui(self):
@@ -93,9 +94,9 @@ class InputFilesSection(QGroupBox):
     def switch_mode(self):
         self.mode1 = not self.mode1
         self.update_labels()
-        # update the cache:
-        if self.mode1: update_cache(['input-paths', 'mode'], 'real-data')  # -> to cache
-        else: update_cache(['input-paths', 'mode'], 'synthetic-data')  # -> to cache
+        # update the cache (utilise les .value de l'enum pour rester en sync):
+        new_mode = DataMode.REAL.value if self.mode1 else DataMode.SYNTHETIC.value
+        update_cache(['input-paths', 'mode'], new_mode)
         # update the file selectors:
         self.tif_selector.update_mode()
         self.json_selector.update_mode()
@@ -103,7 +104,7 @@ class InputFilesSection(QGroupBox):
     def update_ui_from_toml(self, toml_path):
         config = load_or_create_toml(toml_path)  # <- from cache/ or any config
         mode = config['input-paths']['mode']
-        self.mode1 = mode == 'real-data'
+        self.mode1 = mode == DataMode.REAL.value
         self.update_labels()
         self.tif_selector.update_mode()
         self.json_selector.update_mode()

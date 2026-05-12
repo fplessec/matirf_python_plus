@@ -7,15 +7,23 @@ from tomli_w import dumps
 from .sections import FiguresSection, MessageSection, SyntheticTruthSection
 from gui.utils import close_active_window
 from gui.control_window import DisplayWindowManager
-from core import PipelineManager
+from core import PipelineManager, PipelineState
 from in_out import RESULTS_DIR
 import settings
 
 
 class PipelineQtBridge(QObject):
+    """
+    Pont thread-safe entre les callbacks Python du pipeline et la boucle Qt.
+
+    Le pipeline tourne dans un thread worker, mais l'UI Qt doit être mise à jour
+    depuis le main thread. On utilise des pyqtSignal avec Qt.QueuedConnection
+    pour transférer proprement les événements d'un thread à l'autre.
+    """
     message = pyqtSignal(str)
-    finished = pyqtSignal(object)
+    finished = pyqtSignal(object)            # transporte le ReconstructionResult
     error = pyqtSignal(str)
+    state_changed = pyqtSignal(object, object)  # (old_state, new_state)
 
 
 class DisplayWindow(QMainWindow):
@@ -34,6 +42,7 @@ class DisplayWindow(QMainWindow):
         self.qt_bridge.message.connect(self._print, Qt.QueuedConnection)
         self.qt_bridge.finished.connect(self.on_finished, Qt.QueuedConnection)
         self.qt_bridge.error.connect(self.on_error, Qt.QueuedConnection)
+        self.qt_bridge.state_changed.connect(self.on_state_changed, Qt.QueuedConnection)
 
         self._connect_pipeline_callbacks()
 
@@ -41,7 +50,7 @@ class DisplayWindow(QMainWindow):
 
     def initialize_from_existing_data(self):
         self.update_plot()
-        self._print(self.pipeline.messages)
+        self._print(self.pipeline.result.messages)
         self.save_btn.setEnabled(True)
 
         if self.switch_btn:
@@ -51,22 +60,23 @@ class DisplayWindow(QMainWindow):
     # PIPELINE
     # =========================
     def _connect_pipeline_callbacks(self):
-        def emit_message(msg):
-            self.qt_bridge.message.emit(msg)
-        def emit_finished(result):
-            self.qt_bridge.finished.emit(result)
-        def emit_error(err):
-            self.qt_bridge.error.emit(err)
+        """
+        Connecte les callbacks du pipeline aux signaux Qt du bridge.
+        Chaque callback se contente d'émettre un signal Qt, qui sera ensuite
+        traité dans le main thread (via Qt.QueuedConnection sur les slots).
+        """
         self.pipeline.callbacks = {
-            "message": emit_message,
-            "finished": emit_finished,
-            "error": emit_error,
+            "message": lambda msg: self.qt_bridge.message.emit(msg),
+            "finished": lambda result: self.qt_bridge.finished.emit(result),
+            "error": lambda err: self.qt_bridge.error.emit(err),
+            "state_changed": lambda old, new: self.qt_bridge.state_changed.emit(old, new),
         }
 
     # =========================
-    # CALLBACKS
+    # CALLBACKS (main thread Qt)
     # =========================
     def on_finished(self, result):
+        # 'result' est un ReconstructionResult complet (passé en payload du signal).
         self.update_plot()
         self.save_btn.setEnabled(True)
         self.save_action.setEnabled(True)
@@ -75,6 +85,12 @@ class DisplayWindow(QMainWindow):
 
     def on_error(self, err):
         self._print(f"Error: {err}")
+
+    def on_state_changed(self, old_state: PipelineState, new_state: PipelineState):
+        """Réagit aux transitions d'état du pipeline pour adapter l'UI."""
+        # Pour l'instant, on log juste la transition. Logique d'UI plus riche
+        # (status bar, spinner...) pourra venir ici.
+        self._print(f"[state] {old_state.value} → {new_state.value}")
 
     def _print(self, msg):
         if hasattr(self, "messages_section"):
@@ -176,7 +192,7 @@ class DisplayWindow(QMainWindow):
     # DISPLAY
     # =========================
     def update_plot(self):
-        self.figures_section.update_plot(self.pipeline.f, self.config)
+        self.figures_section.update_plot(self.pipeline.result.f, self.config)
         if self.pipeline.is_synthetic_data() and self.synthetic_section:
             self.synthetic_section.update_plot()
 

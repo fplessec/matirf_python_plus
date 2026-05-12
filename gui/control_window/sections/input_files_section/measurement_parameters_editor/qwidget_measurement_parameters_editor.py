@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QFileDialog
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QFileDialog, QMessageBox
 
 from .measurement_parameters_ui_dictionary import MEASUREMENT_PARAMETERS_UI
 from gui import SimpleParameterWidget
@@ -121,9 +121,10 @@ class MeasurementParametersEditor(QWidget):
         return container
 
     def save_json_file(self):
-        data = self.collect_current_parameters()
-        save_json(data, self.json_path)
-        self.close()
+        data = self.collect_current_parameters(when_saving=True)
+        if data != 'error':
+            save_json(data, self.json_path)
+            self.close()
 
     def create_file(self):
         save_path, _ = QFileDialog.getSaveFileName(self,
@@ -135,11 +136,28 @@ class MeasurementParametersEditor(QWidget):
             self.save_json_file()
             self.parent.update_selected_file(save_path)
 
-    def collect_current_parameters(self):
-        params = {"angles_deg": [float(angle) for angle in self.findChild(QTextEdit).toPlainText().splitlines() if
-                                 angle.strip()]}
+    def collect_current_parameters(self, when_saving=False):
+        error_message = ""
+        try:
+            params = {"angles_deg": [float(angle.strip(',')) for angle in self.findChild(QTextEdit).toPlainText().splitlines() if
+                                     angle.strip()]}
+        except ValueError as e:
+            params = {}
+            error_message += "Cannot save the modifications:\n\n"
+            error_message += f"- {type(e).__name__}: {e}.\n"\
+                             "Please check any characters that would cause an anomaly in the incident angles (for "\
+                             "example a ',' instead of a '.').\n\n"
         for param_name, widget in self.parameter_widgets.items():
             params[param_name] = widget.param_value
+            if widget.param_value is None:
+                if error_message == "": error_message += "Cannot save the modifications:\n\n"
+                error_message += f"- Parameter '{param_name}' has no valid value.\n"
+        if error_message != "" and when_saving:
+            QMessageBox.warning(
+                self,
+                "", error_message
+            )
+            return 'error'
         return params
 
     def update_ui_current_parameters(self):
@@ -147,7 +165,7 @@ class MeasurementParametersEditor(QWidget):
         for param_name, param_value in params.items():
             if param_name != 'angles_deg':
                 widget = self.parameter_widgets[param_name]
-                widget.update()
+                widget.update_callback()
 
     def closeEvent(self, event):
         if self.json_path is not None:

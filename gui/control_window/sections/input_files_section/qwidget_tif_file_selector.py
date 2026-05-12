@@ -2,7 +2,9 @@ import os
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout, QMessageBox,
+)
 
 from .qwidget_tif_file_preprocess_viewer import TifFilePreprocessViewer
 from gui.more_widgets import QCrossButton
@@ -85,9 +87,35 @@ class TifFileSelector(QWidget):
         self.preprocess_button.setVisible(self.parent.are_both_file_selected())  # method from InputFilesSection
 
     def open_tif_file_preprocess_editor(self):
+        """
+        Opens the TifFilePreprocessViewer to visualize input data.
+        If mode is REAL then we need to have the same number of stacks in the MA-TIRF measurement file (tif file) as the
+        number of angles in the measurement parameters file (json file) ; if it's not the case then a warning will
+        appear in a QMessageBox to notify the user.
+        """
         if self.tif_file_preprocess_editor is not None:
             self.tif_file_preprocess_editor.close()
-        self.tif_file_preprocess_editor = TifFilePreprocessViewer(parent=self)
+        try:
+            self.tif_file_preprocess_editor = TifFilePreprocessViewer(parent=self)
+        except AssertionError as e:
+            self.tif_file_preprocess_editor = None
+            QMessageBox.warning(
+                self,
+                "Cannot preview the preprocessing",
+                "The preview could not be computed because the measurement files "
+                "are inconsistent:\n"
+                f"{e}\n\n"
+            )
+            return
+        except Exception as e:
+            self.tif_file_preprocess_editor = None
+            QMessageBox.warning(
+                self,
+                "Cannot preview the preprocessing",
+                f"An unexpected error occurred while computing the preview:\n\n"
+                f"{type(e).__name__}: {e}"
+            )
+            return
         self.tif_file_preprocess_editor.show()
 
     def mode_dependent_text_update(self):
