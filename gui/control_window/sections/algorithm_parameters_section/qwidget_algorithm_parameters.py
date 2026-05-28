@@ -1,10 +1,13 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QMessageBox,
+)
 
 from gui import SimpleParameterWidget
 from gui.more_widgets import QSeparator
 from cache import update_cache
-from in_out import CONFIG_PATH
+from in_out import CONFIG_PATH, load_or_create_toml, load_json
 from settings import FontSize
+from core.operations import estimate_delta_anisotropy_from_params
 
 
 class AlgoParamsWidget(QWidget):
@@ -38,9 +41,84 @@ class AlgoParamsWidget(QWidget):
                 toml_key_list=['algo-params', param_name]
             )
             self.parameter_widgets[param_name] = widget
-            layout.addWidget(widget)
+            # special case : for parameter 'delta' (anisotropy coefficient) I add a button 'Estimate' which uses the
+            # estimate_delta_anisotropy_from_params function from core/operations.py :
+            if param_name == 'delta':
+                row = QWidget()
+                row_layout = QHBoxLayout(row)
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                row_layout.addWidget(widget, stretch=1)
+                estimate_btn = QPushButton("Estimate")
+                estimate_btn.setToolTip(
+                    "Estimate delta from measurement parameters (.json) "
+                    "and operator parameters (nz, z0, zN)."
+                )
+                estimate_btn.clicked.connect(self._estimate_delta)
+                row_layout.addWidget(estimate_btn)
+                layout.addWidget(row)
+            else:
+                layout.addWidget(widget)
+
             first_widget = False
         layout.addStretch()
+
+    def _estimate_delta(self):
+        """
+        Callback that estimate delta from the selected value of the user (saved in the cache) :
+        the selected values that are required to compute delta are some physical parameters
+        from the json file and the z0, zN, nZ parameters from the oper-params group.
+        This function displays a error message if any of this values aren't selected, and
+        otherwise it updates the SimpleParameterWidget for 'delta'.
+        """
+        _REQUIRED_MEASUREMENT_KEYS = ['n_medium', 'numerical_aperture', 'wavelength_nm']
+        _REQUIRED_OPER_KEYS = ['nz', 'z0', 'zN']
+        config = load_or_create_toml(CONFIG_PATH)
+        missing = []
+        # is the json file selected ?
+        json_path = config.get('input-paths', {}).get('json', 'None')
+        if json_path == 'None' or not json_path:
+            missing.append("Measurement parameters file (.json) not selected.")
+            measurement_params = None
+        else:
+            try:
+                measurement_params = load_json(json_path)
+            except Exception as e:
+                missing.append(f"Cannot load .json file: {type(e).__name__}: {e}")
+                measurement_params = None
+        # does the json file contain the required parameters ?
+        if measurement_params is not None:
+            for key in _REQUIRED_MEASUREMENT_KEYS:
+                if key not in measurement_params or measurement_params[key] in (None, 'None'):
+                    missing.append(f"Missing measurement parameter '{key}' in .json.")
+        # does the oper-params group contain the required parameters ?
+        oper_params = config.get('oper-params', {})
+        for key in _REQUIRED_OPER_KEYS:
+            if key not in oper_params or oper_params[key] in (None, 'None'):
+                missing.append(f"Missing operator parameter '{key}' (set it in the operator section).")
+        # if there is anything missing then a error message is display:
+        if missing:
+            QMessageBox.warning(
+                self,
+                "Cannot estimate delta",
+                "The following parameters are required to estimate delta:\n\n"
+                + "\n".join(f"  • {m}" for m in missing)
+            )
+            return
+        # if not, then delta can be estimated:
+        try:
+            delta = estimate_delta_anisotropy_from_params(measurement_params, oper_params)
+            delta = round(delta, 4)  # no need to have more than 4 decimals
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Cannot estimate delta",
+                f"An unexpected error occurred during estimation:\n\n"
+                f"{type(e).__name__}: {e}"
+            )
+            return
+        # if the computation went fine then the cache and the U.I. are updated:
+        update_cache(['algo-params', 'delta'], float(delta))
+        self.parameter_widgets['delta'].update_ui_from_toml(CONFIG_PATH)
 
     def get_parameters(self):
         parameters = {}

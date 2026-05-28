@@ -14,11 +14,13 @@ class InputFilesSection(QGroupBox):
     """
     This section of the user interface allows the user to select the path of the data.
     There is two possible modes:
-        > mode1: the data are real measurements from MA-TIRF microscopy ; the user needs to choose a tif file which is
-                 the actual MA-TIRF image stack, and a json file which is the parameters of this measurement.
-        > mode2 (not mode1): the data are synthetic measurements ; the user needs to choose a tif file which is the
-                 ground truth object, a 3D image, and a json file which is a fake measurement parameters file, in order
-                 to compute the operator a fake MA-TIRF measurement
+        > mode_is_real == True: this corresponds to DataMode.REAL
+                the data are real measurements from MA-TIRF microscopy ; the user needs to choose a tif file which is
+                the actual MA-TIRF image stack, and a json file which is the parameters of this measurement.
+        > mode_is_real == False: this corresponds to DataMode.SYNTHETIC
+                the data are synthetic measurements ; the user needs to choose a tif file which is the ground truth
+                object, a 3D image, and a json file which is a fake measurement parameters file, in order to compute
+                the operator of a fake MA-TIRF measurement
 
     This QGroupBox focus on registering what type of data is the desired TIF file path:
     MA-TIRF multi-stack data or synthetic 3D truth, and registers 'real-data' or 'synthetic-data' inside the
@@ -31,7 +33,7 @@ class InputFilesSection(QGroupBox):
         self.on_color = self.palette().color(QPalette.WindowText).name()
         self.off_color = self.palette().color(QPalette.PlaceholderText).name()
         self.parent = parent
-        self.mode1 = self.get_cached_mode()
+        self.is_mode_real = self.get_cached_mode()
         self.setup_ui()
 
     @staticmethod
@@ -58,16 +60,16 @@ class InputFilesSection(QGroupBox):
         top_layout.setContentsMargins(4, 4, 4, 4)
         # creation of the widgets one after another:
         self.switch_button = QSwitchButton()
-        if not self.mode1: self.switch_button.switch_to_right()
+        if not self.is_mode_real: self.switch_button.switch_to_right()
         self.switch_button.toggled.connect(self.switch_mode)
-        self.mode1_label = QLabel("Work with real MA-TIRF measurement")
-        self.mode2_label = QLabel("Simulate measurement with synthetic truth")
+        self.real_mode_label = QLabel("Work with real MA-TIRF measurement")
+        self.synthetic_mode_label = QLabel("Simulate measurement with synthetic truth")
         self.update_labels()
         # build the widgets together to make the top layout:
         top_layout.addStretch()
-        top_layout.addWidget(self.mode1_label)
+        top_layout.addWidget(self.real_mode_label)
         top_layout.addWidget(self.switch_button)
-        top_layout.addWidget(self.mode2_label)
+        top_layout.addWidget(self.synthetic_mode_label)
         top_layout.addStretch()
         return top_layout
 
@@ -84,18 +86,22 @@ class InputFilesSection(QGroupBox):
         return bot_layout
 
     def update_labels(self):
-        if self.mode1:
-            self.mode1_label.setStyleSheet(f"color: {self.on_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
-            self.mode2_label.setStyleSheet(f"color: {self.off_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
+        if self.is_mode_real:
+            self.real_mode_label.setStyleSheet(f"color: {self.on_color}; font-style: italic; "
+                                               f"font-size: {FontSize.SMALL}pt;")
+            self.synthetic_mode_label.setStyleSheet(f"color: {self.off_color}; font-style: italic; "
+                                                    f"font-size: {FontSize.SMALL}pt;")
         else:
-            self.mode1_label.setStyleSheet(f"color: {self.off_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
-            self.mode2_label.setStyleSheet(f"color: {self.on_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
+            self.real_mode_label.setStyleSheet(f"color: {self.off_color}; font-style: italic; "
+                                               f"font-size: {FontSize.SMALL}pt;")
+            self.synthetic_mode_label.setStyleSheet(f"color: {self.on_color}; font-style: italic; "
+                                                    f"font-size: {FontSize.SMALL}pt;")
 
     def switch_mode(self):
-        self.mode1 = not self.mode1
+        self.is_mode_real = not self.is_mode_real
         self.update_labels()
         # update the cache (utilise les .value de l'enum pour rester en sync):
-        new_mode = DataMode.REAL.value if self.mode1 else DataMode.SYNTHETIC.value
+        new_mode = DataMode.REAL.value if self.is_mode_real else DataMode.SYNTHETIC.value
         update_cache(['input-paths', 'mode'], new_mode)
         # update the file selectors:
         self.tif_selector.update_mode()
@@ -104,11 +110,11 @@ class InputFilesSection(QGroupBox):
     def update_ui_from_toml(self, toml_path):
         config = load_or_create_toml(toml_path)  # <- from cache/ or any config
         mode = config['input-paths']['mode']
-        self.mode1 = mode == DataMode.REAL.value
+        self.is_mode_real = mode == DataMode.REAL.value
         self.update_labels()
         self.tif_selector.update_mode()
         self.json_selector.update_mode()
-        if self.mode1: self.switch_button.switch_to_left(no_signal=True)
+        if self.is_mode_real: self.switch_button.switch_to_left(no_signal=True)
         else: self.switch_button.switch_to_right(no_signal=True)
         self.tif_selector.update_selected_file(config['input-paths']['tif'])
         self.json_selector.update_selected_file(config['input-paths']['json'])

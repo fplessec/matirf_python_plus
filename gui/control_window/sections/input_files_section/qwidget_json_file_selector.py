@@ -112,7 +112,8 @@ class JsonFileSelector(QWidget):
         self.measurement_parameters_editor.show()
 
     def mode_dependent_text_update(self):
-        return "Path of the measurement parameters" if self.parent.mode1 else "Path of the simulated parameters"
+        return "Path of the measurement parameters" if self.parent.is_mode_real\
+               else "Path of the simulated parameters"
 
     def update_mode(self):
         self.title_label.setText(self.mode_dependent_text_update())

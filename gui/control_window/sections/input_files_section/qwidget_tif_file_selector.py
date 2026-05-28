@@ -119,7 +119,8 @@ class TifFileSelector(QWidget):
         self.tif_file_preprocess_editor.show()
 
     def mode_dependent_text_update(self):
-        return "Path of the MA-TIRF image stack" if self.parent.mode1 else "Path of the 3D object (synthetic truth)"
+        return "Path of the MA-TIRF image stack" if self.parent.is_mode_real\
+               else "Path of the 3D object (synthetic truth)"
 
     def update_mode(self):
         self.title_label.setText(self.mode_dependent_text_update())

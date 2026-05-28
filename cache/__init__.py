@@ -12,7 +12,7 @@ def update_cache(key_path, new_value):
     ref = config
     for key in key_path[:-1]:
         ref = ref[key]
-    # is the new value is None, it will be represented by "null" in the .toml cached config file
+    # if the new value is None, it will be represented by "null" in the .toml cached config file
     ref[key_path[-1]] = new_value if new_value is not None else "null"
     save_toml(config, CONFIG_PATH)
 

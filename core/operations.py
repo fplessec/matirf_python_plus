@@ -195,15 +195,20 @@ def estimate_delta_anisotropy(nz, z0, zN, nt, NA, wavelength_nm) -> float:
     Using 'z0' (the smallest depth on z of the reconstructed image, in nanometers) 'zN' (the smallest depth on z of the
     reconstructed image, in nanometers) and 'nz' (the number of cuts of the reconstructed image on the z axis), we can
     compute Δz, the size of the voxel of the reconstructed image along z.
+        > Δz = (zN - z0) / nz
     Using 'nt' (the optical index of the sample medium), 'NA' (the numerical aperture of the objective) and
     'wavelength_nm' (the wavelength of the excitation beam in nm) we can estimate Δxy, the size of the the voxel of the
     reconstructed image along x or y.
-    Under certain hypothesis, such as considering that the resolution is limited by diffraction, we can approximate:
-    Δxy ≈ Δxy_Rayleigh = 0.61 λ / nt / NA
+        > Diffraction resolution limit:
+          Δxy_Rayleigh = 0.61 λ / nt / NA
+        > Under certain hypothesis, such as considering that the resolution is limited by diffraction, we can
+          approximate:
+          Δxy ≈ Δxy_Rayleigh / 2  under the Shannon-Nyquist theorem
+          Δxy ≈ 0.305 λ / nt / NA
     This function return the estimated anisotropy ratio δ = Δz / Δxy.
     """
-    # δ ≈ (zN - z0) / nz * n_medium * NA_obj / 0.61 / λ
-    return  (zN - z0) / nz * nt * NA / 0.61 / wavelength_nm
+    # δ ≈ (zN - z0) / nz  /  (  0.305 * λ / (n_medium * NA_obj) )
+    return  (zN - z0) / nz * nt * NA / 0.305 / wavelength_nm
 
 def estimate_delta_anisotropy_from_params(measurement_params: dict, operator_params: dict) -> float:
     """
