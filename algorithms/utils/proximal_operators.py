@@ -156,10 +156,10 @@ class ProximalOperators:
         grad = torch.empty_like(f)  # pre-allocated memory
         for _ in range(n_iter):
             hess = self.diff_ops.hessian(u)
-            # prox de la norme au carré de la hessienne:
+            # prox of the squared hessian norm:
             #grad[:] = hess.pow(2).sum(dim=(0, 1))  # avoid repeated allocations
 
-            # prox de la norme de la hessienne (sqrt de la norme au carré):
+            # prox of the hessian norm (sqrt of the squared norm):
             grad[:] = hess.sum(dim=(0, 1))  # avoid repeated allocations
             u = u - step * lambda_reg * grad
         return u

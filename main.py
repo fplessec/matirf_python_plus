@@ -166,9 +166,7 @@ from core import PipelineManager
 
 
 
-# =========================
-# GUI
-# =========================
+## centers the window on the screen where the cursor is:
 def center_window(window):
     cursor_pos = QCursor.pos()
     screen = QApplication.screenAt(cursor_pos)
@@ -196,9 +194,7 @@ def open_gui():
     sys.exit(app.exec_())
 
 
-# =========================
-# CLI
-# =========================
+## runs the MA-TIRF pipeline from a TOML config and saves results to output_path:
 def run_client(config_path: Path, output_path: Path):
     if not config_path.exists():
         raise FileNotFoundError(config_path)
@@ -207,9 +203,7 @@ def run_client(config_path: Path, output_path: Path):
 
     print("[INFO] Starting pipeline...")
 
-    # =========================
-    # CALLBACKS CLI
-    # =========================
+    ## CLI callbacks (just print to stdout):
     def on_message(msg):
         print(msg)
 
@@ -223,9 +217,7 @@ def run_client(config_path: Path, output_path: Path):
     def on_error(err):
         print("[ERROR]", err)
 
-    # =========================
-    # PIPELINE
-    # =========================
+    ## create and start the pipeline with the CLI callbacks:
     pipeline = PipelineManager.create(
         config,
         callbacks={
@@ -235,15 +227,13 @@ def run_client(config_path: Path, output_path: Path):
         }
     )
     pipeline.start()
-    # attendre la fin
+    # wait for the algorithm thread to finish
     while pipeline._running:
         time.sleep(0.05)
     PipelineManager.remove(pipeline)
 
 
-# =========================
-# ENTRY POINT
-# =========================
+## parses CLI args and dispatches to gui or cli mode:
 def main():
     parser = argparse.ArgumentParser()
 

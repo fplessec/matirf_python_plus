@@ -2,10 +2,10 @@ from typing import Dict, Any
 import time
 import torch
 
-from ..abstract_algo import Algorithm
+from base import Algorithm
 from ..utils.loss_computer import LossComputer
 from ..utils.proximal_operators import ProximalOperators
-from core.operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
+from core.operations import apply_matirf_operator, get_variables_from_dict
 from settings import device, dtype
 
 
@@ -17,9 +17,6 @@ class PpxaAlgo(Algorithm):
         (max_iter, lambda_relax, K, EPS, gamma, reg, lambda_reg, delta, rho) = get_variables_from_dict(
             params,['max_iter', 'lambda_relax', 'K', 'EPS', 'gamma', 'reg', 'lambda_reg', 'delta', 'rho']
         )
-
-        delta_estimated = estimate_delta_anisotropy_from_params(self.measurement_params, self.oper_params)
-        self._print(f"delta anisotropy estimation = {delta_estimated}\n")
 
         gamma_prox_estimated = 1 / torch.linalg.norm(H)**2 / (1 - lambda_reg)
         self._print(f"gamma prox estimation = {gamma_prox_estimated}\n")
@@ -83,12 +80,12 @@ class PpxaAlgo(Algorithm):
                     lambda_relax = lambda_relax / 2  # divides lambda_relax by 2
                 elif loss - prev_loss > - EPS:  # the stopping criterion is met
                     self._print("\nThe stopping criterion EPS has been met.")
-                    self._print(f"Execution en {time.time() - t0} s.")
+                    self._print(f"Execution in {time.time() - t0} s.")
                     return f.clamp(min=0.)
                 prev_loss = loss
 
         self._print("\nThe maximum iterations number has been reached.")
-        self._print(f"Execution en {time.time() - t0} s.")
+        self._print(f"Execution in {time.time() - t0} s.")
         return f.clamp(min=0.)
 
     @staticmethod
@@ -223,12 +220,12 @@ class PpxaAlgo(Algorithm):
 #                     lambda_relax = lambda_relax / 2  # divides lambda_relax by 2
 #                 elif loss - prev_loss > - EPS:  # the stopping criterion is met
 #                     self._print("\nThe stopping criterion EPS has been met.")
-#                     self._print(f"Execution en {time.time() - t0} s.")
+#                     self._print(f"Execution in {time.time() - t0} s.")
 #                     return f.clamp(min=0.)
 #                 prev_loss = loss
 #
 #         self._print("\nThe maximum iterations number has been reached.")
-#         self._print(f"Execution en {time.time() - t0} s.")
+#         self._print(f"Execution in {time.time() - t0} s.")
 #         return f.clamp(min=0.)
 #
 #     @staticmethod

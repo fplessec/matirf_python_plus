@@ -1,0 +1,3 @@
+from .input_files_section import DeconvInputFilesSection
+from .algorithm_section import DeconvAlgorithmSection
+from .add_noise_section import DeconvAddNoiseSection

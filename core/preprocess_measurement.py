@@ -1,6 +1,6 @@
 import torch
 
-from .add_noise import add_noise_to_measurement
+from base.add_noise import add_noise_to_measurement
 from .operations import compute_min_max_angles_from_params
 import settings
 

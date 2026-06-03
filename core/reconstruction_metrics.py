@@ -8,11 +8,8 @@ from settings import device
 METRICS = {}
 
 
+## computes alpha* that minimizes ||f_true - alpha * f||^2:
 def optimal_scale(f, f_true, delta=1., eps=1e-12):
-    """
-    Calcule alpha* qui minimise ||f_true - alpha f||^2
-    en tenant compte de l'anisotropie (delta coefficent d'anisotropie en z).
-    """
     f = torch.as_tensor(f, device=device, dtype=torch.float32)
     f_true = torch.as_tensor(f_true, device=device, dtype=torch.float32)
     num = (f * f_true).sum()
@@ -118,7 +115,7 @@ def psnr_invariant(f, f_true, delta=None):
 @register_metric("SSIM")
 def ssim_3d_aligned(f, f_true, delta=1.):
     f_aligned, _ = align_scale(f, f_true, delta)
-    # SSIM reste numpy-based
+    # SSIM is numpy-based
     f_np = f_aligned.detach().cpu().numpy()
     t_np = torch.as_tensor(f_true).detach().cpu().numpy()
     scores = []
@@ -143,10 +140,7 @@ def sinkhorn_wasserstein_3d(
     eps=1e-12,
     max_points=5000,
 ):
-    # a revoir (transport optimal)
-    """
-    Wasserstein 3D (Sinkhorn) en PyTorch, invariant à l’échelle.
-    """
+    # TODO: review (optimal transport)
     f = torch.as_tensor(f, device=device).float()
     f_true = torch.as_tensor(f_true, device=device).float()
     Z, Y, X = f_true.shape
@@ -193,19 +187,19 @@ def sinkhorn_wasserstein_3d(
             break
     gamma = torch.diag(u) @ K @ torch.diag(v)
     W = torch.sum(gamma * C)
-    return torch.sqrt(W).item()  # interpretation: “distance moyenne de transport” en pixel/voxel
+    return torch.sqrt(W).item()  # average transport distance in pixel/voxel
     return W.item()
 
 
 @register_metric("FSC_mean")
-# a revoir (fourier shell correlation)
+# TODO: review (Fourier shell correlation)
 def fsc_3d(f, f_true, delta=None, n_shells=50, eps=1e-12):
     f = torch.as_tensor(f, device=device).float()
     f_true = torch.as_tensor(f_true, device=device).float()
     # FFT
     F1 = torch.fft.fftn(f)
     F2 = torch.fft.fftn(f_true)
-    # fréquences
+    # frequencies
     Z, Y, X = f.shape
     zz, yy, xx = torch.meshgrid(
         torch.fft.fftfreq(Z, device=device),

@@ -7,6 +7,6 @@ mais possède son propre core, ses propres algorithmes, sa propre GUI, et son
 propre cache.
 
 Lancement :
-    python main.py deconv gui                       # mode interactif
-    python main.py deconv cli -c <conf> -o <out>    # mode batch
+    python deconv/main.py gui                       # mode interactif
+    python deconv/main.py cli -c <conf> -o <out>    # mode batch
 """

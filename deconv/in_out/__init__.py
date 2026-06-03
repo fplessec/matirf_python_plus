@@ -19,7 +19,7 @@ from .png_file import load_png, save_png
 from .toml_file import load_or_create_toml, save_toml
 
 
-DECONV_DIR = Path(dirname(dirname(__file__)))
+DECONV_DIR = Path(dirname(dirname(__file__))).resolve()
 DECONV_CACHE_DIR = DECONV_DIR / 'cache'
 DECONV_CONFIG_PATH = DECONV_CACHE_DIR / 'config.toml'
 DECONV_DATA_DIR = DECONV_DIR / 'data'

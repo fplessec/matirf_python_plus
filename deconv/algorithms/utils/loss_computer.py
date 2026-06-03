@@ -1,33 +1,11 @@
-"""
-Calcul de la loss pour la déconvolution 2D.
-
-Formule :
-    L(f) = (1 - λ_reg) * 1/2 || H f - g ||² + λ_reg * R(f)
-
-R(f) selon le type de régularisation :
-    - "no regularization"        : R(f) = 0
-    - "L2 norm"                  : R(f) = ||f||²
-    - "L1 norm"                  : R(f) = ||f||₁
-    - "L2 norm of the gradient"  : R(f) = ||∇f||₂  (Tikhonov)
-    - "L1 norm of the gradient"  : R(f) = ||∇f||₁  (Total Variation)
-
-Le gradient ∇f est calculé par différences finies sur l'axe x (colonnes) et y
-(lignes). On ne calcule pas de Hessien ni de SHV (réservés à la 3D MA-TIRF).
-"""
-
 import torch
 import torch.nn.functional as F
 
 from deconv.core.operations import apply_psf
 
 
+## 2D forward finite-difference gradient, returns (dx, dy) with same shape as f:
 def _grad_xy(f: torch.Tensor):
-    """
-    Gradient 2D par différences finies forward, avec padding "edge"
-    (replication des bords) pour conserver la même shape que f.
-
-    Retourne (dx, dy) chacun de shape (M, N).
-    """
     # dy = f[i+1, j] - f[i, j]
     dy = torch.zeros_like(f)
     dy[:-1, :] = f[1:, :] - f[:-1, :]
@@ -37,11 +15,8 @@ def _grad_xy(f: torch.Tensor):
     return dx, dy
 
 
+## callable loss: L(f) = (1 - lambda_reg) * 1/2 ||Hf - g||^2 + lambda_reg * R(f):
 class LossComputer:
-    """
-    Construit une loss callable : loss = loss_computer(f).
-    Compatible autograd grâce à apply_psf (basé sur torch.fft).
-    """
 
     def __init__(self, g: torch.Tensor, H: torch.Tensor, reg: str, lambda_reg: float):
         self.g = g

@@ -1,16 +1,10 @@
 """
-ADAM pour la déconvolution 2D.
+Adam optimizer for 2D deconvolution.
 
-On minimise par descente de gradient (Adam) la loss définie dans
-algorithms/utils/loss_computer.py :
-    L(f) = (1 - λ_reg) * 1/2 || H f - g ||² + λ_reg * R(f)
+Minimizes the loss defined in algorithms/utils/loss_computer.py:
+    L(f) = (1 - lambda_reg) * 1/2 || H f - g ||^2 + lambda_reg * R(f)
 
-torch.fft étant nativement compatible autograd, on n'a PAS besoin de calculer
-le gradient à la main (apply_psf_adjoint) : `loss.backward()` fait tout.
-
-Initialisation f0 = g (l'image floutée elle-même). Choix simple et stable :
-g a déjà la bonne shape, est dans [0, 1] et fournit un bon point de départ.
-Une alternative serait f0 = wiener(g, H) mais ça ajoute une dépendance.
+Initialization: f0 = g (the blurred image itself).
 """
 
 from typing import Dict, Any
@@ -18,7 +12,7 @@ import time
 
 import torch
 
-from ..abstract_algo import Algorithm
+from base import Algorithm
 from ..utils.loss_computer import LossComputer
 from deconv.core.operations import get_variables_from_dict
 
@@ -37,8 +31,7 @@ class AdamAlgo(Algorithm):
             params, ['max_iter', 'lr', 'K', 'EPS', 'reg', 'lambda_reg']
         )
 
-        # Initialisation : on part de g (image floutée). Cloner pour ne pas
-        # accidentellement modifier g, et activer requires_grad pour Adam.
+        # initialization: start from g (blurred image), clone and enable grad
         f = g.clone().detach()
         f.requires_grad_(True)
 
@@ -63,11 +56,11 @@ class AdamAlgo(Algorithm):
             loss.backward()
             optimizer.step()
 
-            # Projection sur f >= 0 (les images sont supposées positives)
+            # project onto f >= 0 (images are assumed positive)
             with torch.no_grad():
                 f.clamp_(min=0.0)
 
-            # Logging + scheduler
+            # logging and scheduler
             if it % K == K - 1:
                 dloss = loss - prev_loss
                 self._print(
@@ -76,13 +69,13 @@ class AdamAlgo(Algorithm):
                     f"dloss={dloss:+.3e}"
                 )
                 if dloss >= 0:
-                    scheduler.step()  # divise lr par 2 (la loss remonte)
+                    scheduler.step()  # halve lr (loss is increasing)
                 elif dloss > -EPS:
                     self._print("\nThe stopping criterion EPS has been met.")
-                    self._print(f"Execution en {time.time() - t0:.2f} s.")
+                    self._print(f"Execution in {time.time() - t0:.2f} s.")
                     return f.detach()
                 prev_loss = loss
 
         self._print("\nThe maximum iterations number has been reached.")
-        self._print(f"Execution en {time.time() - t0:.2f} s.")
+        self._print(f"Execution in {time.time() - t0:.2f} s.")
         return f.detach()

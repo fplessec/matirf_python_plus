@@ -59,7 +59,7 @@ class LossComputer:
         # residual = Hf - self.g
         # # norme L2²
         # num = (residual ** 2).mean()
-        # # norme de g (même scaling que mse)
+        # # norm of g (same scaling as mse)
         # denom = (self.g ** 2).mean()
         # eps = 1e-12
         # data_term = 0.5 * num / (denom + eps)

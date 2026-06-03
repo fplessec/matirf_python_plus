@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from ..denoisers import denoise_tv_bregman, denoise_NL_RIDGE
-from ..abstract_algo import Algorithm
+from base import Algorithm
 from settings import device, dtype
 from core.operations import apply_matirf_operator, get_variables_from_dict
 

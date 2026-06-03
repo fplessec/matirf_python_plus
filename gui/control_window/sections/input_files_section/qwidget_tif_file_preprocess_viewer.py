@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QHBoxLayout
 
 from gui.more_widgets import ImageAndHisto3DViewer
-from core import DataMode
+from base import DataMode
 from core.pipeline_steps import compute_preprocessing_preview
 from in_out import load_or_create_toml, CONFIG_PATH
 

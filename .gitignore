@@ -1,5 +1,6 @@
 .DS_Store
 .idea
+.claude
 env
 **/__pycache__/
 /cache/config.toml

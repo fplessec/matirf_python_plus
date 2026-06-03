@@ -4,7 +4,7 @@ import time
 import torch
 import torch.nn.functional as F
 
-from ..abstract_algo import Algorithm
+from base import Algorithm
 from ..denoisers import denoise_tv_bregman, denoise_NL_RIDGE
 from core.operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
 from settings import device, dtype
@@ -81,7 +81,7 @@ class McmcAlgo(Algorithm):
         z = inversion_fct(f)
         # Perturbation gaussian nosie std sigma:
         z += sigma * torch.randn_like(f)
-        # Projection sur z >= 0
+        # project onto z >= 0
         with torch.no_grad():
             z.clamp_(min=0)
         # Denoizing:

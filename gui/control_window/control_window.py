@@ -25,9 +25,7 @@ class ControlWindow(QMainWindow):
         # and to put the bool parameters to their default value:
         self.load_cached_config()
 
-    # =========================
-    # UI
-    # =========================
+    ## builds the main layout with menu bar, two columns, and bottom bar:
     def setup_ui(self):
         self.setFocus()
         self.create_menu_bar()
@@ -127,9 +125,7 @@ class ControlWindow(QMainWindow):
         widget.setLayout(layout)
         return widget
 
-    # =========================
-    # CONFIG
-    # =========================
+    ## loads each section's UI from the cached TOML config:
     def load_cached_config(self):
         self.input_files_section.update_ui_from_toml(CONFIG_PATH)  # <- from cache
         self.operator_section.update_ui_from_toml(CONFIG_PATH)  # <- from cache
@@ -151,9 +147,7 @@ class ControlWindow(QMainWindow):
             config = load_or_create_toml(CONFIG_PATH)  # <- from cache
             save_toml(config, save_path)  # -> to any config path
 
-    # =========================
-    # RUN
-    # =========================
+    ## creates and starts a pipeline from the cached config, then opens a display window:
     def run(self):
         config = load_or_create_toml(CONFIG_PATH)  # <- from cache
         pipeline = PipelineManager.create(config)
@@ -161,9 +155,7 @@ class ControlWindow(QMainWindow):
         display_window.show()
         pipeline.start()
 
-    # =========================
-    # OPEN SAVED
-    # =========================
+    ## loads a saved reconstruction from a folder and displays it:
     def open_reconstruction(self):
         open_dir = QFileDialog.getExistingDirectory(self, "Select Folder", str(RESULTS_DIR))
         if not open_dir: return
@@ -174,9 +166,7 @@ class ControlWindow(QMainWindow):
         display_window.show()
         display_window.initialize_from_existing_data()
 
-    # =========================
-    # EVENTS
-    # =========================
+    ## closes all sub-windows and stops all pipelines before quitting:
     def closeEvent(self, event):
         if self.input_files_section.json_selector.measurement_parameters_editor:
             self.input_files_section.json_selector.measurement_parameters_editor.close()

@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QHBoxLayout, QGroupBox, QVBoxLayout, QLabel
 from .qwidget_tif_file_selector import TifFileSelector
 from .qwidget_json_file_selector import JsonFileSelector
 from gui.more_widgets import QSeparator, QSwitchButton
-from core import DataMode
+from base import DataMode
 from in_out import load_or_create_toml, CONFIG_PATH
 from cache import update_cache
 from settings import FontSize

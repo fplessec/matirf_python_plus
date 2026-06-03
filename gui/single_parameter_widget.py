@@ -2,8 +2,8 @@ from PyQt5.QtWidgets import QHBoxLayout, QWidget, QLabel, QLineEdit, QComboBox, 
 from PyQt5.QtGui import QFont
 
 from settings import FontSize
-from cache import update_cache
-from in_out import load_or_create_toml
+from cache import update_cache as _default_update_cache
+from in_out import load_or_create_toml as _default_load_toml
 from .more_widgets import QLatexLabel
 
 
@@ -18,6 +18,8 @@ class SimpleParameterWidget(QWidget):
         param_info (dict): specific to the precedent 'type' attribute and the parameter.
         fontsize (int): the size of the font used in the QLabel/QLatexLabel.
         toml_key_list (list or None): if not None, used to specify the key pathway of the parameter in the config file.
+        update_cache_fn (callable or None): function(key_path, value) to persist a parameter change in cache.
+        load_toml_fn (callable or None): function(filepath) -> dict to load a TOML config file.
     The different types:
         > type = 'value': the parameter is a number,
         > type = 'bool': the parameter is a choice (Yes or No, True or False),
@@ -41,7 +43,8 @@ class SimpleParameterWidget(QWidget):
                             "string3"]) the default value is the first element of the list
             }
     """
-    def __init__(self, title, type, param_info=None, fontsize=FontSize.NORMAL, toml_key_list=None):
+    def __init__(self, title, type, param_info=None, fontsize=FontSize.NORMAL, toml_key_list=None,
+                 update_cache_fn=None, load_toml_fn=None):
         super().__init__()
         if param_info is None:
             param_info = {}
@@ -50,6 +53,9 @@ class SimpleParameterWidget(QWidget):
         self.param_info = param_info
         self.fontsize = fontsize
         self.toml_key_list = toml_key_list
+        ## injectable cache/toml functions (defaults to matirf's):
+        self._update_cache = update_cache_fn or _default_update_cache
+        self._load_toml = load_toml_fn or _default_load_toml
         self.input_widget = None
         self.value_display = None
         self.checkbox = None
@@ -94,7 +100,7 @@ class SimpleParameterWidget(QWidget):
                 self.param_value = value
                 if self.toml_key_list is not None:
                     # adding a specific action to the callback to update the parameter value in cache file:
-                    update_cache(self.toml_key_list, self.param_value)
+                    self._update_cache(self.toml_key_list, self.param_value)
             except ValueError:
                 # if the user doesn't respect the data-type 'dtype':
                 if self.input_widget.text() != '':
@@ -121,7 +127,7 @@ class SimpleParameterWidget(QWidget):
             self.param_value = value
             if self.toml_key_list is not None:
                 # adding a specific action to the callback to update the parameter value in cache file:
-                update_cache(self.toml_key_list, self.param_value)
+                self._update_cache(self.toml_key_list, self.param_value)
         self.update_callback = update_bool
         self.checkbox.stateChanged.connect(update_bool)
         bool_layout = QHBoxLayout()
@@ -140,7 +146,7 @@ class SimpleParameterWidget(QWidget):
             self.param_value = self.combo.currentText()
             if self.toml_key_list is not None:
                 # adding a specific action to the callback to update the parameter value in cache file:
-                update_cache(self.toml_key_list, self.param_value)
+                self._update_cache(self.toml_key_list, self.param_value)
         self.update_callback = update_option
         self.combo.currentTextChanged.connect(update_option)
         self.layout.addWidget(self.combo)
@@ -149,7 +155,7 @@ class SimpleParameterWidget(QWidget):
         """Updates the current U.I. to match its value from a config file."""
         if self.toml_key_list is None:
             return
-        config = load_or_create_toml(toml_path)
+        config = self._load_toml(toml_path)
         toml_key_list = self.toml_key_list.copy()
         while toml_key_list != []:
             try: config = config[toml_key_list.pop(0)]
@@ -177,7 +183,7 @@ class SimpleParameterWidget(QWidget):
             self.param_value = typed_value
         except (ValueError, TypeError):
             if config_value is None or config_value == "None":
-                update_cache(self.toml_key_list, "None")
+                self._update_cache(self.toml_key_list, "None")
                 self.update_callback()
             else:
                 print(
@@ -192,7 +198,7 @@ class SimpleParameterWidget(QWidget):
             self.param_value = bool_value
         except (ValueError, TypeError):
             if config_value is None or config_value == "None":
-                update_cache(self.toml_key_list, bool(self.param_info['default']))
+                self._update_cache(self.toml_key_list, bool(self.param_info['default']))
                 self.update_callback()
             else:
                 print(f"Warning: Invalid boolean value '{config_value}' for parameter '{self.title}'")

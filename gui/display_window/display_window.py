@@ -7,23 +7,18 @@ from tomli_w import dumps
 from .sections import FiguresSection, MessageSection, SyntheticTruthSection
 from gui.utils import close_active_window
 from gui.control_window import DisplayWindowManager
-from core import PipelineManager, PipelineState
+from core import PipelineManager
+from base import PipelineState
 from in_out import RESULTS_DIR
 import settings
 
 
+## thread-safe bridge between pipeline callbacks and the Qt main thread:
 class PipelineQtBridge(QObject):
-    """
-    Pont thread-safe entre les callbacks Python du pipeline et la boucle Qt.
-
-    Le pipeline tourne dans un thread worker, mais l'UI Qt doit être mise à jour
-    depuis le main thread. On utilise des pyqtSignal avec Qt.QueuedConnection
-    pour transférer proprement les événements d'un thread à l'autre.
-    """
     message = pyqtSignal(str)
-    finished = pyqtSignal(object)            # transporte le ReconstructionResult
+    finished = pyqtSignal(object)
     error = pyqtSignal(str)
-    state_changed = pyqtSignal(object, object)  # (old_state, new_state)
+    state_changed = pyqtSignal(object, object)
 
 
 class DisplayWindow(QMainWindow):
@@ -56,15 +51,8 @@ class DisplayWindow(QMainWindow):
         if self.switch_btn:
             self.switch_btn.setEnabled(True)
 
-    # =========================
-    # PIPELINE
-    # =========================
+    ## wires pipeline callbacks to Qt signals so the UI updates from the main thread:
     def _connect_pipeline_callbacks(self):
-        """
-        Connecte les callbacks du pipeline aux signaux Qt du bridge.
-        Chaque callback se contente d'émettre un signal Qt, qui sera ensuite
-        traité dans le main thread (via Qt.QueuedConnection sur les slots).
-        """
         self.pipeline.callbacks = {
             "message": lambda msg: self.qt_bridge.message.emit(msg),
             "finished": lambda result: self.qt_bridge.finished.emit(result),
@@ -72,11 +60,8 @@ class DisplayWindow(QMainWindow):
             "state_changed": lambda old, new: self.qt_bridge.state_changed.emit(old, new),
         }
 
-    # =========================
-    # CALLBACKS (main thread Qt)
-    # =========================
+    ## updates plots and enables buttons when the algorithm finishes:
     def on_finished(self, result):
-        # 'result' est un ReconstructionResult complet (passé en payload du signal).
         self.update_plot()
         self.save_btn.setEnabled(True)
         self.save_action.setEnabled(True)
@@ -86,19 +71,15 @@ class DisplayWindow(QMainWindow):
     def on_error(self, err):
         self._print(f"Error: {err}")
 
+    ## logs pipeline state transitions to the message panel:
     def on_state_changed(self, old_state: PipelineState, new_state: PipelineState):
-        """Réagit aux transitions d'état du pipeline pour adapter l'UI."""
-        # Pour l'instant, on log juste la transition. Logique d'UI plus riche
-        # (status bar, spinner...) pourra venir ici.
         self._print(f"[state] {old_state.value} → {new_state.value}")
 
     def _print(self, msg):
         if hasattr(self, "messages_section"):
             self.messages_section._print(msg)
 
-    # =========================
-    # UI
-    # =========================
+    ## builds the main layout with menu bar, left column (config + messages), and right column (figures):
     def setup_ui(self):
         self.create_menu_bar()
         # the base objects:
@@ -188,9 +169,7 @@ class DisplayWindow(QMainWindow):
         widget.setLayout(bottom_bar_layout)
         return widget
 
-    # =========================
-    # DISPLAY
-    # =========================
+    ## refreshes the figures and synthetic truth panels with the latest result:
     def update_plot(self):
         self.figures_section.update_plot(self.pipeline.result.f, self.config)
         if self.pipeline.is_synthetic_data() and self.synthetic_section:
@@ -204,20 +183,16 @@ class DisplayWindow(QMainWindow):
             self.stack.setCurrentIndex(0)
             self.switch_btn.setText("Go To Truth →")
 
-
+    ## opens a save dialog and writes the reconstruction folder (data + config):
     def save_reconstruction(self):
-        """
-        Opens a dialog box to create a folder and saves the reconstruction.
-        Each reconstruction is a folder that contains data and metadata, such as the configuration file.
-        """
         save_dir, _ = QFileDialog.getSaveFileName(self, "Name the Save Directory",
                                                   str(RESULTS_DIR), "Folder Selection (*.*)")
         if not save_dir:
             return
         self.pipeline.save_results(save_dir)
 
+    ## stops the pipeline and unregisters from the managers before closing:
     def closeEvent(self, event):
-        """Rewrites the closeEvent to stop the algorithm correctly and communicate with the managers."""
         if self.synthetic_section:
             if self.synthetic_section.viewer_window:
                 self.synthetic_section.viewer_window.close()

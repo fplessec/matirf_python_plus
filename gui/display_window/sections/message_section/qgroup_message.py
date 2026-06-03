@@ -13,15 +13,14 @@ class MessageSection(QGroupBox):
         layout = QVBoxLayout()
         layout.setContentsMargins(1, 1, 1, 1)
         layout.setSpacing(1)
-        # Zone de texte en lecture seule
         self.text_edit = QTextEditTab2Switch(parent=self)
         self.text_edit.setReadOnly(True)
         layout.addWidget(self.text_edit)
         self.setLayout(layout)
 
     def _print(self, message):
-        self.text_edit.append(message)  # Ajoute une nouvelle ligne
-        self.text_edit.ensureCursorVisible()  # Fait défiler automatiquement
+        self.text_edit.append(message)
+        self.text_edit.ensureCursorVisible()
 
     def get_text(self):
         return self.text_edit.toPlainText()

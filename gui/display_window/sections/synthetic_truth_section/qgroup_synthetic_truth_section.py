@@ -15,26 +15,20 @@ class SyntheticTruthSection(QGroupBox):
 
     def _setup_ui(self):
         self.layout = QVBoxLayout()
-
-        # TABLE
+        # table for metrics:
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels(["Metric", "Value"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        # BUTTON
+        # button to visualize:
         self.viewer_btn = QPushButton("Visualize difference")
         self.viewer_btn.clicked.connect(self.open_viewer)
-
+        # assemble:
         self.layout.addWidget(self.table)
         self.layout.addWidget(self.viewer_btn)
-
         self.setLayout(self.layout)
 
-
     def update_plot(self):
-        # Le pipeline garantit qu'en mode synth, result.metrics est calculé
-        # dans _on_algo_finished. Plus de fallback de calcul ici (qui était
-        # à la fois buggé et hors-sujet pour un widget).
+        # metrics are computed by the pipeline in _on_algo_finished
         result = self.pipeline.result
         if result is None or not result.has_synthetic_truth() or result.metrics is None:
             return
@@ -47,7 +41,7 @@ class SyntheticTruthSection(QGroupBox):
             self.table.setItem(row, 1, QTableWidgetItem(str(value)))
 
     def open_viewer(self):
-        # La diff est précalculée par le pipeline et stockée dans result.diff.
+        # diff is precomputed by the pipeline and stored in result.diff
         result = self.pipeline.result
         if result is None or result.diff is None:
             return

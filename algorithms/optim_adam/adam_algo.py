@@ -3,9 +3,9 @@ import time
 
 import torch
 
-from ..abstract_algo import Algorithm
+from base import Algorithm
 from ..utils.loss_computer import LossComputer
-from core.operations import apply_matirf_operator, get_variables_from_dict, estimate_delta_anisotropy_from_params
+from core.operations import apply_matirf_operator, get_variables_from_dict
 from settings import device, dtype
 
 def get_lr(optimizer):
@@ -21,10 +21,8 @@ class AdamAlgo(Algorithm):
         (max_iter, lr, K, EPS, reg, lambda_reg, delta, rho) = get_variables_from_dict(
             params, ['max_iter', 'lr', 'K', 'EPS', 'reg', 'lambda_reg', 'delta', 'rho'])
 
-        delta_estimated = estimate_delta_anisotropy_from_params(self.measurement_params, self.oper_params)
-        self._print(f"delta anisotropy estimation = {delta_estimated}\n")
 
-        # Pré-calculs matriciels
+        # matrix precomputations
         Ht = H.transpose(0, 1)
         HtH = Ht @ H
         Htg = apply_matirf_operator(Ht, g)
@@ -55,11 +53,11 @@ class AdamAlgo(Algorithm):
             loss.backward()
             optimizer.step()
 
-            # Projection sur f >= 0
+            # project onto f >= 0
             with torch.no_grad():
                 f.clamp_(min=0)
 
-            # Logging et scheduler
+            # logging and scheduler
             if iter % K == K - 1:
                 dloss = loss - prev_loss
                 self._print(
@@ -68,13 +66,13 @@ class AdamAlgo(Algorithm):
                     f"dloss={dloss:+.3e}"
                 )
                 if dloss >= 0:
-                    scheduler.step()  # divise lr par 2
+                    scheduler.step()  # halve lr
                 elif dloss > -EPS:
                     self._print("\nThe stopping criterion EPS has been met.")
-                    self._print(f"Execution en {time.time() - t0:.2f} s.")
+                    self._print(f"Execution in {time.time() - t0:.2f} s.")
                     return f
                 prev_loss = loss
 
         self._print("\nThe maximum iterations number has been reached.")
-        self._print(f"Execution en {time.time() - t0:.2f} s.")
+        self._print(f"Execution in {time.time() - t0:.2f} s.")
         return f

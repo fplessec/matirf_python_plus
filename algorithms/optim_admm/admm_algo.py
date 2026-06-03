@@ -3,7 +3,7 @@ import time
 
 import torch
 
-from ..abstract_algo import Algorithm
+from base import Algorithm
 from core.operations import apply_matirf_operator, get_variables_from_dict
 from settings import device, dtype
 
