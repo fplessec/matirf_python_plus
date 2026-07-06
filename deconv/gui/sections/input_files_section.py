@@ -3,17 +3,21 @@ import os
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import (
-    QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog, QWidget, QMessageBox,
+    QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QWidget, QMessageBox,
 )
+from common.gui.file_dialog import open_file
 
-from gui.more_widgets import QSwitchButton, QSeparator, QCrossButton
-from base import DataMode
-from deconv.in_out import load_or_create_toml, DECONV_CONFIG_PATH, DECONV_MEASUREMENTS_DIR
+from common.gui.widgets import QCrossButton
+from common.gui.specializable.control_window import BaseInputFilesSection
+from common import DataMode
+from deconv import DECONV_CONFIG_PATH, DECONV_MEASUREMENTS_DIR, DEFAULT_DECONV_CONFIG
+from common.in_out import load_or_create_toml
 from deconv.cache import update_cache
-from settings import FontSize
+from common.settings import FontSize
 
 
-## widget to select a PNG file (2D image for deconv):
+# ── widget to select a PNG file (2D image for deconv) ───────────────────
+
 class PngFileSelector(QWidget):
 
     def __init__(self, parent):
@@ -54,8 +58,7 @@ class PngFileSelector(QWidget):
         self.setLayout(layout)
 
     def _choose_file(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, self._mode_text(), str(DECONV_MEASUREMENTS_DIR), "Image Files (*.png)")
+        path = open_file(self, self._mode_text(), DECONV_MEASUREMENTS_DIR, "Image Files (*.png)")
         if path:
             self.update_selected_file(path)
 
@@ -84,6 +87,12 @@ class PngFileSelector(QWidget):
         try:
             self.preprocess_viewer = DeconvPreprocessViewer(parent=self)
         except Exception as e:
+            config = load_or_create_toml(DECONV_CONFIG_PATH, default_config=DEFAULT_DECONV_CONFIG)
+            errors = []
+            if config['add-noise']['add_noise'] and config['add-noise']['sigma'] == 'None':
+                errors.append('Noise standard deviation value is None, please define a value for this parameter.')
+            if errors:
+                e = Exception('\n-'+'\n-'.join(errors))
             self.preprocess_viewer = None
             QMessageBox.warning(
                 self,
@@ -102,7 +111,8 @@ class PngFileSelector(QWidget):
         self.title_label.setText(self._mode_text())
 
 
-## widget to select a JSON file (PSF / simulation parameters for deconv):
+# ── widget to select a JSON file (PSF / simulation parameters) ──────────
+
 class DeconvJsonFileSelector(QWidget):
 
     def __init__(self, parent):
@@ -144,8 +154,7 @@ class DeconvJsonFileSelector(QWidget):
         self.setLayout(layout)
 
     def _choose_file(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, self._mode_text(), str(DECONV_MEASUREMENTS_DIR), "Parameters Files (*.json)")
+        path = open_file(self, self._mode_text(), DECONV_MEASUREMENTS_DIR, "Parameters Files (*.json)")
         if path:
             self.update_selected_file(path)
 
@@ -168,7 +177,7 @@ class DeconvJsonFileSelector(QWidget):
         font.setBold(self.is_file_selected)
         self.file_label.setFont(font)
         self._update_create_modify_button_text()
-        self.parent.png_selector.preprocess_button.setVisible(self.parent.are_both_file_selected())
+        self.parent.image_selector.preprocess_button.setVisible(self.parent.are_both_file_selected())
 
     def _update_create_modify_button_text(self):
         self.create_modify_button.setText(
@@ -190,92 +199,43 @@ class DeconvJsonFileSelector(QWidget):
         self.title_label.setText(self._mode_text())
 
 
-## input files section for the deconv problem (PNG + JSON with real/synthetic switch):
-class DeconvInputFilesSection(QGroupBox):
+# ── input files section for the deconv problem ──────────────────────────
 
-    def __init__(self, parent=None):
-        super().__init__("Input Files")
-        self.on_color = self.palette().color(QPalette.WindowText).name()
-        self.off_color = self.palette().color(QPalette.PlaceholderText).name()
-        self.parent = parent
-        self.is_mode_real = self._get_cached_mode()
-        self._setup_ui()
+class DeconvInputFilesSection(BaseInputFilesSection):
+    """
+    Deconvolution input files section.
 
-    @staticmethod
-    def _get_cached_mode():
+    Selects a .png file (2D image or ground truth) and a .json PSF
+    parameters file, with a real / synthetic mode toggle.
+    """
+
+    def _get_cached_mode(self) -> bool:
         try:
-            mode = load_or_create_toml(DECONV_CONFIG_PATH)['input-paths']['mode']
+            mode = load_or_create_toml(
+                DECONV_CONFIG_PATH, default_config=DEFAULT_DECONV_CONFIG
+            )['input-paths']['mode']
             return mode == DataMode.REAL.value
         except (KeyError, FileNotFoundError):
             return False  # default is synthetic for deconv
 
-    def _setup_ui(self):
-        layout = QVBoxLayout()
-        layout.setContentsMargins(1, 1, 1, 1)
-        layout.addLayout(self._create_top_layout())
-        layout.addLayout(self._create_bottom_layout())
-        self.setLayout(layout)
+    def _real_mode_text(self):
+        return "Work with real measurement"
 
-    def _create_top_layout(self):
-        top = QHBoxLayout()
-        top.setContentsMargins(4, 4, 4, 4)
-        self.switch_button = QSwitchButton()
-        if not self.is_mode_real:
-            self.switch_button.switch_to_right()
-        self.switch_button.toggled.connect(self._switch_mode)
-        self.real_label = QLabel("Work with real measurement")
-        self.synth_label = QLabel("Simulate with synthetic truth")
-        self._update_labels()
-        top.addStretch()
-        top.addWidget(self.real_label)
-        top.addWidget(self.switch_button)
-        top.addWidget(self.synth_label)
-        top.addStretch()
-        return top
+    def _synthetic_mode_text(self):
+        return "Simulate with synthetic truth"
 
-    def _create_bottom_layout(self):
-        bot = QHBoxLayout()
-        bot.setContentsMargins(1, 1, 1, 1)
-        self.png_selector = PngFileSelector(parent=self)
-        self.json_selector = DeconvJsonFileSelector(parent=self)
-        bot.addWidget(self.png_selector)
-        bot.addWidget(QSeparator('V'))
-        bot.addWidget(self.json_selector)
-        return bot
+    def _create_image_selector(self):
+        return PngFileSelector(parent=self)
 
-    def are_both_file_selected(self):
-        return self.png_selector.is_file_selected and self.json_selector.is_file_selected
+    def _create_json_selector(self):
+        return DeconvJsonFileSelector(parent=self)
 
-    def _update_labels(self):
-        if self.is_mode_real:
-            self.real_label.setStyleSheet(
-                f"color: {self.on_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
-            self.synth_label.setStyleSheet(
-                f"color: {self.off_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
-        else:
-            self.real_label.setStyleSheet(
-                f"color: {self.off_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
-            self.synth_label.setStyleSheet(
-                f"color: {self.on_color}; font-style: italic; font-size: {FontSize.SMALL}pt;")
-
-    def _switch_mode(self):
-        self.is_mode_real = not self.is_mode_real
-        self._update_labels()
-        new_mode = DataMode.REAL.value if self.is_mode_real else DataMode.SYNTHETIC.value
+    def _on_switch_mode(self, is_mode_real):
+        new_mode = DataMode.REAL.value if is_mode_real else DataMode.SYNTHETIC.value
         update_cache(['input-paths', 'mode'], new_mode)
-        self.png_selector.update_mode()
-        self.json_selector.update_mode()
 
-    def update_ui_from_toml(self, toml_path):
-        config = load_or_create_toml(toml_path)
-        mode = config['input-paths']['mode']
-        self.is_mode_real = mode == DataMode.REAL.value
-        self._update_labels()
-        self.png_selector.update_mode()
-        self.json_selector.update_mode()
-        if self.is_mode_real:
-            self.switch_button.switch_to_left(no_signal=True)
-        else:
-            self.switch_button.switch_to_right(no_signal=True)
-        self.png_selector.update_selected_file(config['input-paths']['png'])
-        self.json_selector.update_selected_file(config['input-paths']['json'])
+    def _load_config_for_update(self, toml_path):
+        return load_or_create_toml(toml_path, default_config=DEFAULT_DECONV_CONFIG)
+
+    def _get_file_paths_from_config(self, config):
+        return config['input-paths']['png'], config['input-paths']['json']

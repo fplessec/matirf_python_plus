@@ -1,16 +1,9 @@
 import torch
 
-from settings import device, dtype
+import common.settings as settings
 
 
-def get_variables_from_dict(dico: dict, variable_name_list: list['str']) -> tuple:
-    """
-    This function allows you to unpack the values contained in a set of parameters represented by the ‘dico’ argument,
-    using the ‘variable_name_list’ argument to select the keys (parameter names, therefore typed str) of the desired
-    parameters from the set of parameters.
-    It returns a tuple of the values of each desired parameter in the order determined by the ‘variable_name_list’.
-    """
-    return tuple(dico[key] for key in variable_name_list)
+from common.utils import get_variables_from_dict
 
 def build_gaussian_psf(sigma: float, kernel_size: int) -> torch.Tensor:
     """
@@ -20,7 +13,7 @@ def build_gaussian_psf(sigma: float, kernel_size: int) -> torch.Tensor:
     if kernel_size % 2 == 0:
         kernel_size += 1  # forcing the kernel size to be odd
     half = kernel_size // 2
-    coords = torch.arange(-half, half + 1, device=device, dtype=dtype)
+    coords = torch.arange(-half, half + 1, device=settings.device, dtype=settings.dtype)
     y, x = torch.meshgrid(coords, coords, indexing='ij')
     psf = torch.exp(-(x * x + y * y) / (2.0 * sigma * sigma))
     psf = psf / psf.sum()
@@ -73,6 +66,7 @@ def apply_psf(H: torch.Tensor, f: torch.Tensor, adjoint=False) -> torch.Tensor:
     psf_fft_padded = _psf_to_fft_kernel(H, f.shape)
     f_fft = torch.fft.fft2(f)
     H_fft = torch.fft.fft2(psf_fft_padded)
-    if adjoint: H_fft = H_fft.conj()
+    if adjoint:
+        H_fft = H_fft.conj()
     return torch.real(torch.fft.ifft2(f_fft * H_fft))
 

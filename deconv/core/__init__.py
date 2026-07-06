@@ -1,2 +1,2 @@
 from .deconv_result import DeconvResult
-from .deconv_pipeline_manager import DeconvPipelineManager
+from .deconv_pipeline import DeconvPipeline

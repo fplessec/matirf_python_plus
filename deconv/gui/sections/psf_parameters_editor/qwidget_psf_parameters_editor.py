@@ -1,12 +1,14 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox
+from common.gui.file_dialog import save_file
 
 from .psf_parameters_ui_dictionary import PSF_PARAMETERS_UI
-from gui import SimpleParameterWidget
-from gui.more_widgets import QSeparator
-from deconv.in_out import load_json, save_json, DECONV_MEASUREMENTS_DIR
-import settings
+from common.gui.base import SimpleParameterWidget
+from common.gui.widgets import QSeparator
+from deconv import DECONV_MEASUREMENTS_DIR
+from common.in_out import load_json, save_json
+import common.settings as settings
 
 
 ## editor window to create or modify a PSF parameters JSON file:
@@ -69,8 +71,8 @@ class PsfParametersEditor(QWidget):
             self.close()
 
     def _create_file(self):
-        save_path, _ = QFileDialog.getSaveFileName(
-            self, "Save PSF Parameters File", str(DECONV_MEASUREMENTS_DIR), "JSON Files (*.json)")
+        save_path = save_file(self, "Save PSF Parameters File",
+                              DECONV_MEASUREMENTS_DIR, "JSON Files (*.json)")
         if save_path:
             self.json_path = save_path
             self._save_json()

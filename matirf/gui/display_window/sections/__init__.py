@@ -1,0 +1,2 @@
+from .figures_section import FiguresSection
+from .synthetic_truth_section import SyntheticTruthSection

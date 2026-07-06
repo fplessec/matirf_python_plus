@@ -1,27 +1,30 @@
 # =============================================================================
 # pyproject.toml - matirf_python_plus
 # =============================================================================
-# Ce fichier transforme le projet en un package Python installable.
+# This file turns the project into an installable Python package.
 #
-# Une fois installé en mode "editable" :
+# Once installed in editable mode:
 #     source env/bin/activate
 #     pip install -e .
 #
-# Tu peux importer tes modules depuis n'importe où dans le venv :
-#     from algorithms.denoisers import denoise_gaussian
-#     from core import PipelineManager
+# You can import your modules from anywhere in the venv:
+#     from common.algorithms import BaseAdam
+#     from common.denoisers import DENOISER_REGISTRY
 #     ...
 #
-# Et tu peux lancer n'importe quel script :
-#     python algorithms/denoisers/tests/main.py
-#     python -m algorithms.denoisers.tests.main
-# Les deux marchent.
+# Console entry points:
+#     matirf gui                  # launch matirf GUI
+#     matirf cli -c config.toml   # launch matirf CLI
+#     matirf reset                # delete the cached config.toml
+#     deconv gui                  # launch deconv GUI
+#     deconv reset                # delete the cached config.toml
+#     inverse-problems list       # list available inverse problems
 # =============================================================================
 
 
 # -----------------------------------------------------------------------------
-# Build system : indique à pip comment construire le package.
-# setuptools est l'outil standard, ça marche partout.
+# Build system: tells pip how to build the package.
+# setuptools is the standard tool, works everywhere.
 # -----------------------------------------------------------------------------
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -29,12 +32,12 @@ build-backend = "setuptools.build_meta"
 
 
 # -----------------------------------------------------------------------------
-# Métadonnées du projet (PEP 621)
+# Project metadata (PEP 621)
 # -----------------------------------------------------------------------------
 [project]
 name = "matirf_python_plus"
 version = "0.1.0"
-description = "Algorithme de reconstruction MA-TIRF (problème inverse)"
+description = "Generic inverse problem solver with MA-TIRF and deconvolution implementations"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -42,17 +45,17 @@ authors = [
 ]
 
 # -----------------------------------------------------------------------------
-# Dépendances runtime - strict minimum nécessaire au fonctionnement du projet.
-# Chaque ligne correspond à un module réellement importé dans le code.
+# Runtime dependencies - strict minimum required for the project to work.
+# Each line corresponds to a module actually imported in the code.
 # -----------------------------------------------------------------------------
 dependencies = [
-    "torch>=2.7.1",            # tenseurs, calculs sur CPU/GPU (utilisé partout)
+    "torch>=2.7.1",            # tensors, CPU/GPU computations (used everywhere)
     "numpy>=2.0",              # nlridge.py, abstract_algo.py, viewers, etc.
-    "matplotlib>=3.10.3",      # viewers GUI, qlatexlabel
-    "PyQt5>=5.15.11",          # interface graphique
+    "matplotlib>=3.10.3",      # GUI viewers, qlatexlabel
+    "PyQt5>=5.15.11",          # graphical interface
     "tifffile>=2025.5.10",     # in_out/tif_file.py
-    "tomli>=2.2.1",            # in_out/toml_file.py (lecture)
-    "tomli_w>=1.2.0",          # in_out/toml_file.py + display_window.py (écriture)
+    "tomli>=2.2.1",            # in_out/toml_file.py (reading)
+    "tomli_w>=1.2.0",          # in_out/toml_file.py + display_window.py (writing)
     "Pillow>=10.0",            # algorithms/denoisers/tests/__init__.py + denoise_tv_bregman.py
     "scikit-image>=0.22",      # reconstruction_metrics (SSIM), pnp_algo, nlridge, denoise_tv_bregman (estimate_sigma)
     "einops>=0.7",             # algorithms/denoisers/nlridge.py (rearrange, repeat)
@@ -60,8 +63,8 @@ dependencies = [
 
 
 # -----------------------------------------------------------------------------
-# Dépendances optionnelles (dev, tests, ...)
-# Installables avec : pip install -e ".[dev]"
+# Optional dependencies (dev, tests, ...)
+# Install with: pip install -e ".[dev]"
 # -----------------------------------------------------------------------------
 [project.optional-dependencies]
 dev = [
@@ -70,49 +73,46 @@ dev = [
 
 
 # -----------------------------------------------------------------------------
-# Points d'entrée console
-# Permet d'invoquer le projet via une commande directe :
-#     matirf gui
-#     matirf cli -c config.toml -o output_dir/
-# (à condition que main.py expose une fonction main())
+# Console entry points
+#
+# Each inverse problem has its own command that delegates to cli.py.
+# cli.py detects the problem from the command name (sys.argv[0]).
+# "inverse-problems" is a utility command to list available problems.
+#
+# To add a new inverse problem (e.g. superres):
+#   1. Create the superres/ package with main.py and cache/
+#   2. Add here:  superres = "cli:main"
+#   3. pip install -e .
 # -----------------------------------------------------------------------------
 [project.scripts]
-matirf = "main:main"
+matirf = "cli:main"
+deconv = "cli:main"
+list = "cli:main"
+help = "cli:main"
+settings = "cli:main"
 
 
 # -----------------------------------------------------------------------------
-# Découverte automatique des packages
-# - on garde uniquement les vrais packages (dossiers avec __init__.py)
-# - on exclut env/, data/, cache/ (cache au sens "données mises en cache" pas
-#   le sous-package python).
-#
-# ATTENTION : tu as un PACKAGE Python nommé "cache/" (avec __init__.py),
-# qu'on garde. Le DOSSIER de données s'appelle aussi cache/ et contient
-# le config.toml — c'est le même dossier, ce n'est pas un souci pour
-# setuptools puisqu'il regarde juste les __init__.py.
+# Automatic package discovery
+# - keep only real packages (directories with __init__.py)
+# - exclude env/, data/, __pycache__/
 # -----------------------------------------------------------------------------
 [tool.setuptools.packages.find]
 where = ["."]
 include = [
-    "algorithms*",
-    "cache*",
-    "core*",
-    "gui*",
-    "in_out*",
-    "settings*",
+    "common*",
+    "matirf*",
+    "deconv*",
 ]
 exclude = [
     "env*",
-    "data*",
+    "*.data*",
     "__pycache__*",
-    "*.tests.*",  # exclut les sous-packages de tests si tu en as
 ]
 
 # -----------------------------------------------------------------------------
-# Modules Python "top-level" à installer en plus des packages.
-# main.py est un fichier autonome à la racine du projet (pas dans un package),
-# il faut donc explicitement dire à setuptools de l'inclure pour que la
-# commande `matirf` puisse faire `from main import main`.
+# Top-level Python modules to install alongside the packages.
+# cli.py is the centralized entry point at the project root.
 # -----------------------------------------------------------------------------
 [tool.setuptools]
-py-modules = ["main"]
+py-modules = ["cli"]

@@ -1,12 +1,11 @@
-from PyQt5.QtWidgets import (
-    QGroupBox, QVBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QWidget, QHBoxLayout,
-)
+from PyQt5.QtWidgets import QWidget, QHBoxLayout
 
-from gui.more_widgets import ImageAndHisto2DViewer
+from common.gui.widgets import ImageAndHisto2DViewer
+from common.gui.specializable.display_window import BaseSyntheticTruthSection
 
 
-## popup window showing the difference image f_true - alpha*f (2D):
 class DeconvDifferenceViewer(QWidget):
+    """Popup window showing the difference image f_true - alpha*f (2D)."""
 
     def __init__(self, diff, parent=None):
         super().__init__()
@@ -27,43 +26,7 @@ class DeconvDifferenceViewer(QWidget):
         super().closeEvent(event)
 
 
-## synthetic ground truth analysis section for the deconv display window:
-class DeconvSyntheticTruthSection(QGroupBox):
+class DeconvSyntheticTruthSection(BaseSyntheticTruthSection):
 
-    def __init__(self, pipeline):
-        super().__init__("Synthetic Ground Truth Analysis")
-        self.viewer_window = None
-        self.pipeline = pipeline
-        self._setup_ui()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout()
-        self.table = QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(["Metric", "Value"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.viewer_btn = QPushButton("Visualize difference")
-        self.viewer_btn.clicked.connect(self._open_viewer)
-        layout.addWidget(self.table)
-        layout.addWidget(self.viewer_btn)
-        self.setLayout(layout)
-
-    def update_plot(self):
-        result = self.pipeline.result
-        if result is None or not result.has_synthetic_truth() or result.metrics is None:
-            return
-        self._populate_table(result.metrics)
-
-    def _populate_table(self, metrics: dict):
-        self.table.setRowCount(len(metrics))
-        for row, (key, value) in enumerate(metrics.items()):
-            self.table.setItem(row, 0, QTableWidgetItem(str(key)))
-            self.table.setItem(row, 1, QTableWidgetItem(str(value)))
-
-    def _open_viewer(self):
-        result = self.pipeline.result
-        if result is None or result.diff is None:
-            return
-        if self.viewer_window is not None:
-            self.viewer_window.close()
-        self.viewer_window = DeconvDifferenceViewer(result.diff, parent=self)
-        self.viewer_window.show()
+    def _create_difference_viewer(self, diff):
+        return DeconvDifferenceViewer(diff, parent=self)

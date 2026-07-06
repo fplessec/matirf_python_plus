@@ -1,9 +1,10 @@
 from PyQt5.QtWidgets import QWidget, QHBoxLayout
 
-from gui.more_widgets import ImageAndHisto2DViewer
-from base import DataMode
-from deconv.core.pipeline_steps import compute_preprocessing_preview
-from deconv.in_out import load_or_create_toml, DECONV_CONFIG_PATH
+from common.gui.widgets import ImageAndHisto2DViewer
+from common import DataMode
+from deconv.core.pipeline_operations import DeconvOperations
+from deconv import DECONV_CONFIG_PATH, DEFAULT_DECONV_CONFIG
+from common.in_out import load_or_create_toml
 
 
 ## preview window showing input image vs preprocessed/synthetic measurement (2D):
@@ -14,7 +15,7 @@ class DeconvPreprocessViewer(QWidget):
         self.parent = parent
         config = load_or_create_toml(DECONV_CONFIG_PATH)
         self.mode = DataMode.from_config(config['input-paths']['mode'])
-        self.left, self.right = compute_preprocessing_preview(config, self.mode)
+        self.left, self.right = DeconvOperations.compute_preprocessing_preview(config, self.mode)
         self.setWindowTitle(
             "Preview - Real measurement preprocessing" if self.mode == DataMode.REAL
             else "Preview - Synthetic data simulation")

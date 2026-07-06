@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from base.base_result import BaseResult
+from common.core.base_result import BaseResult
 
 
 @dataclass

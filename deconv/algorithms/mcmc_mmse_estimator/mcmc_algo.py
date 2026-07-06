@@ -1,103 +1,96 @@
-from typing import Dict, Any
-import time
+"""
+MCMC MMSE estimator for 2D deconvolution.
+
+Two proposal methods available (selectable via UI):
+    C: noise → data consistency → positivity → denoising
+    D: data consistency → noise → positivity → denoising
+
+Data consistency uses Wiener/ridge inversion in Fourier domain:
+    H_inv(x) = F^{-1}[ conj(H_fft) / (|H_fft|^2 + lambda_rr) * F(x) ]
+"""
+
+import copy
 
 import torch
-import torch.nn.functional as F
 
-from base import Algorithm
-from algorithms.denoisers import denoise_tv_bregman, denoise_NL_RIDGE
-from deconv.core.operations import apply_psf, get_variables_from_dict
-from settings import device, dtype
+from common.algorithms import BaseMcmc
+from deconv.core.operations import apply_psf, _psf_to_fft_kernel
+from deconv.gui.estimate_lambda_rr import estimate_lambda_rr
 
 
-class McmcAlgo(Algorithm):
+PROPOSAL_METHODS = ["D", "C"]
 
-    def run(self, g, H, params: Dict[str, Any]):
-        self.fixe_randomness()
 
-        (max_iter, step_size, beta, sigma, K, denoiser) = get_variables_from_dict(
-            params, ['max_iter', 'step_size', 'beta', 'sigma', 'K', 'denoiser'])
+class McmcAlgo(BaseMcmc):
+    """MCMC for 2D deconvolution. Forward operator is FFT-based convolution."""
 
-        t0 = time.time()
+    supported_features = {"2d"}
 
-        # f0 = g (for deconv, f and g have the same shape)
-        f = g.clone()
-        accepted = 0
+    ui_params = copy.deepcopy(BaseMcmc.ui_params)
+    del ui_params["step_size"]
+    del ui_params["mu"]
+    ui_params["proposal_method"] = {
+        "title": "Proposal method",
+        "type": "option",
+        "param_info": {
+            "options_list": PROPOSAL_METHODS,
+        }
+    }
+    ui_params["lambda_rr"] = {
+        "title": "Ridge regularization (inversion)",
+        "type": "value",
+        "param_info": {
+            "dtype": float,
+            "unit": "",
+            "latex_name": "\\lambda_{rr}",
+            "default": 0.01,
+        },
+        "extra_button": {
+            "label": "Estimate",
+            "tooltip": "Estimate lambda_rr from the Fourier spectrum of the PSF.\n"
+                       "Displays the sorted |H_fft| values and lets you\n"
+                       "choose which frequency to use as cutoff.",
+            "callback": estimate_lambda_rr,
+        }
+    }
 
-        self._print(f"MCMC start | T={max_iter} | step_size={step_size} | sigma={sigma} | beta={beta}")
-        self._print(f"denoiser={denoiser}")
+    def apply_forward(self, H, f):
+        return apply_psf(H, f)
 
-        for k in range(max_iter):
-            if self.is_stop_requested():
-                return None
+    def apply_adjoint(self, H, x):
+        return apply_psf(H, x, adjoint=True)
 
-            z = self.proposal_step(f, g, H, step_size, sigma, denoiser)
-            is_accepted = self.evaluation_step(f, z, g, H, beta)
+    def _wiener_inverse(self, H, x, lambda_rr):
+        """Wiener/ridge deconvolution in Fourier domain:
+        (H^T H + lambda_rr I)^{-1} H^T x."""
+        H_fft = torch.fft.fft2(_psf_to_fft_kernel(H, x.shape))
+        x_fft = torch.fft.fft2(x)
+        wiener_filter = H_fft.conj() / (H_fft.abs() ** 2 + lambda_rr)
+        return torch.real(torch.fft.ifft2(wiener_filter * x_fft))
 
-            if is_accepted:
-                f = z
-                accepted += 1
+    def proposal_step(self, f, g, H, sigma, denoiser, params):
+        method = params.get('proposal_method', 'D')
+        lambda_rr = params.get('lambda_rr', 0.01)
 
-            if k % K == K - 1:
-                rate = accepted / (k + 1) * 100
-                loss_f = 0.5 * F.mse_loss(apply_psf(H, f), g).item()
-                self._print(
-                    f"iter {k + 1:4d} | accepted={accepted}/{k + 1} ({rate:.0f}%) | "
-                    f"loss={loss_f:.3e}"
-                )
+        if method == 'C':
+            return self._proposal_C(f, g, H, sigma, denoiser, lambda_rr)
+        else:
+            return self._proposal_D(f, g, H, sigma, denoiser, lambda_rr)
 
-        rate = accepted / max_iter * 100
-        self._print(f"\naccepted {accepted}/{max_iter} ({rate:.1f}%)")
-        self._print(f"execution in {time.time() - t0:.2f} s")
-        return f
-
-    ## proposes z from f via gradient step + noise + positivity + denoising:
-    def proposal_step(self, f, g, H, step_size, sigma, denoiser):
-        # 1. gradient step on the data fidelity 1/2 ||Hf - g||^2:
-        #    grad = H^T(Hf - g)
-        residual = apply_psf(H, f) - g
-        grad = apply_psf(H, residual, adjoint=True)
-        z = f - step_size * grad
-
-        # 2. stochastic perturbation:
-        z = z + sigma * torch.randn_like(z)
-
-        # 3. positivity constraint:
-        z = z.clamp(min=0.)
-
-        # 4. denoising (implicit prior):
+    def _proposal_C(self, f, g, H, sigma, denoiser, lambda_rr):
+        """Noise → data consistency → positivity → denoising."""
+        z = f + sigma * torch.randn_like(f)
+        residual = g - self.apply_forward(H, z)
+        z = z + self._wiener_inverse(H, residual, lambda_rr)
+        z.clamp_(min=0)
         z = self.apply_denoiser(z, sigma, denoiser)
-
         return z
 
-    ## accepts or rejects z with Metropolis-Hastings ratio on the data fidelity:
-    def evaluation_step(self, f, z, g, H, beta):
-        # D(x) = 1/2 ||Hx - g||^2
-        Hf = apply_psf(H, f)
-        Hz = apply_psf(H, z)
-        D_f = 0.5 * F.mse_loss(Hf, g, reduction='sum')
-        D_z = 0.5 * F.mse_loss(Hz, g, reduction='sum')
-
-        # acceptance probability: a = min(1, exp((D_f - D_z) / beta))
-        log_ratio = (D_f - D_z) / beta
-        acceptance_prob = torch.min(torch.tensor(1.0), torch.exp(log_ratio))
-
-        alpha = torch.rand(1)
-        return alpha.item() <= acceptance_prob.item()
-
-    ## applies the selected denoiser to z:
-    def apply_denoiser(self, z, sigma, denoiser):
-        original_shape = z.shape
-        if denoiser == "None":
-            return z
-        elif denoiser == "Non-Local Ridge":
-            result = denoise_NL_RIDGE(z, sigma)
-        elif denoiser == "TV Bregman":
-            # weight = 1/sigma: stronger denoising for larger noise
-            weight = max(1.0 / sigma, 0.1)
-            result = denoise_tv_bregman(z, weight=weight)
-        else:
-            self._print(f"denoiser '{denoiser}' not implemented, skipping")
-            return z
-        # denoisers may add/change dimensions, reshape back to original
-        return result.reshape(original_shape)
+    def _proposal_D(self, f, g, H, sigma, denoiser, lambda_rr):
+        """Data consistency → noise → positivity → denoising."""
+        residual = g - self.apply_forward(H, f)
+        z = f + self._wiener_inverse(H, residual, lambda_rr)
+        z = z + sigma * torch.randn_like(z)
+        z.clamp_(min=0)
+        z = self.apply_denoiser(z, sigma, denoiser)
+        return z

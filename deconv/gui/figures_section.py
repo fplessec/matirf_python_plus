@@ -1,31 +1,33 @@
-from PyQt5.QtWidgets import QGroupBox, QVBoxLayout
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
-from gui.more_widgets import ImageAndHisto2DViewer
+from common.gui.specializable.display_window.sections import BaseFiguresSection
+from common.gui.widgets import ImageAndHisto2DViewer
 
 
-## figures section for the deconv display window (ImageAndHisto2DViewer):
-class DeconvFiguresSection(QGroupBox):
+class DeconvFiguresSection(BaseFiguresSection):
+    """
+    Figures section for the deconv display window.
+    Single view: ImageAndHisto2DViewer for 2D deconvolution results.
+    """
 
     def __init__(self, parent=None):
-        super().__init__("Figures")
-        self.parent = parent
-        self._setup_ui()
+        ## viewer reference (populated on first create_views call):
+        self.viewer_2d = None
+        super().__init__(parent)
 
-    def _setup_ui(self):
-        self.layout = QVBoxLayout()
-        self.layout.setContentsMargins(1, 1, 1, 1)
-        self.layout.setSpacing(0)
-        self.setLayout(self.layout)
+    def create_views(self):
+        ## single view: 2D image viewer with histogram:
+        view = QWidget()
+        view_layout = QVBoxLayout(view)
+        view_layout.setContentsMargins(0, 0, 0, 0)
+        view_layout.setSpacing(0)
+        self.viewer_2d = ImageAndHisto2DViewer(self._init_f, title='Reconstruction')
+        view_layout.addWidget(self.viewer_2d)
+        return [view]
 
-    def update_plot(self, f, config):
-        self._clear()
-        viewer = ImageAndHisto2DViewer(f, title='Reconstruction')
-        self.layout.addWidget(viewer)
-
-    def _clear(self):
-        while self.layout.count():
-            item = self.layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setParent(None)
-                widget.deleteLater()
+    def update_views(self, f, config):
+        ## store data for initial view creation:
+        self._init_f = f
+        ## if viewer is already created, update it in-place:
+        if self.viewer_2d is not None:
+            self.viewer_2d.set_image(f)
