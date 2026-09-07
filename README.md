@@ -3,7 +3,7 @@
 Generic inverse problem solver. Reconstructs an unknown image **f** from a measurement **g** and a forward operator **H** by solving iteratively:
 
 ```
-min_f  D(Hf, g) + lambda * R(f)
+min_f (1 - lambda) * D(Hf, g) + lambda * R(f)
 ```
 
 Currently implements two inverse problems:
