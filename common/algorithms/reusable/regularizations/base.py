@@ -16,7 +16,7 @@ class Regularization:
     uses_diff_ops = False
 
     def loss(self, f, diff_ops):
-        """R(f) → scalar."""
+        """R(f) -> scalar."""
         raise NotImplementedError
 
     def prox(self, f, lambda_reg, diff_ops, **kwargs):

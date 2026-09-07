@@ -1,0 +1,19 @@
+[sampling]
+seed = 7
+
+[ellipsoid]
+count = 0
+
+[filament]
+count = 0
+
+[membrane]
+count = 1
+sharpness = 2.0
+thickness_nm = 10.0
+corrugation_amp_nm = 80.0
+depth_min_frac = 0.3
+depth_max_frac = 0.8
+
+[double_layer]
+count = 0

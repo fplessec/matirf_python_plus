@@ -15,22 +15,31 @@ import math
 from common.denoisers.base import Denoiser
 
 
-def _denoise_tv_bregman(image, weight, max_iter=100, eps=1e-3):
+def _denoise_tv_bregman(image, weight, max_iter=100, eps=1e-3, lam=0.1):
     """Perform total-variation denoising using split-Bregman optimization.
+
+    Solves  min_u  (weight/2) ||u - image||^2 + TV(u).
 
     Parameters:
         image (torch.Tensor):
             Input data to be denoised.
         weight (float):
-            Denoising weight. The smaller the 'weight', the more denoising (at
-            the expense of less similarity to the 'input').
+            Data-fidelity weight. The smaller the 'weight', the more denoising
+            (at the expense of less similarity to the 'input').
+
+            NOTE: 'weight' and the Bregman penalty 'lam' must stay independent.
+            The previous version set lam = 2*weight, which made 'weight' cancel
+            out of the update (norm = 9*weight, regularization = weight*image),
+            so the result was identical for every weight. Keeping 'lam' fixed
+            restores the intended behaviour: 'weight' now actually controls the
+            denoising strength.
         max_iter (int):
-            Optional
-            Maximal number of iterations used for the optimization.
+            Optional. Maximal number of iterations used for the optimization.
         eps (float):
-            Optional
-            The threshold of distance between denoised image in iterations
-            The algorithm stops when image distance is smaller than eps
+            Optional. The algorithm stops when the update norm is below eps.
+        lam (float):
+            Optional. Split-Bregman coupling penalty (fixed). Its inverse 1/lam
+            is the isotropic soft-threshold applied to the gradient field.
 
     Returns:
         out (torch.Tensor): denoised image
@@ -53,7 +62,6 @@ def _denoise_tv_bregman(image, weight, max_iter=100, eps=1e-3):
     bx = out.clone().detach()
     by = out.clone().detach()
 
-    lam = 2 * weight
     rmse = float("inf")
     norm = (weight + 4 * lam)
 
@@ -97,11 +105,11 @@ def _denoise_tv_bregman(image, weight, max_iter=100, eps=1e-3):
 
         tx = ux + bxx
         ty = uy + byy
-        s = torch.sqrt(torch.pow(tx, 2)+torch.pow(ty, 2))
-        dxx = torch.div(torch.addcmul(torch.zeros(s.shape, dtype=torch.float), lam, s, tx),
-                        torch.add(torch.mul(s, lam), 1))
-        dyy = torch.div(torch.addcmul(torch.zeros(s.shape, dtype=torch.float), lam, s, ty),
-                        torch.add(torch.mul(s, lam), 1))
+        s = torch.sqrt(torch.pow(tx, 2)+torch.pow(ty, 2)) + 1e-12
+        # isotropic soft-threshold of the gradient field at threshold 1/lam:
+        shrink = torch.clamp(s - 1.0 / lam, min=0.0) / s
+        dxx = shrink * tx
+        dyy = shrink * ty
 
         dx[1:-1, 1:-1, :] = dxx.clone().detach()
         dy[1:-1, 1:-1, :] = dyy.clone().detach()
@@ -159,9 +167,12 @@ class TVBregmanDenoiser(Denoiser):
         self.eps = eps
 
     def denoise(self, y, sigma, delta=1.0):
-        """Adapter: TV Bregman uses 'weight' instead of 'sigma'.
-        weight = 1/sigma gives stronger denoising for larger noise."""
-        weight = max(1.0 / sigma, 0.1) if sigma > 0 else 10.0
+        """Adapter: TV Bregman uses a data-fidelity 'weight' instead of 'sigma'.
+        A *smaller* weight denoises more, so it must decrease with the noise
+        level (sigma on the [0,255] scale): weight = clip(3 / sigma, 0.005, 1.0).
+        This range spans from near-identity (small sigma) to strong piecewise-
+        constant smoothing (large sigma), as validated empirically."""
+        weight = min(max(3.0 / (sigma + 1e-6), 0.005), 1.0)
         # y is (1, Y, X) — squeeze to (Y, X) for the 2D implementation
         image_2d = y.squeeze(0)
         result = _denoise_tv_bregman(image_2d, weight=weight,

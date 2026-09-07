@@ -55,32 +55,46 @@ class BaseSectionWidget(QWidget):
 
     # ── parameter dependencies (show/hide based on parent value) ────────
 
-    ## wires depends_on: show/hide dependent widgets when parent option changes
+    ## wires depends_on: show/hide dependent widgets when the parent value changes.
+    ## The condition can be:
+    ##   - a scalar / list  -> the dependent is shown when the parent value is one of them
+    ##                         (used with 'option' parents, e.g. reg -> {"reg": [...]})
+    ##   - a callable(value) -> shown when it returns True (works with any parent type,
+    ##                         e.g. a numeric 'count' -> {"count": lambda v: v > 0})
     def _setup_dependencies(self):
         for param_name, param_config in self.params_ui_dict.items():
             depends_on = param_config.get("depends_on")
             if not depends_on:
                 continue
-            for parent_name, required_values in depends_on.items():
+            for parent_name, condition in depends_on.items():
                 if parent_name not in self.parameter_widgets:
                     continue
                 parent_widget = self.parameter_widgets[parent_name]
-                if not isinstance(required_values, (list, tuple)):
-                    required_values = [required_values]
-                # connect the parent combo signal to show/hide this dependent widget
-                self._connect_dependency(parent_widget, param_name, required_values)
+                # connect the parent's signal to show/hide this dependent widget
+                self._connect_dependency(parent_widget, param_name, condition)
                 # apply initial visibility
-                self._update_dependency_visibility(parent_widget, param_name, required_values)
+                self._update_dependency_visibility(parent_widget, param_name, condition)
 
-    def _connect_dependency(self, parent_widget, dependent_name, required_values):
+    def _connect_dependency(self, parent_widget, dependent_name, condition):
+        callback = lambda _=None: self._update_dependency_visibility(
+            parent_widget, dependent_name, condition)
         if parent_widget.combo is not None:
-            parent_widget.combo.currentTextChanged.connect(
-                lambda _: self._update_dependency_visibility(
-                    parent_widget, dependent_name, required_values)
-            )
+            parent_widget.combo.currentTextChanged.connect(callback)
+        elif parent_widget.input_widget is not None:
+            parent_widget.input_widget.textChanged.connect(callback)
+        elif parent_widget.checkbox is not None:
+            parent_widget.checkbox.stateChanged.connect(callback)
 
-    def _update_dependency_visibility(self, parent_widget, dependent_name, required_values):
-        visible = parent_widget.param_value in required_values
+    def _update_dependency_visibility(self, parent_widget, dependent_name, condition):
+        value = parent_widget.param_value
+        if callable(condition):
+            try:
+                visible = bool(condition(value))
+            except Exception:
+                visible = False
+        else:
+            required = condition if isinstance(condition, (list, tuple)) else [condition]
+            visible = value in required
         self.parameter_widgets[dependent_name].setVisible(visible)
         sep = self._separators.get(dependent_name)
         if sep is not None:
@@ -92,13 +106,11 @@ class BaseSectionWidget(QWidget):
             depends_on = param_config.get("depends_on")
             if not depends_on:
                 continue
-            for parent_name, required_values in depends_on.items():
+            for parent_name, condition in depends_on.items():
                 if parent_name not in self.parameter_widgets:
                     continue
                 parent_widget = self.parameter_widgets[parent_name]
-                if not isinstance(required_values, (list, tuple)):
-                    required_values = [required_values]
-                self._update_dependency_visibility(parent_widget, param_name, required_values)
+                self._update_dependency_visibility(parent_widget, param_name, condition)
 
     # ── public helpers ────────────────────────────────────────────────────
 

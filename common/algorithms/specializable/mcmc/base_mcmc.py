@@ -3,14 +3,14 @@ Generic MCMC MMSE estimator for inverse problems.
 
 Generates samples from the posterior pi(f) proportional to exp(-U(f,g)/2)
 using Metropolis-Hastings, and returns the MMSE estimate:
-    f_MMSE ≈ 1/T * sum_{t=1}^{T} f_t   (over accepted samples)
+    f_MMSE ≈ 1/T * sum_{t=1}^{transposed} f_t   (over accepted samples)
 
 The integral is intractable, but by the law of large numbers the
 empirical mean of the accepted samples converges in probability to f_MMSE.
 
 Subclasses must override:
     apply_forward(H, f)       : computes Hf
-    apply_adjoint(H, x)       : computes H^T x
+    apply_adjoint(H, x)       : computes H^t x
     proposal_step(f, g, H, sigma, denoiser, params) : generates candidate z
 """
 
@@ -39,7 +39,7 @@ class BaseMcmc(Algorithm):
         (max_iter, beta, sigma, K, denoiser) = get_variables_from_dict(
             params, ['max_iter', 'beta', 'sigma', 'K', 'denoiser'])
 
-        self._data_fidelity = self._create_data_fidelity(params)
+        self._data_fidelity = self._create_data_fidelity(params)  # D(Hf, g)
 
         t0 = time.time()
 
@@ -87,8 +87,8 @@ class BaseMcmc(Algorithm):
         return f
 
     def init_f(self, g, H, params):
-        """Initialization of f. Default: f0 = g."""
-        return g.clone()
+        """Initialization of f. Default: f0 = H^t g."""
+        return self.apply_adjoint(H, g.clone())
 
     ## accepts or rejects z with Metropolis-Hastings ratio on the data fidelity:
     def evaluation_step(self, f, z, g, H, beta):

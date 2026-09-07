@@ -1,0 +1,8 @@
+[grid]
+nx = 64
+ny = 64
+nz = 50
+dxy_nm = 100.0
+z0_nm = 0.0
+zN_nm = 300.0
+fine_step_nm = 10.0

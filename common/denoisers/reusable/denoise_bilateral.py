@@ -42,18 +42,24 @@ class BilateralDenoiser(Denoiser):
                 K(j) ∝ exp( -||j||^2 / (2 * sigma_s^2) )
                 sum_j K(j) = 1
 
+        Note on `sigma`: it is a noise level on the [0, 255] scale. The intensity
+        tolerance scales with it (`sigma_r = 2·sigma`), while the spatial
+        neighborhood is kept BOUNDED (`sigma_s = clip(sigma/50, 0.5, 1.5)` px) so
+        the kernel/loop never explodes with large sigma.
+
         Args:
             y (Tensor): Input noisy image (1,Y,X) or (Z,Y,X)
-            sigma (float): Noise standard deviation
+            sigma (float): Noise standard deviation on the [0, 255] scale
             delta (float): Anisotropy ratio (Δz/Δxy) for 3D
         Returns:
             Tensor: Denoised image with same shape as input
         """
         y5d = _to_5d(y)
         is3d = _is_3d(y)
-        sigma_s = 2.5 * sigma  # size of the neighborhood: [2-3]*sigma
-        sigma_r = 2.0 * sigma  # pixel intensitiy torelance range: [1.5-2]*sigma
-        K = (_kernel_gaussian(sigma_s, sigma_s/delta, True)
+        sigma_s = min(max(sigma / 50.0, 0.5), 1.5)  # BOUNDED spatial neighborhood (px)
+        sigma_r = max(2.0 * sigma, 1e-3)            # intensity tolerance on [0,255]
+        sigma_s_z = min(sigma_s / max(delta, 1e-3), 2.0)
+        K = (_kernel_gaussian(sigma_s, sigma_s_z, True)
              if is3d else
              _kernel_gaussian(sigma_s, is3d=False).unsqueeze(0))
         # normalizing gaussian kernel:

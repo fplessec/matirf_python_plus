@@ -66,11 +66,4 @@ PNP_UI_PARAMETERS = {
             'default': True
         }
     },
-    "var_stab": {
-        "title": "Variance Stabilization",
-        "type": "bool",
-        "param_info": {
-            'default': True
-        }
-    },
 }

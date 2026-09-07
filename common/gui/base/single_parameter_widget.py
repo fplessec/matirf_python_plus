@@ -226,13 +226,16 @@ class SimpleParameterWidget(QWidget):
         if self.toml_key_list is None:
             return
         config = self._load_toml(toml_path)
-        toml_key_list = self.toml_key_list.copy()
-        while toml_key_list != []:
-            try:
-                config = config[toml_key_list.pop(0)]
-            except Exception:
-                config = None
-        new_param_value = config if config != "null" else None
+        node = config
+        for key in self.toml_key_list:
+            if isinstance(node, dict) and key in node:
+                node = node[key]
+            else:
+                # key path absent from the config -> leave the widget unchanged
+                # (this is what lets a pruned '[section]' keep only some keys without
+                #  the missing ones being rewritten as "None")
+                return
+        new_param_value = node if node != "null" else None
         if new_param_value == {}:
             return
         self.temporarily_disconnect_signals()

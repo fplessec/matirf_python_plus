@@ -13,18 +13,16 @@ class LossComputer:
                  lambda_reg=0.):
         self.g = g
         self.H = H
-        self.apply_forward = apply_forward
-        self.data_fidelity = data_fidelity
-        self.regularization = regularization
-        self.diff_ops = diff_ops
+        self.apply_forward = apply_forward    # is a method from the Algorithm object
+        self.data_fidelity = data_fidelity    # is a DataFidelity object from common.algorithms.reusable
+        self.regularization = regularization  # is a Regularization object from common.algorithms.reusable
+        self.diff_ops = diff_ops              # is DifferentialOperators object from common.algorithms.base
         self.lambda_reg = lambda_reg
 
     def __call__(self, f):
         Hf = self.apply_forward(self.H, f)
         data_term = self.data_fidelity.loss(Hf, self.g)
-
         if self.lambda_reg == 0.:
             return data_term
-
         reg_term = self.regularization.loss(f, self.diff_ops)
         return (1 - self.lambda_reg) * data_term + self.lambda_reg * reg_term

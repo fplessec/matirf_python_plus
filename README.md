@@ -10,7 +10,7 @@ Currently implements two inverse problems:
 - **matirf** : 3D MA-TIRF reconstruction (multi-angle TIRF microscopy)
 - **deconv** : 2D image deconvolution
 
-Each problem can be solved with multiple algorithms (ADAM, MCMC, PnP, PPXA, ADMM), multiple data fidelity terms (Gaussian, Poisson, Poisson-Gaussian), and multiple regularizations (TV, Tikhonov, Hessian, SHV, ...).
+Each problem can be solved with multiple algorithms (ADAM, MCMC, PnP, ADMM-PnP, PPXA, ADMM), multiple data fidelity terms (Gaussian, Poisson, Poisson-Gaussian), and multiple regularizations (TV, Tikhonov, Hessian, SHV, ...).
 
 The project supports both a **GUI** (graphical interface to configure and visualize reconstructions) and a **CLI** (command line for batch processing).
 
@@ -26,7 +26,7 @@ The project supports both a **GUI** (graphical interface to configure and visual
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/matirf_python_plus.git
+git clone https://github.com/fplessec/matirf_python_plus.git
 cd matirf_python_plus
 ```
 
@@ -106,6 +106,14 @@ matirf cli
 deconv cli
 ```
 
+### Launch the synthetic ground-truth generator (matirf only)
+
+Generates reproducible 3D synthetic ground truths (ellipsoids, filaments, membranes, double layers) to benchmark the reconstruction algorithms on data whose truth is known:
+
+```bash
+matirf synth
+```
+
 ### Reset the cached configuration
 
 Each inverse problem caches its configuration in a `config.toml` file. To reset it to defaults:
@@ -136,15 +144,17 @@ settings gui                 # open a graphical settings editor
 matirf_python_plus/
     cli.py                          # centralized entry point
     common/                         # shared components
-        algorithms/                 # base algorithm classes
-            mcmc/                   #   MCMC (MMSE estimator)
-            adam/                   #   ADAM (MAP estimator)
-            pnp/                   #   Plug-and-Play
-            ppxa/                  #   PPXA (proximal)
-            admm/                  #   ADMM
-            data_fidelities/       #   noise models (Gaussian, Poisson, ...)
-            regularizations/       #   priors (TV, Tikhonov, Hessian, SHV, ...)
-            utils/                 #   differential operators (2D/3D/anisotropic)
+        algorithms/                 # algorithm stack (three layers)
+            base/                   #   machinery: Algorithm, LossComputer, differential operators
+            reusable/               #   optimization terms (interfaces + implementations)
+                data_fidelities/    #     noise models (Gaussian, Poisson, ...)
+                regularizations/    #     priors (TV, Tikhonov, Hessian, SHV, ...)
+            specializable/          #   algorithm skeletons with hooks
+                adam/               #     ADAM (MAP estimator)
+                mcmc/               #     MCMC (MMSE estimator)
+                pnp/                #     Plug-and-Play (HQS) + ADMM-PnP
+                ppxa/               #     PPXA (proximal)
+                admm/               #     ADMM
         denoisers/                  # denoiser implementations
         gui/                        # shared GUI components
         core/                       # pipeline base classes
@@ -153,6 +163,7 @@ matirf_python_plus/
         algorithms/                 #   problem-specific algorithm subclasses
         core/                       #   pipeline, forward operator
         gui/                        #   custom GUI elements
+        synthetic/                  #   reproducible synthetic ground-truth generator (matirf synth)
         cache/                      #   cached config.toml
         data/                       #   measurements and results
     deconv/                         # 2D deconvolution inverse problem
@@ -213,22 +224,22 @@ list
 
 ## Adding a new algorithm
 
-All algorithm logic lives in `common/algorithms/`. To add a new algorithm:
+Algorithm skeletons live in `common/algorithms/specializable/`. To add a new algorithm:
 
-1. Create a sub-package in `common/algorithms/` (e.g. `common/algorithms/my_algo/`)
+1. Create a sub-package in `common/algorithms/specializable/` (e.g. `common/algorithms/specializable/my_algo/`)
 2. Implement the base class inheriting from `Algorithm`
 3. Set the class attributes: `name`, `ui_params`, `estimator_type`, `uses_denoiser`, `uses_regularization`
-4. Register it in `common/algorithms/__init__.py`
-5. Create the problem-specific subclass in `matirf/algorithms/` or `deconv/algorithms/` with `apply_forward`, `apply_adjoint`, and `features`
+4. Export it from `common/algorithms/specializable/__init__.py` (and re-export from `common/algorithms/__init__.py`)
+5. Create the problem-specific subclass in `matirf/algorithms/` or `deconv/algorithms/` (with `apply_forward`, `apply_adjoint`, `supported_features`) and register it in that problem's `algorithms/__init__.py` (`ALGORITHMS`)
 
 ---
 
 ## Adding a new denoiser
 
-1. Create a new file in `common/denoisers/` (e.g. `denoise_bm3d.py`)
+1. Create a new file in `common/denoisers/reusable/` (e.g. `denoise_bm3d.py`)
 2. Implement a class inheriting from `Denoiser` with attributes `name`, `supports_3d`, `supports_anisotropy`
-3. Implement the `denoise(self, y, sigma, delta=1.0)` method
-4. Add the instance to `_ALL_DENOISERS` in `common/denoisers/denoiser_list.py`
+3. Implement the `denoise(self, y, sigma, delta=1.0)` method (`sigma` is a noise level on the [0, 255] scale)
+4. Add the instance to `_ALL_DENOISERS` in `common/denoisers/reusable/denoiser_list.py`
 
 The denoiser will automatically appear in the UI for all algorithms that use denoisers.
 
@@ -236,9 +247,9 @@ The denoiser will automatically appear in the UI for all algorithms that use den
 
 ## Adding a new regularization
 
-1. Create a new file in `common/algorithms/regularizations/` (e.g. `wavelet.py`)
+1. Create a new file in `common/algorithms/reusable/regularizations/` (e.g. `wavelet.py`)
 2. Implement a class inheriting from `Regularization` with `name`, `display_name`, `uses_diff_ops`
 3. Implement `loss(self, f, diff_ops)` and `prox(self, f, lambda_reg, diff_ops)`
-4. Add the class to `_ALL_REGULARIZATIONS` in `common/algorithms/regularizations/__init__.py`
+4. Add the class to `_ALL_REGULARIZATIONS` in `common/algorithms/reusable/regularizations/__init__.py`
 
 The regularization will automatically appear in the UI for all algorithms that use regularizations.

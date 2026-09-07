@@ -12,7 +12,7 @@ class DataFidelity:
     noise_model = ""
 
     def loss(self, Hf, g):
-        """D(Hf, g) → scalar."""
+        """D(Hf, g) -> scalar."""
         raise NotImplementedError
 
     def prox(self, Hf, g, **kwargs):

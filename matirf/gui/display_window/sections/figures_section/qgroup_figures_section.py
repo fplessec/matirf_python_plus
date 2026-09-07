@@ -41,6 +41,19 @@ class FiguresSection(BaseFiguresSection):
         view2_layout.addWidget(self.viewer_3d)
         return [view1, view2]
 
+    # ── view-1 PNG export (depth map + profiles, fixed size across windows) ──
+
+    def supports_view1_export(self):
+        return True
+
+    def export_view1(self, filepath):
+        from common.gui.widgets.figure_export import export_depth_and_profiles
+        export_depth_and_profiles(self.depth_map_widget, self.profiles_widget, filepath)
+
+    def export_default_dir(self):
+        from matirf import MATIRF_RESULTS_DIR
+        return str(MATIRF_RESULTS_DIR)
+
     def update_views(self, f, config):
         z0 = config['oper-params']['z0']
         zN = config['oper-params']['zN']

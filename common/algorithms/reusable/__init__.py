@@ -1,73 +1,63 @@
 """
-REUSABLE ALGORITHM LAYER (Prebuilt algorithmic components)
+REUSABLE ALGORITHM LAYER (Optimization terms: interfaces + implementations)
 
-This module provides fully implemented, ready-to-use algorithmic components
-for common functionalities across inverse problem applications
-(matirf, deconv, and future extensions).
-
-These components are built on top of the BASE layer and implement
-concrete mathematical objects that can be used directly without modification.
+This module defines the optimization terms plugged into any algorithm's
+loss (matirf, deconv, and future extensions). It provides BOTH the
+abstract interfaces (DataFidelity, Regularization) AND their ready-to-use
+concrete implementations.
 
 ---------------------------------------------------------------------
 Core idea
 ---------------------------------------------------------------------
-
-While the BASE layer provides abstract interfaces
-(DataFidelity, Regularization),
-the REUSABLE layer provides complete, domain-independent implementations
-that can be plugged into any algorithm without modification.
+The BASE layer defines the algorithm machinery (Algorithm, LossComputer,
+DifferentialOperators). This REUSABLE layer owns the mathematical terms
+that machinery operates on: it declares their interfaces and ships
+complete, domain-independent implementations that can be plugged in
+without modification.
 
 ---------------------------------------------------------------------
 What belongs here
 ---------------------------------------------------------------------
+> Interfaces (abstract bases, defined in this layer):
+    > DataFidelity   -> contract for data terms   D(Hf, g)
+    > Regularization -> contract for prior terms  R(f)
 
-This layer includes prebuilt algorithmic modules such as:
+> Regularizations (concrete R(f)):
+    > NoRegularization, L1, L2
+    > Tikhonov, TV (Total Variation)
+    > Hessian Frobenius, SHV (Sparse Hessian Variation)
 
-- Regularizations
-    Concrete regularization terms R(f):
-        * NoRegularization, L1, L2, Tikhonov
-        * TV (Total Variation)
-        * Hessian Frobenius, SHV (Sparse Hessian Variation)
-
-- Data Fidelities
-    Concrete data fidelity terms D(Hf, g) for different noise models:
-        * Gaussian (L2 norm)
-        * Poisson (Kullback-Leibler divergence)
-        * Poisson-Gaussian (mixed model)
-
----------------------------------------------------------------------
-Design role
----------------------------------------------------------------------
-
-Reusable components:
-    - implement the DataFidelity / Regularization interfaces from base/
-    - provide loss() and prox() methods for optimization
-    - remain independent of specific inverse problem implementations
-    - are safe to reuse across matirf, deconv, and future modules
+> Data Fidelities (concrete D(Hf, g), one per noise model):
+    > Gaussian (L2 norm)
+    > Poisson (Kullback-Leibler divergence)
+    > Poisson-Gaussian (mixed model)
 
 ---------------------------------------------------------------------
-Key distinction
+Registry
 ---------------------------------------------------------------------
+Single source of truth linking config.toml <-> UI <-> runtime dispatch:
+    > REGULARIZATION_REGISTRY / DATA_FIDELITY_REGISTRY
+        > map display_name -> class (primary key)
+        > also map name -> class (backward-compatible fallback)
+    > REGULARIZATION_LIST / DATA_FIDELITY_LIST
+        > display names for UI option widgets
+    > ANISOTROPIC_REGULARIZATIONS
+        > regularizations that use differential operators (delta in 3D)
 
-- base/:
-    abstract algorithmic primitives (Algorithm, DataFidelity, Regularization)
-
-- reusable/:
-    concrete implementations (L1, TV, GaussianFidelity, PoissonFidelity)
-
-- specializable/:
-    algorithm skeletons requiring problem-specific override (BaseAdam, BasePpxa...)
+---------------------------------------------------------------------
+---------------------------------------------------------------------
+Overall design philosophy of Reusable terms:
+    > define AND implement the DataFidelity / Regularization interfaces
+    > provide loss() and prox() methods for optimization
+    > remain independent of specific inverse problem implementations
+    > are safe to reuse across matirf, deconv, and future modules
 """
 
 from .regularizations import (
     Regularization,
     REGULARIZATION_REGISTRY, REGULARIZATION_LIST, ANISOTROPIC_REGULARIZATIONS,
-    NoRegularization, L1Regularization, L2Regularization,
-    TikhonovRegularization, TVRegularization,
-    HessianFrobeniusRegularization, SHVRegularization,
 )
 from .data_fidelities import (
     DataFidelity,
     DATA_FIDELITY_REGISTRY, DATA_FIDELITY_LIST,
-    GaussianFidelity, PoissonFidelity, PoissonGaussianFidelity,
 )

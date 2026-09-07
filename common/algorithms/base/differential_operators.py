@@ -4,6 +4,7 @@ Spatial differential operators for 2D and 3D images.
 Central finite differences for gradient, divergence, laplacian, hessian.
 GPU uses conv3d for parallelism; CPU uses slicing (conv3d is slow on CPU).
 Supports anisotropic 3D via delta = dz / dxy.
+When the image is 2D this module will use slicing both for GPU and CPU.
 """
 
 import torch
@@ -17,10 +18,10 @@ class DifferentialOperators:
 
     # ── init ──────────────────────────────────────────────────────────────
 
-    def __init__(self, delta=1.0):
+    def __init__(self, delta=1.):
         self.delta = delta
         if settings.device == 'cuda':
-            self._build_3d_kernels()
+            self._build_3d_kernels()  # prebuild kernels if working on gpu
 
     # ── helpers ───────────────────────────────────────────────────────────
 
@@ -30,8 +31,7 @@ class DifferentialOperators:
     @staticmethod
     def _from_5d(f): return f.squeeze(0).squeeze(0)
     @staticmethod
-    def _is_3d( f):
-        return f.dim() == 3
+    def _is_3d(f): return f.dim() == 3
 
     # ── 3D GPU kernels (precomputed for conv3d) ──────────────────────────
 

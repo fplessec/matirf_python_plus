@@ -2,6 +2,7 @@ from .optim_adam import AdamAlgo
 from .optim_ppxa import PpxaAlgo
 from .optim_admm import AdmmAlgo
 from .optim_pnp import PnpAlgo
+from .optim_pnp_admm import PnpAdmmAlgo
 from .mcmc_mmse_estimator import McmcAlgo
 
 
@@ -14,5 +15,6 @@ ALGORITHMS = {cls.name: cls for cls in [
     PpxaAlgo,
     AdmmAlgo,
     PnpAlgo,
+    PnpAdmmAlgo,
     McmcAlgo,
 ]}

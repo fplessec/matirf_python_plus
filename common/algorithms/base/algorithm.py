@@ -37,16 +37,16 @@ class Algorithm(ABC):
 
     # ── class methods ─────────────────────────────────────────────────────
 
-    ## assembles docstrings from the full inheritance chain
+    ## automatically assembles docstrings from the full inheritance chain
     @classmethod
     def description(cls) -> str:
         parts = [f"[{cls.name}] ({cls.estimator_type} estimator)"]
-        for klass in reversed(cls.__mro__):
-            if klass.__doc__ and klass not in (object, ABC):
+        for klass in reversed(cls.__mro__):  # Method Resolution Order: get the inheritance hierarchy chain
+            if klass.__doc__ and klass not in (object, ABC):  # get each non-abstract class docstring
                 parts.append(klass.__doc__.strip())
         parts.append(f"Uses denoiser: {cls.uses_denoiser}")
         parts.append(f"Uses regularization: {cls.uses_regularization}")
-        return "\n\n".join(parts)
+        return "\n\n".join(parts)  # automatic complete docstring description
 
     ## returns ui_params filtered by the intersection of problem and algo features
     @classmethod
@@ -118,6 +118,7 @@ class Algorithm(ABC):
         torch.backends.cudnn.benchmark = False
 
     # ── factory helpers ───────────────────────────────────────────────────
+    # (to avoid circular imports)
     # Auto-create diff_ops, data_fidelity, regularization, loss_computer
     # from params dict. Used by base algo classes so that concrete
     # subclasses only provide apply_forward/apply_adjoint/supported_features.
@@ -137,19 +138,19 @@ class Algorithm(ABC):
                 f"It will be applied slice-by-slice along the Z axis."
             )
 
-    ## creates a DifferentialOperators with delta from params
+    ## creates a DifferentialOperators with delta from params  (default: delta=1.)
     def _create_diff_ops(self, params):
         from common.algorithms.base import DifferentialOperators
-        return DifferentialOperators(delta=params.get('delta', 1.0))
+        return DifferentialOperators(delta=params.get('delta', 1.))
 
-    ## creates a DataFidelity instance from params
+    ## creates a DataFidelity instance from params  (default: L2 gaussian)
     def _create_data_fidelity(self, params):
         from common.algorithms.reusable.data_fidelities import DATA_FIDELITY_REGISTRY, GaussianFidelity
         key = params.get('data_fidelity', GaussianFidelity.display_name)
         cls = DATA_FIDELITY_REGISTRY.get(key, GaussianFidelity)
         return cls(**self._extract_init_kwargs(cls, params))
 
-    ## creates a Regularization instance from params
+    ## creates a Regularization instance from params  (default: no regularization)
     def _create_regularization(self, params):
         from common.algorithms.reusable.regularizations import REGULARIZATION_REGISTRY, NoRegularization
         if not self.uses_regularization:
@@ -181,8 +182,8 @@ class Algorithm(ABC):
         """Computes Hf. Must be overridden by concrete subclasses."""
         raise NotImplementedError
 
-    def apply_adjoint(self, H, x):
-        """Computes H^T x. Must be overridden by concrete subclasses."""
+    def apply_adjoint(self, H, g):
+        """Computes H^t g. Must be overridden by concrete subclasses."""
         raise NotImplementedError
 
     @abstractmethod

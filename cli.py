@@ -155,7 +155,10 @@ def main():
 
     # "matirf help"
     if args and args[0] == "help":
-        print(f"Usage:  {cmd} gui | cli | reset | help")
+        extra = " | synth" if (problem_path / "synthetic").is_dir() else ""
+        print(f"Usage:  {cmd} gui | cli{extra} | reset | help")
+        if extra:
+            print(f"        {cmd} synth   Open the synthetic ground-truth generator GUI")
         return
 
     # "matirf gui" or "matirf cli ..." — delegate to the problem's main.py

@@ -1,8 +1,13 @@
 """
 Plug-and-Play (PnP) algorithm for 3D MA-TIRF reconstruction.
 
-HQS inversion step solved by matrix inversion:
+HQS inversion step:
     f = (H^T H + alpha I)^{-1} (H^T g + alpha z)
+
+H^T H is small (nz x nz), so we diagonalise it once (symmetric eigendecomposition
+H^T H = Q diag(w) Q^T) and reuse it every iteration: for any alpha the solve is
+    (H^T H + alpha I)^{-1} y = Q diag(1 / (w + alpha)) Q^T y
+which avoids re-inverting the matrix at each of the (varying-alpha) iterations.
 """
 
 import copy
@@ -16,7 +21,7 @@ import common.settings as settings
 
 
 class PnpAlgo(BasePnp):
-    """PnP for 3D MA-TIRF. HQS inversion via matrix inverse."""
+    """PnP for 3D MA-TIRF. HQS inversion via a cached eigendecomposition of H^T H."""
 
     supported_features = {"3d", "anisotropic"}
 
@@ -34,13 +39,17 @@ class PnpAlgo(BasePnp):
     def apply_adjoint(self, H, x):
         return apply_matirf_operator(H.transpose(0, 1), x)
 
+    def precompute(self, g, H, params):
+        """Diagonalise H^T H once and cache H^T g for the (varying-alpha) HQS solves."""
+        HtH = H.transpose(0, 1) @ H
+        self._eigvals, self._eigvecs = torch.linalg.eigh(HtH)  # HtH = Q diag(w) Q^T
+        self._Htg = self.apply_adjoint(H, g)
+
     def solve_hqs(self, H, g, z, alpha, params):
-        """f = (H^T H + alpha I)^{-1} (H^T g + alpha z)"""
-        Ht = H.transpose(0, 1)
-        HtH = Ht @ H
-        Htg = apply_matirf_operator(Ht, g)
-        identity = torch.eye(H.shape[1], dtype=settings.dtype, device=settings.device)
-        return apply_matirf_operator(
-            torch.inverse(HtH + alpha * identity),
-            Htg + alpha * z
-        )
+        """f = Q diag(1 / (w + alpha)) Q^T (H^T g + alpha z)"""
+        y = self._Htg + alpha * z                      # (nz, ny, nx)
+        y_flat = y.reshape(y.shape[0], -1)             # (nz, ny*nx)
+        coeff = self._eigvecs.transpose(0, 1) @ y_flat  # Q^T y
+        coeff = coeff / (self._eigvals + alpha).unsqueeze(1)
+        out = self._eigvecs @ coeff                    # Q (...)
+        return out.reshape(y.shape)

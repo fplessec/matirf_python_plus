@@ -4,14 +4,14 @@ Generic ADMM (Alternating Direction Method of Multipliers) for inverse problems.
 Solves:  min_f  1/2 || Hf - g ||^2  +  soft threshold on f  (positivity + sparsity)
 
 Using the splitting u = f with augmented Lagrangian:
-    u-step:  u = (H^T H + mu I)^{-1} (H^T g + mu (f - eta))
+    u-step:  u = (H^t H + mu I)^{-1} (H^t g + mu (f - eta))
     f-step:  f = max(u + eta - threshold, 0)
     eta-step: eta = eta + mu (u - f)
 
 Subclasses must override:
     apply_forward(H, f)                     : computes Hf
-    apply_adjoint(H, x)                     : computes H^T x
-    solve_linear_system(Htg, v, mu, params) : solves (H^T H + mu I)^{-1} (Htg + mu v)
+    apply_adjoint(H, x)                     : computes H^t x
+    solve_linear_system(Htg, v, mu, params) : solves (H^t H + mu I)^{-1} (Htg + mu v)
     init_f(g, H, params)                    : initialization of f
     compute_threshold(g, H, params)         : threshold for the soft-thresholding step
 """
@@ -67,7 +67,7 @@ class BaseAdmm(Algorithm):
         pass
 
     def solve_linear_system(self, Htg, v, mu, params):
-        """Solves (H^T H + mu I)^{-1} (Htg + mu v). Must be overridden by subclasses."""
+        """Solves (H^t H + mu I)^{-1} (Htg + mu v). Must be overridden by subclasses."""
         raise NotImplementedError
 
     def init_f(self, g, H, params):

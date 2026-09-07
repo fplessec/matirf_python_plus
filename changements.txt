@@ -1,0 +1,48 @@
+RÉSUMÉ DES CHANGEMENTS
+
+
+1. GÉNÉRATEUR DE VÉRITÉS TERRAIN SYNTHÉTIQUES (nouveau module matirf/synthetic/)
+
+Un module complet pour générer des objets 3D synthétiques reproductibles, afin
+de comparer les algorithmes.
+- 4 types d'objets : Ellipsoid, Filament, Membrane, DoubleLayer
+- Piloté par deux fichiers TOML (grid.toml = échantillonnage, ground_truth.toml
+  = les objets), avec un seed pour la reproductibilité
+- Sa propre interface graphique, lancée avec :  matirf synth
+
+
+2. NOUVEL ALGORITHME : PnP-ADMM
+
+Variante Plug-and-Play avec variable duale (Lagrangien augmenté), pénalité rho
+fixe, sans recuit Kai-Zhang. Résolution du système linéaire via une
+eigendécomposition cachée de HtH (rapide car rho peut varier sans réinversion).
+
+
+3. REFONTE DES DENOISERS
+
+- Convention unifiée : sigma = niveau de bruit sur l'échelle [0, 255]
+- Tailles de noyaux bornées pour éviter l'explosion aux grands sigma
+- Correction d'un bug dans TV-Bregman (le poids n'avait aucun effet)
+- NL-Ridge renvoie l'entrée telle quelle quand sigma <= 0
+
+
+4. AMÉLIORATION DU PnP (HQS)
+
+- Pont d'échelle documenté (débruitage sur l'échelle 255)
+- HtH diagonalisé une seule fois au lieu d'être réinversé à chaque itération
+
+
+5. EXPORT PNG DES FIGURES
+
+- Bouton "Save view as PNG" dans la fenêtre de résultats
+- Export à taille de pixel fixe (identique quelle que soit la taille de fenêtre)
+- Logique de dessin des viewers refactorisée pour être réutilisée écran/export
+
+
+6. AMÉLIORATIONS DE L'INTERFACE GRAPHIQUE
+
+- Les dépendances entre paramètres (depends_on) acceptent une condition
+  fonction, pas seulement une liste de valeurs
+- Le chargement TOML laisse un paramètre inchangé si sa clé est absente
+- Mise en page des figures en "constrained" (plus de débordement / labels coupés)
+

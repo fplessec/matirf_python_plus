@@ -359,6 +359,10 @@ class NLRidgeDenoiser(Denoiser):
     supports_anisotropy = False
 
     def denoise(self, y, sigma, delta=1.0):
+        # sigma=0 means no noise: NL-Ridge's linear solve is singular there, so
+        # return the input unchanged (identity denoising).
+        if sigma <= 0:
+            return y
         # y is (1, Y, X) — reshape to (N, C, H, W) = (1, 1, Y, X) for NLRidge
         model = NLRidge()
         f4d = y.unsqueeze(0)  # (1, 1, Y, X)

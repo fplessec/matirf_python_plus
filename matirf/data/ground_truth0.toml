@@ -1,0 +1,22 @@
+[sampling]
+seed = 6
+
+[ellipsoid]
+count = 1
+lateral_size_min_nm = 2000.0
+lateral_size_max_nm = 4000.0
+depth_min_frac = 0.1
+sharpness = 5.0
+axial_size_max_nm = 200.0
+axial_size_min_nm = 40.0
+max_tilt_deg = 5.0
+amplitude = 1.0
+
+[filament]
+count = 0
+
+[membrane]
+count = 0
+
+[double_layer]
+count = 0

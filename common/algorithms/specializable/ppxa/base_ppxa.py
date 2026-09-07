@@ -13,7 +13,7 @@ Then updates f via weighted average and relaxation.
 
 Subclasses must override:
     apply_forward(H, f)                : computes Hf
-    apply_adjoint(H, x)               : computes H^T x
+    apply_adjoint(H, x)               : computes H^t x
     init_f(g, H, params)              : initialization of f
     precompute(g, H, params)           : precomputes matrices/operators needed by prox steps
     compute_data_prox(u, params)       : proximal operator for the data fidelity term
@@ -50,7 +50,7 @@ class BasePpxa(Algorithm):
         lambda_reg = params.get('lambda_reg', 0.)
 
         f = self.init_f(g, H, params)
-        loss_computer = self._create_loss_computer(g, H, params)
+        loss_computer = self._create_loss_computer(g, H, params)  # (1 - lambda_reg) * D(Hf, g) + lambda_reg * R(f)
 
         # PPXA initial terms: 3 proximal variables
         p = [torch.zeros_like(f) for _ in range(3)]
@@ -77,14 +77,14 @@ class BasePpxa(Algorithm):
             f, u = self._ppxa_inner_step(p, u, f, weights, lambda_relax)
 
             if it % K == K - 1:
-                loss = loss_computer(f)
+                loss = loss_computer(f.clone().clamp(min=0.))
                 dloss = loss - prev_loss
                 self._print(
                     f"iter {it + 1:4d} \nloss={loss.item():.3e} | "
                     f"lambda_relax={lambda_relax:.2e} | "
                     f"dloss={dloss:+.3e}"
                 )
-                self._update_figure(f)
+                self._update_figure(f.clone().clamp(min=0.))
                 if dloss > 0:
                     lambda_relax = lambda_relax / 2
                 elif dloss > -EPS:
@@ -119,13 +119,13 @@ class BasePpxa(Algorithm):
     def init_weights(self, params):
         """Returns the weight tensor for the 3 proximal terms. Default: uniform."""
         import common.settings as settings
-        weights = torch.tensor([1.0, 1.0, 1.0], dtype=settings.dtype, device=settings.device)
+        weights = torch.tensor([1., 1., 1.], dtype=settings.dtype, device=settings.device)
         weights /= weights.sum()
         return weights
 
     def init_f(self, g, H, params):
-        """Initialization of f. Default: f0 = g."""
-        return g.clone()
+        """Initialization of f. Default: f0 = H^t g."""
+        return self.apply_adjoint(H, g.clone())
 
     def precompute(self, g, H, params):
         """Precomputes matrices/operators needed by prox steps. Store as self attributes."""

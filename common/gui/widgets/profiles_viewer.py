@@ -35,7 +35,9 @@ class ProfilesViewer(QWidget):
         ### creation of the widgets one after another:
         # a canvas to render the depth map:
         qgroupbox_color = self.palette().color(QPalette.Mid).name()  # depends on the palette
-        self.figure = Figure(facecolor=qgroupbox_color)
+        # constrained layout reserves room for the y-axis labels and re-flows on resize,
+        # so the vertical-axis unit labels are never clipped against the neighbouring viewer:
+        self.figure = Figure(facecolor=qgroupbox_color, layout='constrained')
         self.canvas = FigureCanvas(self.figure)
         # the matplotlib toolbar:
         self.toolbar = NavigationToolbar(self.canvas, self)
@@ -68,12 +70,20 @@ class ProfilesViewer(QWidget):
         self.figure.clear()
         self.plot_profiles()
         self.figure.suptitle(self.title, color=self.text1_color)
-        self.figure.tight_layout()
         self.canvas.draw()
 
     def plot_profiles(self, num_ticks=5):
         ax1 = self.figure.add_subplot(211)  # yz
         ax2 = self.figure.add_subplot(212)  # zx
+        self._imshow_yz, self._imshow_zx = self.render_profiles(ax1, ax2, num_ticks)
+
+    def render_profiles(self, ax1, ax2, num_ticks=5):
+        """
+        Draws the yz (top) and zx (bottom) profiles onto the given axes.
+
+        Reused both by the interactive viewer and by the fixed-size PNG export.
+        Returns (imshow_yz, imshow_zx).
+        """
         image = self.image.clone().cpu().detach()
         # set up the labels and ticks of the two axis of the figure:
         ax1.set_xlabel(self.unit, color=self.text2_color)
@@ -96,10 +106,11 @@ class ProfilesViewer(QWidget):
         vmin = min(image.mean(dim=2).min(), image.mean(dim=1).min()).item()
         vmax = max(image.mean(dim=2).max(), image.mean(dim=1).max()).item()
         # plot the profiles: two projections of the 3D data: along yz and zx
-        self._imshow_yz = ax1.imshow(image.mean(dim=2).transpose(0, 1), aspect='auto', vmin=vmin, vmax=vmax, cmap=self.cmap)
+        imshow_yz = ax1.imshow(image.mean(dim=2).transpose(0, 1), aspect='auto', vmin=vmin, vmax=vmax, cmap=self.cmap)
         ax1.set_title("yz", color=self.text1_color)
-        self._imshow_zx = ax2.imshow(image.mean(dim=1), aspect='auto', vmin=vmin, vmax=vmax, cmap=self.cmap)
+        imshow_zx = ax2.imshow(image.mean(dim=1), aspect='auto', vmin=vmin, vmax=vmax, cmap=self.cmap)
         ax2.set_title("zx", color=self.text1_color)
+        return imshow_yz, imshow_zx
 
 
 if __name__=="__main__":  # test

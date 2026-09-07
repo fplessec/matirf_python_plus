@@ -37,7 +37,9 @@ class DepthMapViewer(QWidget):
         ### creation of the widgets one after another:
         # a canvas to render the depth map:
         qgroupbox_color = self.palette().color(QPalette.Mid).name()  # depends on the palette
-        self.figure = Figure(facecolor=qgroupbox_color)
+        # constrained layout keeps the image + colorbar within the widget bounds and
+        # re-flows on resize (no overflow onto the neighbouring profiles viewer):
+        self.figure = Figure(facecolor=qgroupbox_color, layout='constrained')
         self.canvas = FigureCanvas(self.figure)
         # the matplotlib toolbar:
         self.toolbar = NavigationToolbar(self.canvas, self)
@@ -65,7 +67,6 @@ class DepthMapViewer(QWidget):
         self.figure.clear()
         self.plot_depths_map()
         self.figure.suptitle(self.title, color=self.text1_color)
-        self.figure.tight_layout()
         self.canvas.draw()
 
     def _compute_projection(self):
@@ -87,26 +88,39 @@ class DepthMapViewer(QWidget):
         depth_map /= np.sum(weights, axis=0) + 1e-12
         return proj, depth_map
 
-    def plot_depths_map(self, num_ticks=7):
-        """Plots the depth map on the 0-axis ie z-axis (f is 3D image with format ZYX)."""
-        ax = self.figure.add_subplot(111)
+    def render_depth(self, fig, ax, num_ticks=7, cax=None):
+        """
+        Draws the depth-map projection + horizontal colorbar onto the given (fig, ax).
+
+        Reused both by the interactive viewer and by the fixed-size PNG export, so the
+        exported figure is visually identical to what is shown on screen.
+        When 'cax' is given, the colorbar is drawn in that dedicated axes instead of
+        stealing space from 'ax' (this lets the export keep 'ax' exactly square).
+        Returns (imshow_obj, depth_map).
+        """
         proj, depth_map = self._compute_projection()
-        image = self.image.clone().cpu().detach().numpy()
-        nz, ny, nx = image.shape
-        ### plot the depths map:
-        self._imshow_obj = ax.imshow(proj)
+        imshow_obj = ax.imshow(proj)
         ax.axis('off')
         ### add the colorbar:
         norm = Normalize(vmin=self.z0, vmax=self.zN)
         sm = ScalarMappable(cmap=self.cmap, norm=norm)
-        cbar = self.figure.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.035, pad=0.05)
+        if cax is not None:
+            cbar = fig.colorbar(sm, cax=cax, orientation='horizontal')
+        else:
+            cbar = fig.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.035, pad=0.05)
         ticks = np.linspace(self.z0, self.zN, num_ticks)
         cbar.set_ticks(ticks, labels=[f"{t:.0f}" for t in ticks])
         cbar.set_label(f'Depth ({self.unit})', fontsize=11, color='#808080')
         cbar.outline.set_color(self.text2_color)
         cbar.ax.tick_params(colors=self.text2_color)
+        return imshow_obj, depth_map
+
+    def plot_depths_map(self, num_ticks=7):
+        """Plots the depth map on the 0-axis ie z-axis (f is 3D image with format ZYX)."""
+        ax = self.figure.add_subplot(111)
+        nz, ny, nx = self.image.shape
+        self._imshow_obj, self.depth_map = self.render_depth(self.figure, ax, num_ticks)
         ### show the depth value in the matplotlib toolbar:
-        self.depth_map = depth_map
         # this attribute is used to show (in the matplolib toolbar) the depth value of the pixel where the mouse is
         # currently on, instead of the RGB value of the pixel:
         self._imshow_obj.format_cursor_data = lambda _: ""  # <- don't show the '[R, G, B]'

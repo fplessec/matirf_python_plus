@@ -27,21 +27,25 @@ class WienerDenoiser(Denoiser):
                 K(j) = 1 / N   over the local window
                 sum_j K(j) = 1
 
+        Note on `sigma`: it is the noise standard deviation on the [0, 255]
+        scale. It acts through the Wiener gain (via `sigma^2`), NOT through the
+        window size — the window is a small FIXED neighborhood for the local
+        statistics, kept independent of sigma so it never explodes (a window tied
+        to a [0,255] sigma would reach tens of pixels and blow up the im2col
+        convolution).
+
         Args:
             y (Tensor): Input noisy image (1,Y,X) or (Z,Y,X)
-            sigma (float): Noise standard deviation
+            sigma (float): Noise standard deviation on the [0, 255] scale
             delta (float): Unused (kept for API consistency)
-            window_size (int, optional): Size of the local window
+            window_size (int, optional): Size of the local window (default 7)
         Returns:
             Tensor: Denoised image with same shape as input
         """
         y5d = _to_5d(y)
         is3d = _is_3d(y)
         if window_size is None:
-            window_size = int(max(5, round(2 * sigma)))
-            window_size += (window_size % 2 == 0)
-            # window size ~ 2*sigma (more noise => larger neighborhood),
-            # with a minimum of 5 for stable statistics, and forced odd for a centered window
+            window_size = 7  # small FIXED window; noise level acts via the sigma^2 gain
         if is3d:
             K = torch.ones((window_size,) * 3, device=settings.device, dtype=settings.dtype)
         else:

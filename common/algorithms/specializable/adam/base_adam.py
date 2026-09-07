@@ -11,7 +11,7 @@ Subclasses must override:
     apply_adjoint(H, x)   : computes H^T x
 
 Optionally override:
-    init_f(g, H, params)  : initialization of f (default: g.clone())
+    init_f(g, H, params)  : initialization of f (default: H^t g)
 """
 
 from typing import Dict, Any
@@ -41,7 +41,7 @@ class BaseAdam(Algorithm):
         f = self.init_f(g, H, params)
         f.requires_grad_(True)
 
-        loss_computer = self._create_loss_computer(g, H, params)
+        loss_computer = self._create_loss_computer(g, H, params)  # (1 - lambda_reg) * D(Hf, g) + lambda_reg * R(f)
         optimizer = torch.optim.Adam([f], lr=lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
 
@@ -88,5 +88,5 @@ class BaseAdam(Algorithm):
         return f.detach()
 
     def init_f(self, g, H, params):
-        """Initialization of f. Default: f0 = g. Override for custom init (e.g. ridge regression)."""
-        return g.clone().detach()
+        """Initialization of f. Default: f0 = H^t g. Override for custom init (e.g. ridge regression)."""
+        return self.apply_adjoint(H, g.clone().detach())
