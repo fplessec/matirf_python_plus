@@ -109,3 +109,26 @@ class FrequencyCutoffDialog(QDialog):
 
     def selected_lambda_rr(self):
         return self._slider_to_lambda()
+
+
+if __name__=="__main__":  # test
+    import sys
+    from PyQt5.QtWidgets import QApplication, QStyleFactory
+
+    import common.settings as settings
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+
+    # a synthetic descending magnitude spectrum stands in for |H_fft| values:
+    S = torch.logspace(0, -6, 300)
+    dialog = FrequencyCutoffDialog(
+        None,
+        title="test of object: FrequencyCutoffDialog",
+        info_text=f"synthetic spectrum: {len(S)} magnitudes",
+        S=S,
+    )
+    dialog.accepted.connect(lambda: print("selected lambda_rr =", dialog.selected_lambda_rr()))
+    dialog.show()
+
+    sys.exit(app.exec_())

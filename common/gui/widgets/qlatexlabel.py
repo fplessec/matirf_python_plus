@@ -95,7 +95,7 @@ if __name__=="__main__":  # test
     import sys
     from PyQt5.QtWidgets import QApplication, QVBoxLayout, QGroupBox, QPushButton, QStyleFactory
 
-    import settings
+    import common.settings as settings
 
     class LatexTestWidget(QGroupBox):
         def __init__(self, title='title'):

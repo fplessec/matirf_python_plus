@@ -7,36 +7,19 @@ Data fidelity prox solved by matrix inversion:
 Regularization prox delegated to the Regularization object from common.
 """
 
-import copy
-
 import torch
 
 from common.algorithms import BasePpxa
 from common.utils import get_variables_from_dict
 from matirf.core.operations import apply_matirf_operator
-from matirf.gui.estimate_delta import estimate_delta
+from matirf.algorithms._base import MatirfForwardModel, with_delta_estimate_button
 import common.settings as settings
 
 
-class PpxaAlgo(BasePpxa):
+class PpxaAlgo(MatirfForwardModel, BasePpxa):
     """PPXA for 3D MA-TIRF. Data fidelity prox via matrix inverse."""
 
-    supported_features = {"3d", "anisotropic"}
-
-    # patch ui_params: add estimate_delta button on delta parameter
-    ui_params = copy.deepcopy(BasePpxa.ui_params)
-    ui_params["delta"]["extra_button"] = {
-        "label": "Estimate",
-        "tooltip": "Estimate delta from measurement parameters (.json) "
-                   "and operator parameters (nz, z0, zN).",
-        "callback": estimate_delta,
-    }
-
-    def apply_forward(self, H, f):
-        return apply_matirf_operator(H, f)
-
-    def apply_adjoint(self, H, x):
-        return apply_matirf_operator(H.transpose(0, 1), x)
+    ui_params = with_delta_estimate_button(BasePpxa.ui_params)
 
     def precompute(self, g, H, params):
         """Precompute matrices for the data fidelity prox."""
@@ -55,14 +38,8 @@ class PpxaAlgo(BasePpxa):
         self._lambda_reg = lambda_reg
 
     def init_f(self, g, H, params):
-        """f0 = ( HtH + lambda_rr Id )^(-1) Htg   (ridge regression)"""
-        Ht = H.transpose(0, 1)
-        HtH = Ht @ H
-        Htg = apply_matirf_operator(Ht, g)
-        identity = torch.eye(H.shape[1], dtype=settings.dtype, device=settings.device)
-        # lambda_rr >> 1 to stabilize inversion
-        lambda_rr = 10000.
-        return apply_matirf_operator(torch.inverse(HtH + lambda_rr * identity), Htg)
+        """f0 = (H^T H + lambda_rr I)^{-1} H^T g   (ridge regression)."""
+        return self.ridge_inverse(g, H)
 
     def compute_data_prox(self, u, params):
         """p = (I + gamma*(1-lambda_reg)*H^T H)^{-1} (u + gamma*(1-lambda_reg)*H^T g)"""

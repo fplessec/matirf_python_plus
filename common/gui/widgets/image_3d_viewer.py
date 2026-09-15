@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QSlider, QHBoxLayout
@@ -95,20 +94,22 @@ class Image3DViewer(QWidget):
     def update_slice(self):
         slice_2d = self.image[self.current_slice].numpy()
         self.current_slice_raw = slice_2d  # <- stores the raw values for the mouse
-        # normalize (like fiji):
-        slice_norm = slice_2d.astype(np.float32)
-        slice_norm -= slice_norm.min()
-        if slice_norm.max() > 0:
-            slice_norm /= slice_norm.max()
+        # per-slice display range, recomputed every slice (like fiji's auto-contrast).
+        vmin = float(slice_2d.min())
+        vmax = float(slice_2d.max())
+        if vmax <= vmin:
+            vmax = vmin + 1.0  # constant slice -> avoid a degenerate (all-black) range
         ## fast path: update existing AxesImage data without clearing the figure:
         if hasattr(self, '_imshow_obj') and self._imshow_obj is not None:
-            self._imshow_obj.set_data(slice_norm)
+            self._imshow_obj.set_data(slice_2d)
+            self._imshow_obj.set_clim(vmin, vmax)
             self.canvas.draw_idle()
             self.slice_label.setText(f"Slice {self.current_slice + 1} / {self.nz}")
             return
         ## initial draw: create the AxesImage object:
         self.ax.clear()
-        self._imshow_obj = self.ax.imshow(slice_norm, cmap=self.cmap, origin='upper')
+        self._imshow_obj = self.ax.imshow(slice_2d, cmap=self.cmap, origin='upper',
+                                          vmin=vmin, vmax=vmax)
         self.ax.axis('off')
         self.figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
         self.canvas.draw()
@@ -159,12 +160,14 @@ class Image3DViewer(QWidget):
 
 if __name__=="__main__":
     import sys
-    from in_out import load_tif, MEASUREMENTS_DIR
+    from pathlib import Path
+    from common.in_out import load_tif
     from PyQt5.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
     app.setStyle("macintosh")  # <- force the style for any OS to macintosh
-    window = Image3DViewer(image=load_tif(MEASUREMENTS_DIR / '_esoubies.tif'))
+    image3d = load_tif(Path(__file__).parent / "_image_for_test.TIF")
+    window = Image3DViewer(image=image3d)
     window.resize(1200, 600)
     window.show()
     sys.exit(app.exec_())

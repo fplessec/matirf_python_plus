@@ -101,3 +101,69 @@ class AlgorithmSelectionSection(QGroupBox):
         self.stacked.setCurrentWidget(widget)
         self.algo_combo.setCurrentText(name)
         self._update_reset_btn()
+
+
+if __name__=="__main__":  # test
+    import sys
+    import tempfile
+    from pathlib import Path
+
+    from PyQt5.QtWidgets import QApplication, QStyleFactory
+
+    import common.settings as settings
+    from common.cache import make_update_cache
+    from common.in_out import load_or_create_toml, save_toml
+
+
+    # a minimal fake algorithm registry: each class only needs get_ui_params(features),
+    # exactly like a real Algorithm subclass. This keeps the test independent of any
+    # inverse problem (matirf / deconv), as the reusable/ layer is meant to be.
+    class _FakeAlgo:
+        _ui = {}
+        @classmethod
+        def get_ui_params(cls, features=None):
+            return cls._ui
+
+    class _AlgoAlpha(_FakeAlgo):
+        _ui = {
+            "iter": {"title": "Iterations", "type": "value",
+                     "param_info": {'dtype': int, 'unit': '', 'latex_name': 'n', 'default': 20}},
+            "lr": {"title": "Learning rate", "type": "value",
+                   "param_info": {'dtype': float, 'unit': '', 'latex_name': '\\eta', 'default': 0.01}},
+        }
+
+    class _AlgoBeta(_FakeAlgo):
+        _ui = {
+            "sigma": {"title": "Sigma", "type": "value",
+                      "param_info": {'dtype': float, 'unit': '', 'latex_name': '\\sigma', 'default': 15.0}},
+            "denoiser": {"title": "Denoiser", "type": "option",
+                         "param_info": {'options_list': ['None', 'Gaussian', 'TV']}},
+        }
+
+    FAKE_ALGORITHMS = {"Alpha": _AlgoAlpha, "Beta": _AlgoBeta}
+
+    # the section calls parent.load_cached_config() when the algorithm changes:
+    class _ParentStub:
+        def load_cached_config(self):
+            pass
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+
+    # a throwaway TOML pre-seeded with the two keys the section reads/writes:
+    default_config = {'algorithm': 'None', 'algo-params': {}}
+    tmp_toml = Path(tempfile.mkdtemp()) / "demo_cache.toml"
+
+    section = AlgorithmSelectionSection(
+        parent=_ParentStub(),
+        algorithms_dict=FAKE_ALGORITHMS,
+        config_path=tmp_toml,
+        update_cache_fn=make_update_cache(tmp_toml, default_config),
+        load_toml_fn=load_or_create_toml,
+        save_toml_fn=save_toml,
+        problem_features=None,
+    )
+    section.resize(520, 300)
+    section.show()
+
+    sys.exit(app.exec_())

@@ -14,17 +14,16 @@ import copy
 import torch
 
 from common.algorithms import BaseMcmc
-from deconv.core.operations import apply_psf, _psf_to_fft_kernel
+from deconv.core.operations import _psf_to_fft_kernel
+from deconv.algorithms._base import DeconvForwardModel
 from deconv.gui.estimate_lambda_rr import estimate_lambda_rr
 
 
 PROPOSAL_METHODS = ["D", "C"]
 
 
-class McmcAlgo(BaseMcmc):
+class McmcAlgo(DeconvForwardModel, BaseMcmc):
     """MCMC for 2D deconvolution. Forward operator is FFT-based convolution."""
-
-    supported_features = {"2d"}
 
     ui_params = copy.deepcopy(BaseMcmc.ui_params)
     del ui_params["step_size"]
@@ -53,12 +52,6 @@ class McmcAlgo(BaseMcmc):
             "callback": estimate_lambda_rr,
         }
     }
-
-    def apply_forward(self, H, f):
-        return apply_psf(H, f)
-
-    def apply_adjoint(self, H, x):
-        return apply_psf(H, x, adjoint=True)
 
     def _wiener_inverse(self, H, x, lambda_rr):
         """Wiener/ridge deconvolution in Fourier domain:

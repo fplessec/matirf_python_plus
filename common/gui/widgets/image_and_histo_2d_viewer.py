@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QComboBox
 
-from .image_2d_viewer import Image2DViewer
-from .histogram_2d_widget import Histogram2DWidget
+from common.gui.widgets.image_2d_viewer import Image2DViewer
+from common.gui.widgets.histogram_2d_widget import Histogram2DWidget
 
 
 class ImageAndHisto2DViewer(QGroupBox):
@@ -95,3 +95,28 @@ class ImageAndHisto2DViewer(QGroupBox):
             self.histogram._update_histogram()
         else:
             self.histogram.set_xy(x, y)
+
+
+if __name__=="__main__":  # test
+    import sys
+    from pathlib import Path
+
+    from PyQt5.QtWidgets import QApplication, QStyleFactory
+
+    from common.in_out import load_tif
+    import common.settings as settings
+
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+    palette = settings.dark_palette if settings.dark_style else settings.light_palette
+
+    package_path = Path(__file__).parent
+    image3d = load_tif(package_path / "_image_for_test.TIF")
+    image2d = image3d[image3d.shape[0] // 2]  # a middle plane of the 3D test image
+
+    window = ImageAndHisto2DViewer(image=image2d, title='test of object: ImageAndHisto2DViewer')
+    window.resize(600, 700)
+    window.show()
+
+    sys.exit(app.exec_())

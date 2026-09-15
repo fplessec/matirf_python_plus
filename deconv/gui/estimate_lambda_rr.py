@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QMessageBox
 import torch
 
 from common.in_out import load_json, load_png
-from common.gui.reusable.frequency_cutoff_dialog import FrequencyCutoffDialog
+from common.gui.reusable import FrequencyCutoffDialog
 from deconv.core.operations import compute_psf_from_params, _psf_to_fft_kernel
 
 

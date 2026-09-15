@@ -99,6 +99,8 @@ class BaseInputFilesSection(QGroupBox):
         bot.addWidget(self.image_selector)
         bot.addWidget(QSeparator('V'))
         bot.addWidget(self.json_selector)
+        # both selectors now exist: set the initial state-dependent button states
+        self.notify_selection_changed()
         return bot
 
     # ── shared logic ────────────────────────────────────────────────────
@@ -115,9 +117,19 @@ class BaseInputFilesSection(QGroupBox):
         self._on_switch_mode(self.is_mode_real)
         self.image_selector.update_mode()
         self.json_selector.update_mode()
+        self.notify_selection_changed()
 
     def are_both_file_selected(self):
         return self.image_selector.is_file_selected and self.json_selector.is_file_selected
+
+    ## re-evaluates every selector's state-dependent secondary button (text + visibility).
+    ## Called after any selection change so cross-selector dependencies (e.g. a preview button
+    ## shown only when BOTH files are selected) stay consistent, without selectors reaching
+    ## into each other's widgets.
+    def notify_selection_changed(self):
+        for selector in (self.image_selector, self.json_selector):
+            if hasattr(selector, 'refresh_extra_button'):
+                selector.refresh_extra_button()
 
     def update_ui_from_toml(self, toml_path):
         config = self._load_config_for_update(toml_path)

@@ -161,7 +161,7 @@ class BaseDisplayWindow(QMainWindow):
         window_menu.addAction(interrupt_action)
 
     def _create_left_column(self):
-        from common.gui.reusable.message_section import MessageSection
+        from common.gui.reusable import MessageSection
         layout = QVBoxLayout()
         config_section = MessageSection("Config")
         config_section._print(dumps(self.config))

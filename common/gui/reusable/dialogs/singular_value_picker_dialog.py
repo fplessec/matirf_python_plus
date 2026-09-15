@@ -76,3 +76,28 @@ class SingularValuePickerDialog(QDialog):
     def selected_lambda_rr(self):
         idx = self._combo.currentIndex()
         return round((self._S[idx] ** 2).item(), 6)
+
+
+if __name__=="__main__":  # test
+    import sys
+    import torch
+    from PyQt5.QtWidgets import QApplication, QStyleFactory
+
+    import common.settings as settings
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+
+    # a synthetic descending spectrum stands in for the singular values of H:
+    S = torch.logspace(0, -4, 12)
+    dialog = SingularValuePickerDialog(
+        None,
+        title="test of object: SingularValuePickerDialog",
+        info_text=f"synthetic spectrum: {len(S)} values, cond = {S[0] / S[-1]:.1f}",
+        spectrum_label_prefix="s",
+        S=S,
+    )
+    dialog.accepted.connect(lambda: print("selected lambda_rr =", dialog.selected_lambda_rr()))
+    dialog.show()
+
+    sys.exit(app.exec_())

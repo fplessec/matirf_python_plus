@@ -125,3 +125,61 @@ class Histogram2DWidget(QWidget):
         self.ax.set_ylabel("Count")
         self.figure.tight_layout()
         self.canvas.draw_idle()
+
+
+if __name__=="__main__":  # test
+    import sys
+    from pathlib import Path
+
+    from PyQt5.QtWidgets import QApplication, QStyleFactory, QPushButton, QGroupBox
+
+    from common.in_out import load_tif
+    import common.settings as settings
+
+
+    class HistogramTestWidget(QGroupBox):
+        def __init__(self, image, title='title'):
+            super().__init__(title=title)
+            self.image = image
+            self.histogram = Histogram2DWidget(image=image, mode='Full')
+            self.setup_ui()
+        def setup_ui(self):
+            layout = QVBoxLayout()
+            layout.addWidget(self.histogram)
+            # button: swap mode
+            self.btn_mode = QPushButton("swap mode")
+            self.btn_mode.clicked.connect(self.swap_mode)
+            layout.addWidget(self.btn_mode)
+            # button: pick pixel
+            self.btn_pick = QPushButton("pick pixel")
+            self.btn_pick.clicked.connect(self.pick_pixel)
+            layout.addWidget(self.btn_pick)
+            self.setLayout(layout)
+        def swap_mode(self):
+            modes = ['Full', 'XY-patch']
+            next_mode = modes[(modes.index(self.histogram.mode) + 1) % len(modes)]
+            self.histogram.set_mode(next_mode)
+            # scale logic
+            self.histogram.set_scale('linear' if next_mode == 'XY-patch' else 'log')
+        def pick_pixel(self):
+            if self.histogram.mode != 'XY-patch':
+                return
+            ny, nx = self.image.shape[-2], self.image.shape[-1]
+            x = np.random.randint(0, nx)
+            y = np.random.randint(0, ny)
+            self.histogram.set_xy(x, y)
+
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+    palette = settings.dark_palette if settings.dark_style else settings.light_palette
+
+    package_path = Path(__file__).parent
+    image3d = load_tif(package_path / "_image_for_test.TIF")
+    image2d = image3d[image3d.shape[0] // 2]  # a middle plane of the 3D test image
+
+    window = HistogramTestWidget(image=image2d, title='test of object: Histogram2DWidget')
+    window.resize(600, 450)
+    window.show()
+
+    sys.exit(app.exec_())

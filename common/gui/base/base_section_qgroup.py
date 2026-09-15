@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QVBoxLayout, QGroupBox
 
-from .base_section_widget import BaseSectionWidget
+from common.gui.base.base_section_widget import BaseSectionWidget
 
 
 class BaseSectionQGroup(QGroupBox):

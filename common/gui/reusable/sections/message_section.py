@@ -24,3 +24,21 @@ class MessageSection(QGroupBox):
 
     def get_text(self):
         return self.text_edit.toPlainText()
+
+
+if __name__=="__main__":  # test
+    import sys
+    from PyQt5.QtWidgets import QApplication, QStyleFactory
+
+    import common.settings as settings
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+
+    window = MessageSection("test of object: MessageSection")
+    for i in range(1, 6):
+        window._print(f"log message number {i}")
+    window.resize(420, 300)
+    window.show()
+
+    sys.exit(app.exec_())

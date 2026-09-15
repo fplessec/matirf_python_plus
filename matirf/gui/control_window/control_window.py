@@ -1,6 +1,5 @@
 from common.gui.specializable.control_window import BaseControlWindow
-from common.gui.reusable.algorithm_selection_section import AlgorithmSelectionSection
-from common.gui.reusable.add_noise_section import ADD_NOISE_PARAMETERS_UI
+from common.gui.reusable import AlgorithmSelectionSection, ADD_NOISE_PARAMETERS_UI
 from .sections import InputFilesSection
 from .sections.operator_parameters_section.operator_parameters_ui_dictionary import OPERATOR_PARAMETERS_UI
 from .display_window_manager import DisplayWindowManager
@@ -41,8 +40,6 @@ class ControlWindow(BaseControlWindow):
     ]
 
     def on_close_cleanup(self):
-        """Close sub-windows that are specific to MA-TIRF."""
-        if self.input_files_section.json_selector.measurement_parameters_editor:
-            self.input_files_section.json_selector.measurement_parameters_editor.close()
-        if self.input_files_section.image_selector.tif_file_preprocess_editor:
-            self.input_files_section.image_selector.tif_file_preprocess_editor.close()
+        """Close sub-windows (editor / preview) opened from the input-files selectors."""
+        self.input_files_section.json_selector.close_sub_window()
+        self.input_files_section.image_selector.close_sub_window()

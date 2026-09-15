@@ -32,6 +32,7 @@ _DEFAULTS = OrderedDict([
     }),
     ("app_style", {
         "value": "fusion",
+        "choices": ['macintosh', 'windows', 'fusion'],
         "description": "Qt application style",
     }),
     ("font_size_small", {

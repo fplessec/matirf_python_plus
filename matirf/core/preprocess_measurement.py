@@ -41,7 +41,8 @@ def preprocess_measurement_stack(g, measurement_params, add_noise_params, normal
     # we normalize the resulting MA-TIRF stacks to complete the preprocessing:
     g = normalize_measurement(g, normalization=normalization)
     # and finally we can add noise is the user specified it:
-    if add_noise_params['add_noise']:
+    # (.get: the '[add-noise]' section may be empty right after a cache reset -> no noise)
+    if add_noise_params.get('add_noise', False):
         g = add_noise_to_measurement(g, add_noise_params)
     return g, measurement_params
 

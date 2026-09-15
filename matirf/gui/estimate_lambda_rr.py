@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QMessageBox
 import torch
 
 from common.in_out import load_json
-from common.gui.reusable.singular_value_picker_dialog import SingularValuePickerDialog
+from common.gui.reusable import SingularValuePickerDialog
 from matirf.core.operations import compute_matirf_operator_from_params
 
 

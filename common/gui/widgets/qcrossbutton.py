@@ -38,7 +38,7 @@ if __name__=="__main__":  # test
     import sys
     from PyQt5.QtWidgets import QApplication, QVBoxLayout, QGroupBox, QLabel, QStyleFactory
 
-    import settings
+    import common.settings as settings
 
     class CrossTestWidget(QGroupBox):
         def __init__(self, title='title'):

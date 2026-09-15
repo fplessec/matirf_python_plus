@@ -10,34 +10,16 @@ H^T H = Q diag(w) Q^T) and reuse it every iteration: for any alpha the solve is
 which avoids re-inverting the matrix at each of the (varying-alpha) iterations.
 """
 
-import copy
-
 import torch
 
 from common.algorithms import BasePnp
-from matirf.core.operations import apply_matirf_operator
-from matirf.gui.estimate_delta import estimate_delta
-import common.settings as settings
+from matirf.algorithms._base import MatirfForwardModel, with_delta_estimate_button
 
 
-class PnpAlgo(BasePnp):
+class PnpAlgo(MatirfForwardModel, BasePnp):
     """PnP for 3D MA-TIRF. HQS inversion via a cached eigendecomposition of H^T H."""
 
-    supported_features = {"3d", "anisotropic"}
-
-    ui_params = copy.deepcopy(BasePnp.ui_params)
-    ui_params["delta"]["extra_button"] = {
-        "label": "Estimate",
-        "tooltip": "Estimate delta from measurement parameters (.json) "
-                   "and operator parameters (nz, z0, zN).",
-        "callback": estimate_delta,
-    }
-
-    def apply_forward(self, H, f):
-        return apply_matirf_operator(H, f)
-
-    def apply_adjoint(self, H, x):
-        return apply_matirf_operator(H.transpose(0, 1), x)
+    ui_params = with_delta_estimate_button(BasePnp.ui_params)
 
     def precompute(self, g, H, params):
         """Diagonalise H^T H once and cache H^T g for the (varying-alpha) HQS solves."""

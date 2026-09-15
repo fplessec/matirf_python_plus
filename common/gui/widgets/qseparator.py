@@ -16,7 +16,7 @@ if __name__=="__main__":  # test
     import sys
     from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, QStyleFactory
 
-    import settings
+    import common.settings as settings
 
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create(settings.app_style))

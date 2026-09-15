@@ -64,6 +64,7 @@ Key distinction
 """
 
 
-from .add_noise_section import AddNoiseSection
-from .algorithm_selection_section import AlgorithmSelectionSection
-from .message_section import MessageSection
+# reusable components are grouped by kind (see the three sub-packages):
+from .sections import AddNoiseSection, ADD_NOISE_PARAMETERS_UI, AlgorithmSelectionSection, MessageSection
+from .inputs import FileSelector, SelectorButton, JsonParametersEditor
+from .dialogs import FrequencyCutoffDialog, SingularValuePickerDialog

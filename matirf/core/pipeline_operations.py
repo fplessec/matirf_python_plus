@@ -53,21 +53,25 @@ class MaTirfOperations(PipelineOperations):
 
     @staticmethod
     def validate_config(config) -> list[str]:
+        # .get with 'None'/{} defaults: sections may be empty right after a cache reset,
+        # so an unset parameter must be reported as an error, not crash on a missing key.
         errors = []
-        cfg = config
-        if cfg['algorithm'] == 'None':
+        input_paths = config.get('input-paths', {})
+        oper = config.get('oper-params', {})
+        add_noise = config.get('add-noise', {})
+        if config.get('algorithm', 'None') == 'None':
             errors.append("Algorithm: not selected")
-        if cfg['input-paths']['tif'] == 'None':
+        if input_paths.get('tif', 'None') == 'None':
             errors.append("Input file (TIF): not provided")
-        if cfg['input-paths']['json'] == 'None':
+        if input_paths.get('json', 'None') == 'None':
             errors.append("Measurement parameters file (JSON): not provided")
-        if cfg['oper-params']['nz'] == 'None':
+        if oper.get('nz', 'None') == 'None':
             errors.append("Operator parameter 'nz': not set")
-        if cfg['oper-params']['z0'] == 'None':
+        if oper.get('z0', 'None') == 'None':
             errors.append("Operator parameter 'z0': not set")
-        if cfg['oper-params']['zN'] == 'None':
+        if oper.get('zN', 'None') == 'None':
             errors.append("Operator parameter 'zN': not set")
-        if cfg['add-noise']['add_noise'] and cfg['add-noise']['sigma'] == 'None':
+        if add_noise.get('add_noise', False) and add_noise.get('sigma', 'None') == 'None':
             errors.append("Noise sigma: required when 'add noise' is enabled")
         return errors
 

@@ -118,3 +118,31 @@ class Image2DViewer(QWidget):
         self.current_y = None
         if self.mouse_moved_callback is not None:
             self.mouse_moved_callback(None, None)
+
+
+if __name__=="__main__":  # test
+    import sys
+    from pathlib import Path
+
+    from PyQt5.QtWidgets import QApplication, QStyleFactory, QGroupBox
+
+    from common.in_out import load_tif
+    import common.settings as settings
+
+
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create(settings.app_style))
+    palette = settings.dark_palette if settings.dark_style else settings.light_palette
+
+    package_path = Path(__file__).parent
+    image3d = load_tif(package_path / "_image_for_test.TIF")
+    image2d = image3d[image3d.shape[0] // 2]  # a middle plane of the 3D test image
+
+    window = QGroupBox(title='test of object: Image2DViewer')
+    layout = QVBoxLayout()
+    layout.addWidget(Image2DViewer(image=image2d))
+    window.setLayout(layout)
+    window.resize(600, 600)
+    window.show()
+
+    sys.exit(app.exec_())

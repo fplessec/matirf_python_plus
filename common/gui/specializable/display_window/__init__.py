@@ -1,5 +1,5 @@
 from .base_display_window import BaseDisplayWindow
-from .display_window_manager import BaseDisplayWindowManager
+from .base_display_window_manager import BaseDisplayWindowManager
 from .pipeline_qt_bridge import PipelineQtBridge
 from .sections.base_figures_section import BaseFiguresSection
-from .sections.synthetic_truth_section import BaseSyntheticTruthSection
+from .sections.base_synthetic_truth_section import BaseSyntheticTruthSection

@@ -1,5 +1,5 @@
-from .qwidget_tif_file_selector import TifFileSelector
-from .qwidget_json_file_selector import JsonFileSelector
+from .qwidget_tif_file_selector import make_tif_selector
+from .qwidget_json_file_selector import make_json_selector
 from common.gui.specializable.control_window import BaseInputFilesSection
 from common import DataMode
 from matirf import MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG
@@ -31,10 +31,10 @@ class InputFilesSection(BaseInputFilesSection):
         return "Simulate measurement with synthetic truth"
 
     def _create_image_selector(self):
-        return TifFileSelector(parent=self)
+        return make_tif_selector(self)
 
     def _create_json_selector(self):
-        return JsonFileSelector(parent=self)
+        return make_json_selector(self)
 
     def _on_switch_mode(self, is_mode_real):
         new_mode = DataMode.REAL.value if is_mode_real else DataMode.SYNTHETIC.value

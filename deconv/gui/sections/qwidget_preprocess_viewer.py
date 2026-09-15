@@ -37,5 +37,5 @@ class DeconvPreprocessViewer(QWidget):
         self.setLayout(layout)
 
     def closeEvent(self, event):
-        self.parent.preprocess_viewer = None
+        self.parent.sub_window = None
         super().closeEvent(event)

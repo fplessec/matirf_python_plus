@@ -1,2 +1,2 @@
 from .base_figures_section import BaseFiguresSection
-from .synthetic_truth_section import BaseSyntheticTruthSection
+from .base_synthetic_truth_section import BaseSyntheticTruthSection

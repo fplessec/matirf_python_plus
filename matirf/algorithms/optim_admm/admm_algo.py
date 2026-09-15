@@ -9,19 +9,12 @@ import torch
 
 from common.algorithms import BaseAdmm
 from matirf.core.operations import apply_matirf_operator
+from matirf.algorithms._base import MatirfForwardModel
 import common.settings as settings
 
 
-class AdmmAlgo(BaseAdmm):
+class AdmmAlgo(MatirfForwardModel, BaseAdmm):
     """ADMM for 3D MA-TIRF. Linear system solved by matrix inverse."""
-
-    supported_features = {"3d", "anisotropic"}
-
-    def apply_forward(self, H, f):
-        return apply_matirf_operator(H, f)
-
-    def apply_adjoint(self, H, x):
-        return apply_matirf_operator(H.transpose(0, 1), x)
 
     def precompute(self, g, H, params):
         """Precompute (HtH + mu I)^{-1} for the u-step."""

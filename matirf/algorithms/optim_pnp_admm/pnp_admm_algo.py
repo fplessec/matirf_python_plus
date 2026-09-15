@@ -6,33 +6,16 @@ eigendecomposition of the small (nz x nz) matrix H^T H, so rho can vary for free
 and the matrix is never re-inverted inside the loop.
 """
 
-import copy
-
 import torch
 
 from common.algorithms import BasePnpAdmm
-from matirf.core.operations import apply_matirf_operator
-from matirf.gui.estimate_delta import estimate_delta
+from matirf.algorithms._base import MatirfForwardModel, with_delta_estimate_button
 
 
-class PnpAdmmAlgo(BasePnpAdmm):
+class PnpAdmmAlgo(MatirfForwardModel, BasePnpAdmm):
     """PnP-ADMM for 3D MA-TIRF. Linear solve via a cached eigendecomposition of H^T H."""
 
-    supported_features = {"3d", "anisotropic"}
-
-    ui_params = copy.deepcopy(BasePnpAdmm.ui_params)
-    ui_params["delta"]["extra_button"] = {
-        "label": "Estimate",
-        "tooltip": "Estimate delta from measurement parameters (.json) "
-                   "and operator parameters (nz, z0, zN).",
-        "callback": estimate_delta,
-    }
-
-    def apply_forward(self, H, f):
-        return apply_matirf_operator(H, f)
-
-    def apply_adjoint(self, H, x):
-        return apply_matirf_operator(H.transpose(0, 1), x)
+    ui_params = with_delta_estimate_button(BasePnpAdmm.ui_params)
 
     def precompute(self, g, H, params):
         """Diagonalise H^T H once: H^T H = Q diag(w) Q^T (symmetric)."""

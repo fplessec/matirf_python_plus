@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QComboBox
 
-from .image_3d_viewer import Image3DViewer
-from .histogram_3d_widget import Histogram3DWidget
+from common.gui.widgets.image_3d_viewer import Image3DViewer
+from common.gui.widgets.histogram_3d_widget import Histogram3DWidget
 
 
 class ImageAndHisto3DViewer(QGroupBox):
@@ -118,16 +118,15 @@ if __name__=="__main__":  # test
 
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 
-    import gui.more_widgets as more_widgets
-    from in_out import load_tif
-    import settings
+    from common.in_out import load_tif
+    import common.settings as settings
 
 
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create(settings.app_style))
     palette = settings.dark_palette if settings.dark_style else settings.light_palette
 
-    package_path = Path(more_widgets.__file__).parent
+    package_path = Path(__file__).parent
     image3d = load_tif(package_path / "_image_for_test.TIF")
 
     window = ImageAndHisto3DViewer(image=image3d, title='test of object: ImageAndHisto3DViewer')

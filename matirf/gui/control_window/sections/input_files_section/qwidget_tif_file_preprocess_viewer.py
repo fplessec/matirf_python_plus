@@ -45,5 +45,5 @@ class TifFilePreprocessViewer(QWidget):
         self.setLayout(main_layout)
 
     def closeEvent(self, event):
-        self.parent.tif_file_preprocess_editor = None
+        self.parent.sub_window = None
         super().closeEvent(event)

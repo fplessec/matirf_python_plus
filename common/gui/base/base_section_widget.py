@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 
-from .single_parameter_widget import SimpleParameterWidget
+from common.gui.base.single_parameter_widget import SimpleParameterWidget
 from common.gui.widgets import QSeparator
 
 

@@ -1,6 +1,5 @@
 from common.gui.specializable.control_window import BaseControlWindow
-from common.gui.reusable.algorithm_selection_section import AlgorithmSelectionSection
-from common.gui.reusable.add_noise_section import ADD_NOISE_PARAMETERS_UI
+from common.gui.reusable import AlgorithmSelectionSection, ADD_NOISE_PARAMETERS_UI
 from .sections import DeconvInputFilesSection
 from .display_window_manager import DeconvDisplayWindowManager
 from deconv import DECONV_CONFIG_PATH, DECONV_RESULTS_DIR, DEFAULT_DECONV_CONFIG, DECONV_FEATURES
@@ -41,8 +40,6 @@ class DeconvControlWindow(BaseControlWindow):
     # AlgorithmSelectionSection  → self.algorithm_selection_section
 
     def on_close_cleanup(self):
-        """Close sub-windows that are specific to deconvolution."""
-        if self.deconv_input_files_section.json_selector.psf_parameters_editor:
-            self.deconv_input_files_section.json_selector.psf_parameters_editor.close()
-        if self.deconv_input_files_section.image_selector.preprocess_viewer:
-            self.deconv_input_files_section.image_selector.preprocess_viewer.close()
+        """Close sub-windows (editor / preview) opened from the input-files selectors."""
+        self.deconv_input_files_section.json_selector.close_sub_window()
+        self.deconv_input_files_section.image_selector.close_sub_window()

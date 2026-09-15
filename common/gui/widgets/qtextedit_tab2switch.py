@@ -20,7 +20,7 @@ if __name__=="__main__":  # test
     import sys
     from PyQt5.QtWidgets import QApplication, QVBoxLayout, QLineEdit, QGroupBox, QStyleFactory
 
-    import settings
+    import common.settings as settings
 
     class TabTestWidget(QGroupBox):
         def __init__(self, title='title'):
