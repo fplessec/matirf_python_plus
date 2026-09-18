@@ -1,1 +1,0 @@
-from .qgroup_figures_section import FiguresSection

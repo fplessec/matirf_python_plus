@@ -1,37 +1,104 @@
 """
 Generic editor window to CREATE or MODIFY a JSON parameters file.
 
-Reused by any inverse problem whose input-files section needs a parameters editor
+Reused by any inverse problem whose input-paths section needs a parameters editor
 (matirf's measurement parameters, deconv's PSF parameters, ...). It carries the whole
 common body:
     > Create vs Modify mode, deduced from the owning selector (parent.is_file_selected):
         - Modify: values are pre-filled from the selected JSON, button "Save modifications"
         - Create: values start at their UI-dict defaults, button "Create file" (asks a path,
                   then registers it on the selector via parent.update_selected_file)
-    > one SimpleParameterWidget per entry of a params UI dict
-    > parameter collection with a sentinel: an unset ('None') value shows a QMessageBox and
-      aborts the save (collect returns the string 'error')
+    > one widget per entry of a params UI dict:
+        - types 'value' / 'bool' / 'option' -> a SimpleParameterWidget (one line)
+        - type  'list'                      -> a free-text box, one element per line, parsed
+                                               to a list of param_info['dtype'] (float/int/...)
+    > parameter collection with a sentinel: an unset ('None') value, or an unparsable list
+      line, shows a QMessageBox and aborts the save (collect returns the string 'error')
     > closeEvent coupling back to the owning FileSelector (selected_path / is_file_selected /
       sub_window) and Escape-to-defocus.
 
-Problem-specific EXTRA fields that are not plain SimpleParameterWidgets (e.g. matirf's list
-of incident angles, entered as free text) are added by overriding two hooks:
+For anything beyond these types, two hooks remain for genuinely custom fields:
     build_extra_widgets()        -> [QWidget, ...]  inserted at the top
     collect_extra_parameters()   -> (params_dict, error_message)
 """
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox
 
 from common.gui.file_dialog import save_file
 from common.gui.base import SimpleParameterWidget
-from common.gui.widgets import QSeparator
+from common.gui.widgets import QSeparator, QTextEditTab2Switch
 from common.in_out import load_json, save_json
 import common.settings as settings
 
 
 class JsonParametersEditor(QWidget):
+    """
+    Editor window to CREATE or MODIFY a JSON parameters file, built from a UI dictionary.
+
+    --------
+    > Layout :
+    --------
+
+        [ (optional extra fields, from build_extra_widgets()) ]
+        [ one SimpleParameterWidget per entry of params_ui_dict ]
+        [ "Create file" / "Save modifications" button ]
+
+    ----------
+    > Parameters :
+    ----------
+
+    >> parent : FileSelector
+        The owning selector. `parent.is_file_selected` decides Create vs Modify mode;
+        in Modify mode values are pre-filled from `parent.selected_path`. On close the
+        editor writes back `parent.selected_path` / `parent.is_file_selected` and clears
+        `parent.sub_window`.
+
+    >> params_ui_dict : dict
+        One entry per parameter. Types 'value' / 'bool' / 'option' use the exact format
+        consumed by SimpleParameterWidget (see common/gui/base/single_parameter_widget.py).
+        Type 'list' is handled by this editor: a free-text box (one element per line) parsed
+        to a list of param_info['dtype']; optional param_info['hint'] adds a grey helper label.
+        Example:
+            {
+              "angles_deg": {                          # a list[float], entered one per line
+                  "title": "Incident angles (deg)",
+                  "type": "list",
+                  "param_info": {'dtype': float, 'hint': "1 value per line"},
+              },
+              "sigma": {
+                  "title": "PSF standard deviation (pixels)",
+                  "type": "value",
+                  "param_info": {'dtype': float, 'unit': 'px', 'latex_name': '\\sigma', 'default': None},
+              },
+              "kernel_size": {
+                  "title": "PSF kernel size (pixels)",
+                  "type": "value",
+                  "param_info": {'dtype': int, 'unit': 'px', 'latex_name': '\\text{k}', 'default': None},
+              },
+            }
+
+    >> measurements_dir : Path or str
+        Directory the "Create file" save dialog opens in.
+
+    >> title_noun : str
+        Used in the window title ("Create <title_noun>" / "Modify <title_noun>") and the
+        save-dialog title ("Save <title_noun> File"). E.g. "PSF Parameters".
+
+    >> width : int
+        Initial window width.
+
+    ------------------------------
+    > Extending it (problem-specific fields) :
+    ------------------------------
+    For a field that is NOT a plain SimpleParameterWidget (e.g. a free-text list of angles),
+    subclass and override the two hooks:
+        build_extra_widgets()      -> [QWidget, ...]        inserted at the top
+        collect_extra_parameters() -> (params_dict, error)  merged into the saved JSON
+    A subclass typically fixes params_ui_dict / measurements_dir / title_noun in its own
+    __init__ and is then referenced declaratively via Editor(editor_class=MySubclass).
+    """
 
     def __init__(self, parent, *, params_ui_dict, measurements_dir,
                  title_noun="Parameters", width=600):
@@ -40,7 +107,8 @@ class JsonParametersEditor(QWidget):
         self.params_ui_dict = params_ui_dict
         self._measurements_dir = measurements_dir
         self._title_noun = title_noun
-        self.parameter_widgets = {}
+        self.parameter_widgets = {}          # name -> SimpleParameterWidget (value/bool/option)
+        self._list_widgets = {}              # name -> (QTextEdit, element_dtype)   for type 'list'
         self.is_modify = self.parent.is_file_selected
         self.json_path = self.parent.selected_path if self.is_modify else None
         self.json_file = load_json(self.json_path) if self.is_modify else None
@@ -73,18 +141,48 @@ class JsonParametersEditor(QWidget):
         for param_name, param_config in self.params_ui_dict.items():
             if not first:
                 layout.addWidget(QSeparator('H'))
-            # copy param_info so we never mutate the shared, module-level UI dict when we
-            # inject the current file's value as the default in Modify mode:
-            param_info = dict(param_config["param_info"])
-            if self.is_modify:
-                param_info["default"] = self.json_file[param_name]
-            widget = SimpleParameterWidget(
-                title=param_config["title"], type=param_config["type"], param_info=param_info)
-            self.parameter_widgets[param_name] = widget
-            layout.addWidget(widget)
+            if param_config["type"] == "list":
+                layout.addWidget(self._build_list_field(param_name, param_config))
+            else:
+                # copy param_info so we never mutate the shared, module-level UI dict when we
+                # inject the current file's value as the default in Modify mode:
+                param_info = dict(param_config["param_info"])
+                if self.is_modify:
+                    param_info["default"] = self.json_file[param_name]
+                widget = SimpleParameterWidget(
+                    title=param_config["title"], type=param_config["type"], param_info=param_info)
+                self.parameter_widgets[param_name] = widget
+                layout.addWidget(widget)
             first = False
         layout.addWidget(self._create_button())
         self.setLayout(layout)
+
+    def _build_list_field(self, name, param_config):
+        """
+        A 'list' parameter: a free-text box, one element per line, parsed to a list of the
+        element dtype (param_info['dtype'], e.g. float/int). Optional param_info['hint']
+        adds a small grey helper label. Pre-filled from the file in Modify mode.
+        """
+        info = param_config.get("param_info", {})
+        dtype = info.get("dtype", float)
+        container = QWidget()
+        col = QVBoxLayout(container)
+        col.setContentsMargins(0, 0, 0, 0)
+        header = QHBoxLayout()
+        header.addWidget(QLabel(param_config["title"]))
+        if info.get("hint"):
+            hint = QLabel(info["hint"])
+            hint.setStyleSheet(
+                f"color: gray; font-style: italic; font-size: {settings.FontSize.SMALL}pt;")
+            header.addStretch()
+            header.addWidget(hint)
+        box = QTextEditTab2Switch(parent=self)
+        if self.is_modify:
+            box.setPlainText("\n".join(str(v) for v in self.json_file[name]))
+        col.addLayout(header)
+        col.addWidget(box)
+        self._list_widgets[name] = (box, dtype)
+        return container
 
     def _create_button(self):
         button = QPushButton("Save modifications" if self.is_modify else "Create file")
@@ -123,10 +221,20 @@ class JsonParametersEditor(QWidget):
         params.update(extra_params)
         if extra_error:
             errors.append(extra_error)
-        for param_name, widget in self.parameter_widgets.items():
-            params[param_name] = widget.param_value
-            if widget.param_value is None:
-                errors.append(f"- Parameter '{param_name}' has no valid value.")
+        for param_name, param_config in self.params_ui_dict.items():
+            if param_config["type"] == "list":
+                box, dtype = self._list_widgets[param_name]
+                try:
+                    params[param_name] = [dtype(line.strip().strip(','))
+                                          for line in box.toPlainText().splitlines() if line.strip()]
+                except (ValueError, TypeError) as e:
+                    errors.append(f"- Parameter '{param_name}': invalid list ({e}). Each line must be "
+                                  f"a valid {dtype.__name__} (e.g. use '.' not ',').")
+            else:
+                widget = self.parameter_widgets[param_name]
+                params[param_name] = widget.param_value
+                if widget.param_value is None:
+                    errors.append(f"- Parameter '{param_name}' has no valid value.")
         if errors and when_saving:
             QMessageBox.warning(self, "", "Cannot save the modifications:\n\n" + "\n".join(errors))
             return 'error'

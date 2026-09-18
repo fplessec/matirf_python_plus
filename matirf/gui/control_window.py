@@ -1,7 +1,7 @@
 from common.gui.specializable.control_window import BaseControlWindow
 from common.gui.reusable import AlgorithmSelectionSection, ADD_NOISE_PARAMETERS_UI
-from .sections import InputFilesSection
-from .sections.operator_parameters_section.operator_parameters_ui_dictionary import OPERATOR_PARAMETERS_UI
+from .input_files_section import InputFilesSection
+from .operator_parameters_ui_dictionary import OPERATOR_PARAMETERS_UI
 from .display_window_manager import DisplayWindowManager
 from matirf import MATIRF_CONFIG_PATH, MATIRF_RESULTS_DIR, DEFAULT_MATIRF_CONFIG, MATIRF_FEATURES
 from matirf.core import MaTirfPipeline

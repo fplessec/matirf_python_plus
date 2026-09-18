@@ -32,7 +32,7 @@ from common.gui.base.base_section_qgroup import BaseSectionQGroup
 from common.gui.file_dialog import open_file, save_file
 from matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_RESULTS_DIR
 from matirf.cache import update_cache as update_matirf_cache
-from matirf.gui.display_window.sections.figures_section import FiguresSection
+from matirf.gui.figures_section import FiguresSection
 from .objects import OBJECT_TYPES
 from .objects.base import gate_by_count
 from .grid import GRID_UI, GRID_TOML_KEY

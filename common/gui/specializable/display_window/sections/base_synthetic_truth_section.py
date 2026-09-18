@@ -7,8 +7,10 @@ Provides:
         * curve metrics: displayed as summary value + a button to open a plot
     - A "Visualize difference" button that opens a viewer window
 
-Hooks to implement:
-    _create_difference_viewer(diff)  -> QWidget   (a window showing f_true - alpha*f)
+Declarative model: a concrete section just declares the viewer class used for the
+"difference" popup:
+    DIFFERENCE_VIEWER_CLASS = ImageAndHisto2DViewer   # or ...3DViewer
+The difference popup itself is generic (DifferenceViewer below).
 """
 
 from PyQt5.QtWidgets import (
@@ -18,6 +20,30 @@ from PyQt5.QtWidgets import (
 )
 
 from common.core.metrics import METRIC_REGISTRY
+
+
+class DifferenceViewer(QWidget):
+    """
+    Generic popup window showing the difference image f_true - alpha*f.
+
+    The diff is precomputed by the pipeline (pipeline.result.diff); this only displays it,
+    using the viewer class passed in (ImageAndHisto2DViewer / ImageAndHisto3DViewer).
+    """
+
+    def __init__(self, diff, viewer_class, parent=None):
+        super().__init__()
+        self.parent = parent
+        self.diff = diff.clone()
+        self.setWindowTitle("Difference Viewer")
+        self.resize(700, 900)
+        layout = QHBoxLayout()
+        layout.addWidget(viewer_class(image=self.diff, title="Difference (f_true - alpha * f)"))
+        self.setLayout(layout)
+
+    def closeEvent(self, event):
+        if self.parent:
+            self.parent.viewer_window = None
+        super().closeEvent(event)
 
 
 class CurveViewerWindow(QWidget):
@@ -54,6 +80,29 @@ class CurveViewerWindow(QWidget):
 
 
 class BaseSyntheticTruthSection(QGroupBox):
+    """
+    Synthetic-truth analysis section — a metrics table (scalar values + curve popups) and a
+    "Visualize difference" button. Declared by a single class attribute.
+
+    ----------
+    > Parameters (override as class attributes) :
+    ----------
+
+    >> DIFFERENCE_VIEWER_CLASS : type
+        The image viewer used for the difference popup (f_true - alpha*f), e.g.
+        ImageAndHisto2DViewer / ImageAndHisto3DViewer. The popup itself is generic
+        (DifferenceViewer above).
+
+    ----------
+    > Example :
+    ----------
+
+        class SyntheticTruthSection(BaseSyntheticTruthSection):
+            DIFFERENCE_VIEWER_CLASS = ImageAndHisto3DViewer
+    """
+
+    # a concrete section only declares the viewer class for the difference popup:
+    DIFFERENCE_VIEWER_CLASS = None   # ImageAndHisto2DViewer / ImageAndHisto3DViewer
 
     def __init__(self, pipeline):
         super().__init__("Synthetic Ground Truth Analysis")
@@ -62,23 +111,11 @@ class BaseSyntheticTruthSection(QGroupBox):
         self.pipeline = pipeline
         self._setup_ui()
 
-    # -- hook (to override) --------------------------------------------------
+    # -- difference popup (generic; override only for a fully custom window) --
 
     def _create_difference_viewer(self, diff):
-        """
-        Return a QWidget window that visualises the difference image.
-
-        The returned widget must:
-        - be a top-level window (will be shown via .show())
-        - set self.parent().viewer_window = None in its closeEvent
-          (or let BaseSyntheticTruthSection handle it).
-
-        Parameters
-        ----------
-        diff : tensor / ndarray
-            Pre-computed difference (f_true - alpha * f).
-        """
-        raise NotImplementedError
+        """Return the difference-image window (generic, built from DIFFERENCE_VIEWER_CLASS)."""
+        return DifferenceViewer(diff, self.DIFFERENCE_VIEWER_CLASS, parent=self)
 
     # -- shared UI construction -----------------------------------------------
 

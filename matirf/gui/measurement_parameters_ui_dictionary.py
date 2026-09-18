@@ -1,4 +1,12 @@
 MEASUREMENT_PARAMETERS_UI = {
+    "angles_deg": {
+        "title": "Incident angles (deg)",
+        "type": "list",
+        "param_info": {
+            'dtype': float,
+            'hint': "1 angle per line, respecting the stack order",
+        }
+    },
     "n_glass": {
         "title": "Optical index of the coverslip",
         "type": "value",

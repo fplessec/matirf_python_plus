@@ -167,8 +167,12 @@ def compute_matirf_operator_from_params(measurement_params: dict, operator_param
      wavelength_nm, beam_divergence_deg) = get_variables_from_dict(measurement_params, ['angles_deg',
                                                             'n_glass', 'n_medium', 'n_oil', 'numerical_aperture',
                                                             'wavelength_nm', 'beam_divergence_deg'])
-    (nz, z0, zN, normalize) = get_variables_from_dict(operator_params, ['nz', 'z0', 'zN',
-                                                                                        'normalize'])
+    (nz, z0, zN) = get_variables_from_dict(operator_params, ['nz', 'z0', 'zN'])
+    # 'normalize' is optional: its checkbox may never have been touched (and thus never
+    # written to the cache, e.g. right after a reset) -> default to False (its UI default).
+    normalize = operator_params.get('normalize', False)
+    if normalize in (None, 'None', 'null'):   # cache stores unset values as "null"
+        normalize = False
     return compute_matirf_operator(angles_deg, nz, z0, zN, n_glass, n_medium, numerical_aperture, n_oil,
                                    wavelength_nm, beam_divergence_deg, normalize)
 

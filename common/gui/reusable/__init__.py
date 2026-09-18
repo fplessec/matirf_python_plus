@@ -66,5 +66,5 @@ Key distinction
 
 # reusable components are grouped by kind (see the three sub-packages):
 from .sections import AddNoiseSection, ADD_NOISE_PARAMETERS_UI, AlgorithmSelectionSection, MessageSection
-from .inputs import FileSelector, SelectorButton, JsonParametersEditor
+from .inputs import FileSelector, SelectorButton, JsonParametersEditor, PreprocessViewer
 from .dialogs import FrequencyCutoffDialog, SingularValuePickerDialog

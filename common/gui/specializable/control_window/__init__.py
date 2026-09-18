@@ -1,2 +1,4 @@
 from .base_control_window import BaseControlWindow
-from .sections.base_input_files_section import BaseInputFilesSection
+from .sections.base_input_files_section import (
+    BaseInputFilesSection, FileSlot, Preview, Editor,
+)

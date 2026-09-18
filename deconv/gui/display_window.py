@@ -7,31 +7,11 @@ from deconv import DECONV_RESULTS_DIR
 
 
 class DeconvDisplayWindow(BaseDisplayWindow):
+    """Deconvolution display window — configured entirely by the class attributes below."""
 
-    def window_title(self):
-        return "Deconv Display Window"
-
-    def results_dir(self):
-        return DECONV_RESULTS_DIR
-
-    def pipeline_class(self):
-        return DeconvPipeline
-
-    def display_window_manager_class(self):
-        return DeconvDisplayWindowManager
-
-    def create_figures_section(self):
-        return DeconvFiguresSection(parent=self)
-
-    def create_synthetic_section(self):
-        return DeconvSyntheticTruthSection(self.pipeline)
-
-    def update_figures(self, f, config):
-        self.figures_section.update_plot(f, config)
-
-    def update_synthetic(self):
-        self.synthetic_section.update_plot()
-
-    def on_close_synthetic_cleanup(self):
-        if self.synthetic_section and self.synthetic_section.viewer_window:
-            self.synthetic_section.viewer_window.close()
+    WINDOW_TITLE = "Deconv Display Window"
+    RESULTS_DIR = DECONV_RESULTS_DIR
+    PIPELINE_CLASS = DeconvPipeline
+    DISPLAY_WINDOW_MANAGER_CLASS = DeconvDisplayWindowManager
+    FIGURES_SECTION_CLASS = DeconvFiguresSection
+    SYNTHETIC_SECTION_CLASS = DeconvSyntheticTruthSection

@@ -51,6 +51,59 @@ class SelectorButton:
 
 
 class FileSelector(QWidget):
+    """
+    A file-path selector for one input file of an inverse problem (image or json).
+
+    --------
+    > Layout :
+    --------
+
+        [ mode-dependent title            ]
+        [ "Choose .<noun> file" button    ]
+        [ optional secondary button       ]   (SelectorButton: preview / editor / ...)
+        [ selected file name | (x) unselect ]
+
+    ----------
+    > Parameters :
+    ----------
+
+    >> section : BaseInputFilesSection
+        The owning section. Must expose `is_mode_real` (bool), `are_both_file_selected()`
+        and `notify_selection_changed()`. Used for the mode-dependent title and to keep
+        the secondary buttons in sync across both selectors.
+
+    >> noun : str
+        Short file kind, e.g. 'tif' / 'png' / 'json'. Used in the button text
+        ("Choose .tif file") and the empty label ("No .tif file selected").
+
+    >> dialog_filter : str
+        Qt open-dialog filter, e.g. "Image Files (*.tif *.tiff)".
+
+    >> toml_key : str
+        Key under '[input-paths]' where the chosen path is written, e.g. 'tif' / 'json'.
+
+    >> measurements_dir : Path or str
+        Directory the open dialog starts in.
+
+    >> update_cache_fn : callable
+        Function(key_path, value) writing a value into the cached config.toml.
+
+    >> title_real / title_synthetic : str
+        The title shown above the selector in real-data / synthetic-data mode.
+
+    >> validate_fn : callable or None
+        Optional Function(path) -> bool. If it returns False the chosen file is rejected
+        (e.g. a .json missing required keys).
+
+    >> extra_button : SelectorButton or None
+        Optional secondary button (see SelectorButton), e.g. "See preprocessed file"
+        or "Create/Modify .json". Example:
+            SelectorButton(
+                text="See preprocessed file",
+                on_click=lambda selector: selector.set_sub_window(MyViewer(selector)),
+                visible_when=section.are_both_file_selected,   # shown only when both files chosen
+            )
+    """
 
     def __init__(self, section, *, noun, dialog_filter, toml_key, measurements_dir,
                  update_cache_fn, title_real, title_synthetic,

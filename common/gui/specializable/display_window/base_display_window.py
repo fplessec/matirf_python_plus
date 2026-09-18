@@ -46,34 +46,45 @@ class BaseDisplayWindow(QMainWindow):
 
         self._setup_ui()
 
-    # ── hooks (to override) ──────────────────────────────────────────────
+    # ── declarative configuration (override these class attributes) ──────────
+    # Same declarative style as BaseControlWindow: a concrete display window is defined
+    # entirely by these attributes; no method needs to be overridden.
+    WINDOW_TITLE = ""
+    RESULTS_DIR = None
+    PIPELINE_CLASS = None                 # the BasePipeline subclass for this problem
+    DISPLAY_WINDOW_MANAGER_CLASS = None   # the BaseDisplayWindowManager subclass
+    FIGURES_SECTION_CLASS = None          # the BaseFiguresSection subclass
+    SYNTHETIC_SECTION_CLASS = None        # the BaseSyntheticTruthSection subclass, or None
+
+    # ── hooks (built from the attributes above; override only for special cases) ──
 
     def window_title(self) -> str:
-        raise NotImplementedError
+        return self.WINDOW_TITLE
 
     def results_dir(self):
-        raise NotImplementedError
+        return self.RESULTS_DIR
 
     def pipeline_class(self):
-        raise NotImplementedError
+        return self.PIPELINE_CLASS
 
     def display_window_manager_class(self):
-        raise NotImplementedError
+        return self.DISPLAY_WINDOW_MANAGER_CLASS
 
     def create_figures_section(self):
-        raise NotImplementedError
+        return self.FIGURES_SECTION_CLASS(parent=self)
 
     def create_synthetic_section(self):
-        return None
+        return self.SYNTHETIC_SECTION_CLASS(self.pipeline) if self.SYNTHETIC_SECTION_CLASS else None
 
     def update_figures(self, f, config):
-        raise NotImplementedError
+        self.figures_section.update_plot(f, config)
 
     def update_synthetic(self):
-        pass
+        self.synthetic_section.update_plot()
 
     def on_close_synthetic_cleanup(self):
-        pass
+        if self.synthetic_section and self.synthetic_section.viewer_window:
+            self.synthetic_section.viewer_window.close()
 
     # ── pipeline bridge ──────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 from common.gui.specializable.control_window import BaseControlWindow
 from common.gui.reusable import AlgorithmSelectionSection, ADD_NOISE_PARAMETERS_UI
-from .sections import DeconvInputFilesSection
+from .input_files_section import DeconvInputFilesSection
 from .display_window_manager import DeconvDisplayWindowManager
 from deconv import DECONV_CONFIG_PATH, DECONV_RESULTS_DIR, DEFAULT_DECONV_CONFIG, DECONV_FEATURES
 from deconv.core import DeconvPipeline
