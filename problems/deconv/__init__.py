@@ -33,8 +33,11 @@ DEFAULT_DECONV_CONFIG = {
 from .operator import DeconvOperator      # noqa: E402
 from .problem import DECONV               # noqa: E402
 
+## the generic name cli.py and the tools look for, whatever the problem is called:
+PROBLEM = DECONV
+
 __all__ = [
-    "DECONV", "DeconvOperator",
+    "PROBLEM", "DECONV", "DeconvOperator",
     "DECONV_DIR", "DECONV_CACHE_DIR", "DECONV_CONFIG_PATH",
     "DECONV_DATA_DIR", "DECONV_MEASUREMENTS_DIR", "DECONV_RESULTS_DIR",
     "DEFAULT_DECONV_CONFIG",

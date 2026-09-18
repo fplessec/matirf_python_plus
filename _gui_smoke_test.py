@@ -68,8 +68,11 @@ for p in (MATIRF_CONFIG_PATH, DECONV_CONFIG_PATH):
 
 print("\n=== B. FENÊTRE DE CONTRÔLE ===")
 
-from problems.matirf.gui.control_window import ControlWindow
-from problems.deconv.gui.control_window import DeconvControlWindow
+from gui.factory import control_window_class, display_window_class
+from problems.matirf import MATIRF
+from problems.deconv import DECONV
+ControlWindow = control_window_class(MATIRF)
+DeconvControlWindow = control_window_class(DECONV)
 from fileio import load_or_create_toml, save_toml
 from problems.matirf import DEFAULT_MATIRF_CONFIG
 
@@ -187,8 +190,9 @@ def b12():
 check("B12 bouton 'reset parameters'", b12)
 
 def b13():
-    from problems.matirf.gui.control_window import MATIRF_SOLVERS
-    from problems.matirf import MATIRF
+    from gui.estimators import attach
+    from solvers import SOLVERS as _S
+    MATIRF_SOLVERS = attach(_S, MATIRF.ui.estimators, MATIRF)
     p = MATIRF_SOLVERS["ADAM"].get_ui_params(MATIRF.features)
     assert "extra_button" in p["delta"], "bouton Estimate absent de delta"
     p2 = MATIRF_SOLVERS["MCMC"].get_ui_params(MATIRF.features)
@@ -199,11 +203,14 @@ def b13():
 check("B13 boutons 'Estimate' (matirf)", b13)
 
 def b14():
-    from problems.matirf.gui.estimate_delta import estimate_delta
-    sec = cw.algorithm_selection_section
-    w = sec.algo_widgets["ADAM"]
+    # on passe par le VRAI chemin câblé : le bouton tel que la fenêtre l'a monté
+    from gui.estimators import attach
+    from solvers import SOLVERS as _S
+    view = attach(_S, MATIRF.ui.estimators, MATIRF)
+    button = view["ADAM"].get_ui_params(MATIRF.features)["delta"]["extra_button"]
+    w = cw.algorithm_selection_section.algo_widgets["ADAM"]
     n = len(SHOWN)
-    estimate_delta(w, cw.update_cache_fn, cw.load_config, MATIRF_CONFIG_PATH)
+    button["callback"](w, cw.update_cache_fn, cw.load_config, MATIRF_CONFIG_PATH)
     cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
     d = cfg["algo-params"].get("delta")
     assert isinstance(d, float) and d > 0, f"delta={d}, messages={SHOWN[n:]}"
@@ -211,28 +218,24 @@ def b14():
 check("B14 callback Estimate delta (calcul réel)", b14)
 
 def b15():
-    # le vrai dialogue est NON modal (show + signal accepted) : on le capture pour
-    # l'accepter, sans le remplacer — la SVD et le tracé sont donc réellement exercés
-    import problems.matirf.gui.estimate_lambda_rr as M
-    from problems.matirf.gui.estimate_lambda_rr import estimate_lambda_rr
-    created, orig = [], M.SingularValuePickerDialog
-    class Capture(orig):
-        def __init__(self, *a, **k):
-            super().__init__(*a, **k); created.append(self)
-        def show(self): pass
-    M.SingularValuePickerDialog = Capture
+    # le dialogue réel est modeless (show + signal accepted) : on le retrouve parmi les
+    # fenêtres de premier niveau et on l'accepte, sans rien remplacer
+    from gui.estimators import attach
+    from gui.reusable import SingularValuePickerDialog
+    from solvers import SOLVERS as _S
+    view = attach(_S, MATIRF.ui.estimators, MATIRF)
+    button = view["MCMC"].get_ui_params(MATIRF.features)["lambda_rr"]["extra_button"]
+    w = cw.algorithm_selection_section.algo_widgets["MCMC"]
     n = len(SHOWN)
-    try:
-        estimate_lambda_rr(cw.algorithm_selection_section.algo_widgets["MCMC"],
-                           cw.update_cache_fn, cw.load_config, MATIRF_CONFIG_PATH)
-    finally:
-        M.SingularValuePickerDialog = orig
-    assert created, f"dialogue non construit (messages: {SHOWN[n:]})"
-    created[0].accept(); app.processEvents()
+    button["callback"](w, cw.update_cache_fn, cw.load_config, MATIRF_CONFIG_PATH)
+    dialogs = [x for x in app.topLevelWidgets() if isinstance(x, SingularValuePickerDialog)]
+    assert dialogs, f"dialogue non ouvert (messages: {SHOWN[n:]})"
+    dialogs[-1].accept(); app.processEvents()
     cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
     v = cfg["algo-params"].get("lambda_rr")
     assert isinstance(v, float) and v > 0, f"lambda_rr={v}"
-    return f"SVD de H, dialogue construit, lambda_rr écrit = {v:.4g}"
+    for d in dialogs: d.close()
+    return f"SVD de H, dialogue ouvert, lambda_rr écrit = {v:.4g}"
 check("B15 callback Estimate lambda_rr (SVD de H)", b15)
 
 def b16():
@@ -264,7 +267,7 @@ def synth_cfg():
 MP = pipeline_for(MATIRF)
 pipeline = MP.create(synth_cfg())
 
-from problems.matirf.gui.display_window import DisplayWindow
+DisplayWindow = display_window_class(MATIRF)
 disp = DisplayWindow(pipeline)
 
 def c1():
@@ -385,7 +388,7 @@ def d1():
            "add-noise": {}, "algo-params": {"max_iter": 10, "lr": 0.02, "K": 5, "EPS": 1e-14}}
     DP = pipeline_for(DECONV)
     p = DP.create(cfg)
-    from problems.deconv.gui.display_window import DeconvDisplayWindow as DDW
+    DDW = display_window_class(DECONV)
     w = DDW(p)
     p.start()
     t0 = time.time()
@@ -399,7 +402,7 @@ def d1():
 check("D1  deconv : fenêtre + run complet", d1)
 
 def d2():
-    s = dw.deconv_input_files_section
+    s = dw.input_files_section
     s.image_selector.update_selected_file(PNG)
     s.json_selector.update_selected_file(DJSON)
     n = len(SHOWN)
@@ -411,8 +414,10 @@ def d2():
 check("D2  deconv : aperçu du prétraitement", d2)
 
 def d3():
-    from problems.deconv.gui.control_window import DECONV_SOLVERS
-    from problems.deconv import DECONV as D
+    from gui.estimators import attach
+    from solvers import SOLVERS as _S
+    DECONV_SOLVERS = attach(_S, DECONV.ui.estimators, DECONV)
+    D = DECONV
     p = DECONV_SOLVERS["MCMC"].get_ui_params(D.features)
     assert "extra_button" in p["lambda_rr"]
     assert "delta" not in p, "delta ne doit pas apparaître sur un problème 2D"

@@ -20,7 +20,8 @@ package contains a 'synthetic/' sub-package (today: matirf).
 
 Each command name (matirf, deconv, ...) is auto-detected from sys.argv[0].
 A new inverse problem is discovered automatically: drop a package under problems/
-with a main.py, and it appears here with no change to this file.
+containing a problem.py, and it appears here with no change to this file — no
+launcher, no window class, nothing else to register.
 """
 
 import sys
@@ -34,15 +35,20 @@ PROBLEMS_DIR = PROJECT_ROOT / "problems"
 # Commands that are not inverse problem names
 UTILITY_COMMANDS = {"cli", "list", "help", "settings", "inverse-problems", "__main__"}
 
+# sub-commands opening a problem's synthetic ground-truth generator
+SYNTH_COMMANDS = {"synth", "synthetic", "gt", "ground-truth"}
 
-# Auto-discover inverse problems: every package under problems/ with a main.py.
-# Adding a directory there is the ONLY step needed for a new problem to appear in the CLI.
+
+# Auto-discover inverse problems: every package under problems/ that declares one.
+# A problem package is recognised by its problem.py — the file holding its InverseProblem.
+# Dropping a directory there is the ONLY step needed for it to appear in the CLI: it needs
+# no launcher, no window class and no entry in this file.
 def _discover_problems():
     problems = {}
     if not PROBLEMS_DIR.is_dir():
         return problems
     for d in sorted(PROBLEMS_DIR.iterdir()):
-        if d.is_dir() and (d / "main.py").exists() and (d / "__init__.py").exists():
+        if d.is_dir() and (d / "__init__.py").exists() and (d / "problem.py").exists():
             problems[d.name] = d
     return problems
 
@@ -188,9 +194,16 @@ def main():
         line("reset", "Delete the cached config.toml (back to defaults)")
         return
 
-    # "matirf gui" or "matirf cli ..." — delegate to the problem's main.py
-    problem_main = importlib.import_module(f"problems.{cmd}.main")
-    problem_main.main()
+    # "matirf synth" — the ground-truth generator, for a problem that ships one
+    if args and args[0] in SYNTH_COMMANDS and (problem_path / "synthetic").is_dir():
+        importlib.import_module(f"problems.{cmd}.synthetic.gui").main()
+        return
+
+    # "matirf gui" / "matirf cli -c ... -o ..." — the SAME launcher for every problem.
+    # It reads the problem's own ui declaration, so no problem contributes launcher code.
+    from gui.app import run
+    problem = importlib.import_module(f"problems.{cmd}").PROBLEM
+    run(problem, args)
 
 
 if __name__ == "__main__":

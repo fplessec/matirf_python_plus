@@ -159,6 +159,18 @@ class InverseProblem:
     simulate: Optional[Callable[[ForwardOperator, torch.Tensor], torch.Tensor]] = None
     description: str = ""
 
+    # ── where this problem keeps its files ───────────────────────────────────
+    config_path: Optional[object] = None        # the cached config.toml
+    default_config: Optional[dict] = None       # its shape when absent
+    results_dir: Optional[object] = None        # where reconstructions are saved
+    measurements_dir: Optional[object] = None   # where the file dialogs open
+
+    # ── the interface ────────────────────────────────────────────────────────
+    # A `gui.spec.ProblemUI`, typed as a plain object on purpose: `core` must not import
+    # `gui`. The problem CARRIES its interface declaration without depending on the code
+    # that draws it, so the drawing can be replaced without touching a single problem.
+    ui: Optional[object] = None
+
     # ── what kind of problem this is ─────────────────────────────────────────
 
     @property

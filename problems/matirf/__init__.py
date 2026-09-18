@@ -40,8 +40,11 @@ DEFAULT_MATIRF_CONFIG = {
 from .operator import MatirfOperator      # noqa: E402
 from .problem import MATIRF               # noqa: E402
 
+## the generic name cli.py and the tools look for, whatever the problem is called:
+PROBLEM = MATIRF
+
 __all__ = [
-    "MATIRF", "MatirfOperator",
+    "PROBLEM", "MATIRF", "MatirfOperator",
     "MATIRF_DIR", "MATIRF_CACHE_DIR", "MATIRF_CONFIG_PATH",
     "MATIRF_DATA_DIR", "MATIRF_MEASUREMENTS_DIR", "MATIRF_RESULTS_DIR",
     "DEFAULT_MATIRF_CONFIG",

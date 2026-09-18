@@ -13,10 +13,14 @@ problem because it provides a ForwardOperator, and for no other reason.
 import torch
 
 from core import InverseProblem
+from problems.matirf import (  # paths defined before this module is imported
+    MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG, MATIRF_RESULTS_DIR, MATIRF_MEASUREMENTS_DIR,
+)
 from core.noise import add_noise_to_measurement
 from fileio import load_tif, save_tif, load_json
 import problems.matirf.settings as matirf_settings
 from .operator import MatirfOperator
+from .ui import MATIRF_UI
 from . import physics
 
 
@@ -190,6 +194,11 @@ MATIRF = InverseProblem(
     load_image=load_tif,
     image_extension="TIF",
     raw_path_key="tif",
+    config_path=MATIRF_CONFIG_PATH,
+    default_config=DEFAULT_MATIRF_CONFIG,
+    results_dir=MATIRF_RESULTS_DIR,
+    measurements_dir=MATIRF_MEASUREMENTS_DIR,
+    ui=MATIRF_UI,
     description="Multi-angle TIRF: recover a 3D object from stacks measured at several "
                 "incidence angles, each probing a different depth.",
 )

@@ -259,16 +259,20 @@ class Pipeline:
         self.result.f = f
         if self.prepared.has_truth:
             self._evaluate()
-        self._running = False
         self._set_state(PipelineState.COMPLETED)
         if self.on_finished:
             self.on_finished(self.result)
+        ## LAST, and deliberately so. A headless caller waits with `while pipeline.is_running`,
+        ## so this flag is its exit signal: flipping it before on_finished lets the script
+        ## return — and the process exit — while the callback is still saving on this daemon
+        ## thread, truncating the output. Setting it here means "everything is really done".
+        self._running = False
 
     def _on_failed(self, error: str) -> None:
-        self._running = False
         self._set_state(PipelineState.FAILED)
         if self.on_error:
             self.on_error(error)
+        self._running = False       # last, for the same reason as in _on_solved
 
     def stop(self) -> None:
         """Ask the solver to stop at the end of its current iteration."""

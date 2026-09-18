@@ -10,9 +10,13 @@ to carry machinery it does not need.
 import torch
 
 from core import InverseProblem
+from problems.deconv import (  # paths defined before this module is imported
+    DECONV_CONFIG_PATH, DEFAULT_DECONV_CONFIG, DECONV_RESULTS_DIR, DECONV_MEASUREMENTS_DIR,
+)
 from core.noise import add_noise_to_measurement
 from fileio import load_png, save_png
 from .operator import DeconvOperator
+from .ui import DECONV_UI
 
 
 def _add_configured_noise(g: torch.Tensor, config: dict) -> torch.Tensor:
@@ -70,6 +74,11 @@ DECONV = InverseProblem(
     load_image=load_png,
     image_extension="png",
     raw_path_key="png",
+    config_path=DECONV_CONFIG_PATH,
+    default_config=DEFAULT_DECONV_CONFIG,
+    results_dir=DECONV_RESULTS_DIR,
+    measurements_dir=DECONV_MEASUREMENTS_DIR,
+    ui=DECONV_UI,
     description="2D deconvolution: recover a sharp image from one blurred by a known "
                 "point-spread function.",
 )

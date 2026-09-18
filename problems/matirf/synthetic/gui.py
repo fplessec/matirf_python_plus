@@ -32,7 +32,7 @@ from gui.base.base_section_qgroup import BaseSectionQGroup
 from gui.file_dialog import open_file, save_file
 from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_RESULTS_DIR
 from problems.matirf.cache import update_cache as update_matirf_cache
-from problems.matirf.gui.figures_section import FiguresSection
+from gui.factory import figures_section_class
 from .objects import OBJECT_TYPES
 from .objects.base import gate_by_count
 from .grid import GRID_UI, GRID_TOML_KEY
@@ -42,6 +42,16 @@ from .config import (
     update_grid_cache, update_gt_cache,
 )
 from .generator import generate_ground_truth
+
+
+def _figures_section():
+    """The MA-TIRF figures section, built from the problem's ui declaration.
+
+    Imported lazily: this window is part of the matirf package, and the factory
+    reads the very declaration that package is still assembling at import time.
+    """
+    from problems.matirf import MATIRF
+    return figures_section_class(MATIRF)
 
 
 class SyntheticTruthGeneratorWindow(QWidget):
@@ -199,7 +209,7 @@ class SyntheticTruthGeneratorWindow(QWidget):
                 w = item.widget()
                 if w is not None:
                     w.deleteLater()
-            self.figures = FiguresSection(parent=self)
+            self.figures = _figures_section()(parent=self)
             self.viewer_box.addWidget(self.figures)
             self._last_shape = shape
         self.figures.update_plot(f, config)
