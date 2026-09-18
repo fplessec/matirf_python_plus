@@ -178,6 +178,18 @@ class SyntheticTruthGeneratorWindow(QWidget):
         )
 
     def _show_preview(self, f, grid_params):
+        """
+        Show the generated truth in the MA-TIRF figures section.
+
+        The section is rebuilt only when the grid SHAPE changes, because its viewers are
+        constructed from the image they display. Otherwise it is refreshed in place — by
+        update_plot(), which is the section's own public way of doing exactly that.
+
+        (This used to reach into named widgets of the figures section to refresh them by
+        hand. Those names disappeared when the section became VIEWS-driven, so every
+        regenerate at an unchanged grid shape raised AttributeError. Refreshing through
+        update_plot() is both correct and immune to the section's internals changing again.)
+        """
         z0, zN = grid_params["z0_nm"], grid_params["zN_nm"]
         config = {'oper-params': {'z0': z0, 'zN': zN}}
         shape = tuple(f.shape)
@@ -189,13 +201,8 @@ class SyntheticTruthGeneratorWindow(QWidget):
                     w.deleteLater()
             self.figures = FiguresSection(parent=self)
             self.viewer_box.addWidget(self.figures)
-            self.figures.update_plot(f, config)
             self._last_shape = shape
-        else:
-            for w in (self.figures.depth_map_widget, self.figures.profiles_widget):
-                w.z0, w.zN = z0, zN
-                w.set_image(f)
-            self.figures.viewer_3d.set_image(f)
+        self.figures.update_plot(f, config)
 
     def _refresh_sections(self):
         for section, config_path in self._sections:
