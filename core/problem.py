@@ -59,12 +59,17 @@ class PreparedProblem:
     >> g        : torch.Tensor      the measurement to explain
     >> f_true   : torch.Tensor|None the ground truth — SYNTHETIC mode only, else None
     >> mode     : DataMode          which of the two branches produced this
+    >> config   : dict              the config AFTER loading refined it (for MA-TIRF, its
+                                    angle list no longer contains the background stacks).
+                                    Downstream steps — metrics, saved metadata — must use
+                                    this one, not the config originally passed in.
     """
 
     operator: ForwardOperator
     g: torch.Tensor
     f_true: Optional[torch.Tensor]
     mode: DataMode
+    config: dict = field(default_factory=dict)
 
     @property
     def has_truth(self) -> bool:
@@ -91,17 +96,24 @@ class InverseProblem:
         Builds a configured operator instance. Defaults to `operator_class.from_config`,
         which is what a problem normally provides.
 
-    >> load_measurement : callable(config) -> torch.Tensor
-        REAL mode: read the acquisition from disk and apply any preprocessing, returning g.
+    >> load_measurement : callable(config) -> g, or (g, refined_config)
+        REAL mode: read the acquisition from disk and apply any preprocessing.
 
-    >> load_truth : callable(config) -> torch.Tensor, or None
-        SYNTHETIC mode: read the known object f_true. None means the problem supports real
-        data only, and asking for SYNTHETIC mode then raises a clear error.
+        A loader may return a REFINED CONFIG alongside the data, and the operator is then
+        built from that refined config rather than the original. This is not a convenience:
+        for MA-TIRF, preprocessing detects background stacks and removes them, which changes
+        the list of incident angles — and H is built from exactly that list. Loading and
+        operator construction are genuinely ordered, so `prepare` loads first.
 
-    >> simulate : callable(operator, f_true) -> torch.Tensor
+    >> load_truth : callable(config) -> f_true, or (f_true, refined_config)
+        SYNTHETIC mode: read the known object f_true, with the same refinement contract
+        (MA-TIRF takes the number of z slices from the truth's own shape). None means the
+        problem supports real data only, and asking for SYNTHETIC mode raises a clear error.
+
+    >> simulate : callable(operator, f_true, config) -> torch.Tensor
         SYNTHETIC mode: produce the measurement from the truth. Defaults to `operator.apply`,
-        i.e. g = H f_true. Override for a problem whose simulation is not just the forward
-        model (MA-TIRF, for instance, also preprocesses the simulated stack).
+        i.e. g = H f_true. Override when the simulation is more than the forward model —
+        MA-TIRF also normalizes the simulated stack and adds the configured noise.
 
     >> validate : callable(config) -> list[str]
         Returns one human-readable message per missing or invalid setting, and an empty
@@ -172,29 +184,49 @@ class InverseProblem:
             )
         return from_config(config)
 
+    @staticmethod
+    def _load(loader, config):
+        """
+        Run a loader, accepting either `data` or `(data, refined_config)`.
+
+        Letting a loader refine the config is what keeps the ordering correct: the data
+        itself can determine part of the operator's configuration (see `load_measurement`).
+        """
+        loaded = loader(config)
+        if isinstance(loaded, tuple):
+            data, refined = loaded
+            return data, refined
+        return loaded, config
+
     def prepare(self, config: dict) -> PreparedProblem:
         """
         Turn a configuration into everything a run needs: the operator, g, and f_true.
 
-        The two modes differ only in where the measurement comes from:
-            > REAL       g is loaded from disk; f_true is None
+        Order matters and is the same in both modes — LOAD FIRST, then build the operator
+        from the (possibly refined) config, because loading can determine what the operator
+        should be:
+
+            > REAL       g is loaded and preprocessed; f_true is None
             > SYNTHETIC  f_true is loaded, then g is simulated from it
 
         Call `validate(config)` first — `prepare` assumes the config is already usable and
-        will fail with the underlying loader's error otherwise.
+        will otherwise fail with the underlying loader's error.
         """
         mode = DataMode.from_config(config)
-        operator = self.make_operator(config)
+
         if mode is DataMode.REAL:
-            return PreparedProblem(operator, self.load_measurement(config), None, mode)
+            g, config = self._load(self.load_measurement, config)
+            return PreparedProblem(self.make_operator(config), g, None, mode, config)
+
         if not self.supports_synthetic:
             raise ValueError(
                 f"Problem {self.name!r} does not support synthetic mode "
                 f"(it declares no load_truth), but its config asks for it."
             )
-        f_true = self.load_truth(config)
-        simulate = self.simulate or (lambda op, f: op.apply(f))
-        return PreparedProblem(operator, simulate(operator, f_true), f_true, mode)
+        f_true, config = self._load(self.load_truth, config)
+        operator = self.make_operator(config)
+        simulate = self.simulate or (lambda op, f, cfg: op.apply(f))
+        return PreparedProblem(operator, simulate(operator, f_true, config), f_true, mode, config)
 
     def __repr__(self) -> str:
         feats = ", ".join(sorted(str(f) for f in self.features)) or "none"

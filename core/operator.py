@@ -218,12 +218,20 @@ class ForwardOperator(ABC):
         Worth running once for every new operator: a wrong adjoint does not crash, it
         silently makes every gradient-based solver converge to the wrong answer — the most
         expensive class of bug in this codebase.
+
+        The error is scaled by ||H f|| * ||y||, NOT by the inner product itself. Two random
+        vectors are nearly orthogonal, so <H f, y> can land near zero by chance; dividing by
+        it would then report a huge relative error for a perfectly correct adjoint. The
+        Cauchy-Schwarz bound is the honest yardstick — it is the size of the terms actually
+        being summed, which is what limits the floating-point accuracy.
         """
         f = torch.randn_like(like_f)
         y = torch.randn_like(like_y)
-        left = torch.dot(self.apply(f).flatten(), y.flatten())
-        right = torch.dot(f.flatten(), self.adjoint(y).flatten())
-        scale = max(abs(float(left)), abs(float(right)), 1e-12)
+        Hf = self.apply(f)
+        Hty = self.adjoint(y)
+        left = torch.dot(Hf.flatten(), y.flatten())
+        right = torch.dot(f.flatten(), Hty.flatten())
+        scale = max(float(Hf.norm() * y.norm()), float(f.norm() * Hty.norm()), 1e-12)
         error = abs(float(left - right)) / scale
         assert error <= tol, (
             f"{type(self).__name__}.adjoint is not the transpose of .apply "
