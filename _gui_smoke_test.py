@@ -1,483 +1,787 @@
 """
-GUI smoke test — every user-facing feature, exercised end to end.
+GUI smoke test — every user-facing feature, driven through the real widgets.
 
 Run it:
-    python -m _gui_smoke_test
+    QT_QPA_PLATFORM=offscreen python -m _gui_smoke_test
 
 The unit suites (core, solvers, problems, pipeline) check contracts in isolation. This one
-answers a different question: does the APPLICATION still do everything it did before? It
-drives the real windows — the real selectors, the real Estimate buttons, a real
-reconstruction, the real save/load — and prints PASS/FAIL per feature.
+answers a different question: does the APPLICATION still do everything it did before?
 
-Run it after any change to the GUI, to a problem, or to the pipeline. It is the fastest way
-to know that a refactor did not quietly remove a capability, which is exactly how the
-synthetic generator's preview broke once without anyone noticing.
+WHAT CHANGED, AND WHY IT MATTERS
+    The first version of this file called handler methods directly — `section._switch_mode()`
+    rather than clicking the toggle. That proves the handler works, and proves nothing about
+    whether any button is WIRED to it: a `clicked.connect` lost in a refactor would have
+    passed every check and failed for the user on the first click.
 
-It runs headless (QT_QPA_PLATFORM=offscreen). Modal dialogs are neutralised so nothing
-blocks, and the two cached config.toml are backed up and restored, so running it never
-disturbs the configuration you were working on.
+    So every interaction here now goes through the widget the user actually touches:
+    `button(window, "Run").click()`. Buttons that production code keeps in local variables
+    are found by their label in the widget tree, which also verifies they were added to the
+    layout at all.
+
+    File dialogs are the one thing that cannot be clicked — they are OS-modal. They are
+    stubbed to return a path, so the whole chain behind them is still exercised: choosing a
+    file runs the validator, writes the cache and refreshes the other selector's buttons.
+
+WHAT NO AUTOMATED TEST CAN PROVE
+    That a window is readable. A widget off-screen, a truncated label, an unreadable
+    contrast: offscreen rendering hides all of it. Look at the windows yourself now and
+    then; this file cannot do it for you.
 
 Sections:
-    B  control window      inputs, preview, editor, parameters, solver choice, Estimate
-    C  run + display       full run, figures, metrics, difference, save/load, interrupt
-    D  deconvolution       the same, on the other problem
-    E  matirf synth        generate, preview, save, use as synthetic truth
+    A  control window     real clicks: mode toggle, file choice, preview, editor, config I/O
+    B  solvers            all six parameter panels, not just the two that are convenient
+    C  typing             values typed into widgets reach the TOML; depends_on shows/hides
+    D  run + display      Run clicked, then figures, metrics, difference, save, interrupt
+    E  deconvolution      the same journey on the other problem
+    F  matirf synth       generate, save, use as synthetic truth
+    G  error paths        what the user is told when something is wrong
+    H  two problems       both open at once, with independent pipelines
 """
-import os, sys, json, shutil, tempfile, time, traceback
+
+import contextlib
+import os
+import sys
+import tempfile
+import time
+import traceback
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt5.QtWidgets import QApplication, QMessageBox
-import PyQt5.QtWidgets as QtW
+from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtWidgets import QApplication, QMessageBox, QPushButton
 
 app = QApplication(sys.argv)
 
-# ── neutralise anything modal, record what would have been shown ──────────────
+# ── neutralise anything modal, and record what the user would have been shown ──
 SHOWN = []
-QMessageBox.warning = staticmethod(lambda *a, **k: SHOWN.append(("warning", a[1] if len(a) > 1 else "")) or QMessageBox.Ok)
-QMessageBox.information = staticmethod(lambda *a, **k: SHOWN.append(("info", a[1] if len(a) > 1 else "")) or QMessageBox.Ok)
-QMessageBox.critical = staticmethod(lambda *a, **k: SHOWN.append(("critical", a[1] if len(a) > 1 else "")) or QMessageBox.Ok)
+QMessageBox.warning = staticmethod(
+    lambda *a, **k: SHOWN.append(("warning", a[1] if len(a) > 1 else "",
+                                  a[2] if len(a) > 2 else "")) or QMessageBox.Ok)
+QMessageBox.information = staticmethod(
+    lambda *a, **k: SHOWN.append(("info", a[1] if len(a) > 1 else "", "")) or QMessageBox.Ok)
+QMessageBox.critical = staticmethod(
+    lambda *a, **k: SHOWN.append(("critical", a[1] if len(a) > 1 else "", "")) or QMessageBox.Ok)
 QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.Yes)
 
+from core import DataMode
+from core.enums import PipelineState
+from fileio import load_or_create_toml, save_toml
+from gui.factory import control_window_class, display_window_class
+from pipeline import Pipeline, pipeline_for
+from solvers.objective_params import OBJECTIVE_UI_PARAMS
+from problems.deconv import (
+    DECONV, DECONV_CONFIG_PATH, DECONV_MEASUREMENTS_DIR, DEFAULT_DECONV_CONFIG,
+)
+from problems.matirf import (
+    MATIRF, MATIRF_CONFIG_PATH, MATIRF_MEASUREMENTS_DIR, DEFAULT_MATIRF_CONFIG,
+)
+
+TIF = str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF")
+MJSON = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")
+TRUTH = str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth0.TIF")
+PNG = str(DECONV_MEASUREMENTS_DIR / "img_001.png")
+DJSON = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
+
+
+# ── driving the real widgets ──────────────────────────────────────────────────
+
+def button(root, label: str) -> QPushButton:
+    """
+    The button the user would click, found by its label in the real widget tree.
+
+    Production code keeps several buttons in local variables (Run, Choose file, Estimate),
+    so they cannot be reached through an attribute. Finding them here also proves they were
+    actually added to a layout — a button built but never placed would not be found.
+    """
+    for candidate in root.findChildren(QPushButton):
+        if candidate.text() == label:
+            return candidate
+    available = sorted({b.text() for b in root.findChildren(QPushButton) if b.text()})
+    raise AssertionError(f"no button labelled {label!r}; available: {available}")
+
+
+def click(widget) -> None:
+    """Click, through the real `clicked` signal — so a missing connect is a failure."""
+    widget.click()
+    app.processEvents()
+
+
+def click_switch(switch) -> None:
+    """QSwitchButton reacts to a mouse press, not to click(): send a real press."""
+    switch.mousePressEvent(QMouseEvent(QMouseEvent.MouseButtonPress, QPoint(5, 5),
+                                       Qt.LeftButton, Qt.LeftButton, Qt.NoModifier))
+    app.processEvents()
+
+
+def type_in(parameter_widget, text: str) -> None:
+    """Type into a parameter's field, exactly as the user would."""
+    parameter_widget.input_widget.setText(str(text))
+    app.processEvents()
+
+
+@contextlib.contextmanager
+def dialogs(open_path=None, save_path=None, directory=None):
+    """
+    Answer every file dialog with a fixed path, for the duration of the block.
+
+    The dialogs themselves are OS-modal and cannot be driven, but everything BEHIND them
+    can: choosing a file still runs the validator, writes the cache and refreshes the
+    dependent buttons. Each module is patched where it imported the function, since
+    `from ... import open_file` binds a name that patching the source module would miss.
+    """
+    import gui.file_dialog as source
+    import gui.reusable.inputs.file_selector as selector
+    import gui.specializable.control_window.base_control_window as control
+    import gui.specializable.display_window.base_display_window as display
+    import gui.specializable.display_window.sections.base_figures_section as figures
+    import problems.matirf.synthetic.gui as synth
+
+    answers = {"open_file": open_path, "save_file": save_path, "open_directory": directory}
+    targets = (source, selector, control, display, figures, synth)
+
+    saved = [(module, name, getattr(module, name))
+             for module in targets for name in answers if hasattr(module, name)]
+    for module, name, _ in saved:
+        setattr(module, name, (lambda value: (lambda *a, **k: value))(answers[name]))
+    try:
+        yield
+    finally:
+        for module, name, original in saved:
+            setattr(module, name, original)
+
+
+def wait_until(condition, timeout=120.0) -> bool:
+    """Pump the Qt event loop until `condition` holds — the windows stay responsive."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        app.processEvents()
+        if condition():
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def top_level(kind):
+    """Every open window of a given class — how a popup opened by a click is found."""
+    return [w for w in app.topLevelWidgets() if isinstance(w, kind)]
+
+
+# ── reporting ─────────────────────────────────────────────────────────────────
+
 RESULTS = []
+
+
 def check(name, fn):
     try:
         detail = fn()
         RESULTS.append((True, name, detail or ""))
         print(f"  PASS  {name}" + (f"  — {detail}" if detail else ""))
-    except Exception as e:
-        RESULTS.append((False, name, f"{type(e).__name__}: {e}"))
-        print(f"  FAIL  {name}  — {type(e).__name__}: {e}")
+    except Exception as error:
+        RESULTS.append((False, name, f"{type(error).__name__}: {error}"))
+        print(f"  FAIL  {name}  — {type(error).__name__}: {error}")
         traceback.print_exc(limit=3)
 
-from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_CONFIG_PATH
-from problems.deconv import DECONV_MEASUREMENTS_DIR, DECONV_CONFIG_PATH
 
-TIF  = str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF")
-MJSON = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")
-TRUTH = str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth0.TIF")
-PNG  = str(DECONV_MEASUREMENTS_DIR / "img_001.png")
-DJSON = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
+# ── keep the real caches untouched ────────────────────────────────────────────
 
-# keep the user's real caches untouched
-BACKUPS = {}
-for p in (MATIRF_CONFIG_PATH, DECONV_CONFIG_PATH):
-    if Path(p).exists():
-        BACKUPS[p] = Path(p).read_text()
+BACKUPS = {p: Path(p).read_text() for p in (MATIRF_CONFIG_PATH, DECONV_CONFIG_PATH)
+           if Path(p).exists()}
 
-print("\n=== B. FENÊTRE DE CONTRÔLE ===")
 
-from gui.factory import control_window_class, display_window_class
-from problems.matirf import MATIRF
-from problems.deconv import DECONV
+def matirf_ready_config():
+    """A configuration where everything is set — the state just before clicking Run."""
+    return {
+        "algorithm": "ADAM",
+        "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": MJSON},
+        "oper-params": {"nz": 50, "z0": 0.0, "zN": 400.0, "normalize": False},
+        "add-noise": {},
+        "algo-params": {"max_iter": 12, "lr": 0.01, "K": 4, "EPS": 1e-14},
+    }
+
+
 ControlWindow = control_window_class(MATIRF)
 DeconvControlWindow = control_window_class(DECONV)
-from fileio import load_or_create_toml, save_toml
-from problems.matirf import DEFAULT_MATIRF_CONFIG
+
+print("\n=== A. FENÊTRE DE CONTRÔLE (clics réels) ===")
 
 cw = ControlWindow()
 dw = DeconvControlWindow()
 
+
+def a1():
+    assert cw.windowTitle() == MATIRF.ui.control_title
+    sections = [type(s).__name__ for s in cw._all_sections]
+    assert sections[0] == "InputFilesSection" and sections[-1] == "AlgorithmSelectionSection"
+    return f"{len(sections)} sections, titre depuis la déclaration"
+check("A1  les deux fenêtres se construisent depuis la déclaration", a1)
+
+
+def a2():
+    for label in ("Run", "Save config", "Load any config", "Open reconstruction"):
+        button(cw, label)
+    return "Run, Save config, Load any config, Open reconstruction"
+check("A2  la barre du bas expose ses quatre boutons", a2)
+
+
+def a3():
+    section = cw.input_files_section
+    before = section.is_mode_real
+    click_switch(section.switch_button)          # le vrai basculeur, pas la méthode
+    assert section.is_mode_real != before, "le clic n'a pas basculé le mode"
+    written = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["input-paths"]["mode"]
+    expected = "real-data" if section.is_mode_real else "synthetic-data"
+    assert written == expected, f"cache={written}, attendu {expected}"
+    click_switch(section.switch_button)
+    assert section.is_mode_real == before
+    return f"clic sur le basculeur -> cache ({written})"
+check("A3  basculeur de mode : clic réel -> cache", a3)
+
+
+def a4():
+    section = cw.input_files_section
+    with dialogs(open_path=TIF):
+        click(button(section.image_selector, "Choose .tif file"))
+    assert section.image_selector.is_file_selected, "le .tif n'a pas été retenu"
+    with dialogs(open_path=MJSON):
+        click(button(section.json_selector, "Choose .json file"))
+    assert section.json_selector.is_file_selected
+    paths = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["input-paths"]
+    assert paths["tif"] == TIF and paths["json"] == MJSON
+    return "les deux fichiers choisis par clic et écrits dans le cache"
+check("A4  choisir un fichier : clic -> validateur -> cache", a4)
+
+
+def a5():
+    section = cw.input_files_section
+    assert section.are_both_file_selected()
+    assert not section.image_selector._extra_btn.isHidden(), \
+        "le bouton d'aperçu devrait apparaître une fois les deux fichiers choisis"
+    assert section.json_selector._extra_btn.text() == "Modify .json file"
+    return "aperçu révélé, bouton json passé à « Modify »"
+check("A5  dépendance croisée entre les deux sélecteurs", a5)
+
+
+def a6():
+    section = cw.input_files_section
+    n = len(SHOWN)
+    click(section.image_selector._extra_btn)     # « See preprocessed file »
+    window = section.image_selector.sub_window
+    assert window is not None, f"aperçu non ouvert (messages: {SHOWN[n:]})"
+    shapes = tuple(window.left.shape), tuple(window.right.shape)
+    window.close()
+    return f"clic -> aperçu {shapes[0]} -> {shapes[1]}"
+check("A6  aperçu du prétraitement, par clic", a6)
+
+
+def a7():
+    section = cw.input_files_section
+    click(section.json_selector._extra_btn)      # « Modify .json file »
+    editor = section.json_selector.sub_window
+    assert editor is not None, "éditeur non ouvert"
+    editor.close()
+    return "clic -> éditeur de paramètres ouvert"
+check("A7  éditeur JSON, par clic", a7)
+
+
+def a8():
+    saved = Path(tempfile.mkdtemp()) / "conf.toml"
+    with dialogs(save_path=str(saved)):
+        click(button(cw, "Save config"))
+    assert saved.exists(), "aucun fichier écrit"
+    with dialogs(open_path=str(saved)):
+        click(button(cw, "Load any config"))
+    return f"config sauvegardée ({saved.stat().st_size} o) puis rechargée"
+check("A8  sauvegarder / charger une config, par clic", a8)
+
+
+print("\n=== B. LES SIX SOLVEURS ===")
+
+
 def b1():
-    return f"matirf + deconv construites"
-check("B1  les deux fenêtres de contrôle se construisent", b1)
+    section = cw.algorithm_selection_section
+    names = [section.algo_combo.itemText(i) for i in range(section.algo_combo.count())]
+    assert names == ["None", "ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"], names
+    return "les six proposés, dans l'ordre du registre"
+check("B1  le sélecteur liste les six solveurs", b1)
+
 
 def b2():
-    s = cw.input_files_section
-    assert s.image_selector and s.json_selector
-    assert hasattr(s, "switch_button")
-    return "sélecteurs image + json + bascule de mode"
-check("B2  section fichiers d'entrée", b2)
+    """Chaque solveur, pas seulement les deux commodes : panneau construit, défauts écrits."""
+    section = cw.algorithm_selection_section
+    summary = []
+    for name in ("ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"):
+        section.algo_combo.setCurrentText(name)
+        app.processEvents()
+        config = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
+        assert config["algorithm"] == name, f"{name} non écrit dans le cache"
+        widget = section.algo_widgets[name]
+        assert widget.parameter_widgets, f"{name}: aucun paramètre construit"
+        written = config.get("algo-params", {})
+        assert written, f"{name}: aucun défaut écrit"
+        missing = [k for k in widget.parameter_widgets
+                   if not widget.parameter_widgets[k].isHidden() and k not in written]
+        assert not missing, f"{name}: paramètres visibles non écrits: {missing}"
+        summary.append(f"{name}({len(written)})")
+    return " ".join(summary)
+check("B2  les six panneaux de paramètres se construisent et s'écrivent", b2)
+
 
 def b3():
-    s = cw.input_files_section
-    before = s.is_mode_real
-    s._switch_mode()
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    written = cfg["input-paths"]["mode"]
-    s._switch_mode()  # back
-    assert s.is_mode_real == before
-    return f"bascule réel/synthétique écrite dans le cache ({written})"
-check("B3  bascule de mode -> cache", b3)
+    section = cw.algorithm_selection_section
+    section.algo_combo.setCurrentText("ADAM")
+    app.processEvents()
+    widget = section.algo_widgets["ADAM"]
+    type_in(widget.parameter_widgets["max_iter"], 4242)
+    assert load_or_create_toml(MATIRF_CONFIG_PATH,
+                               DEFAULT_MATIRF_CONFIG)["algo-params"]["max_iter"] == 4242
+    click(section.reset_btn)
+    restored = load_or_create_toml(MATIRF_CONFIG_PATH,
+                                   DEFAULT_MATIRF_CONFIG)["algo-params"]["max_iter"]
+    assert restored == 1000, restored
+    return "valeur saisie écrite (4242), puis « reset parameters » restaure 1000"
+check("B3  « reset parameters », par clic", b3)
 
-def b4():
-    s = cw.input_files_section
-    s.image_selector.update_selected_file(TIF)
-    s.json_selector.update_selected_file(MJSON)
-    assert s.are_both_file_selected()
-    assert not s.image_selector._extra_btn.isHidden(), "bouton preview devrait apparaître"
-    assert s.json_selector._extra_btn.text() == "Modify .json file"
-    return "bouton preview apparaît quand les 2 fichiers sont choisis"
-check("B4  dépendance croisée des sélecteurs", b4)
 
-def b5():
-    s = cw.input_files_section
-    v = s._make_validator(("angles_deg", "n_glass"))
-    bad = Path(tempfile.mkdtemp()) / "bad.json"; bad.write_text('{"angles_deg": [1]}')
-    assert v(MJSON) is True and v(str(bad)) is False
-    return "json valide accepté, json incomplet rejeté"
-check("B5  validateur du .json", b5)
+print("\n=== C. SAISIE ET DÉPENDANCES ===")
 
-def b6():
-    s = cw.input_files_section
-    n = len(SHOWN)
-    s._open_preview(s.image_selector, s.IMAGE_SLOT.preview)
-    win = s.image_selector.sub_window
-    assert win is not None, f"aperçu non ouvert (messages: {SHOWN[n:]})"
-    shape = tuple(win.left.shape), tuple(win.right.shape)
-    win.close()
-    return f"fenêtre d'aperçu ouverte {shape[0]} -> {shape[1]}"
-check("B6  aperçu du prétraitement (matirf, mode réel)", b6)
-
-def b7():
-    s = cw.input_files_section
-    s._open_editor(s.json_selector, s.JSON_SLOT.editor)
-    ed = s.json_selector.sub_window
-    assert ed is not None
-    n = len(ed._widgets) if hasattr(ed, "_widgets") else "?"
-    ed.close()
-    return f"éditeur de paramètres ouvert"
-check("B7  éditeur JSON (Create/Modify)", b7)
-
-def b8():
-    sec = cw.oper_params
-    assert hasattr(sec, "update_ui_from_toml")
-    cw.update_cache_fn(["oper-params", "nz"], 10)
-    cw.update_cache_fn(["oper-params", "z0"], 0.0)
-    cw.update_cache_fn(["oper-params", "zN"], 400.0)
-    cw.update_cache_fn(["oper-params", "normalize"], False)
-    sec.update_ui_from_toml(MATIRF_CONFIG_PATH)
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    assert cfg["oper-params"]["nz"] == 10
-    return "nz/z0/zN écrits et relus"
-check("B8  section paramètres opérateur (matirf)", b8)
-
-def b9():
-    sec = cw.add_noise
-    cw.update_cache_fn(["add-noise", "add_noise"], True)
-    cw.update_cache_fn(["add-noise", "sigma"], 0.01)
-    sec.update_ui_from_toml(MATIRF_CONFIG_PATH)
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    assert cfg["add-noise"]["add_noise"] is True and cfg["add-noise"]["sigma"] == 0.01
-    cw.update_cache_fn(["add-noise", "add_noise"], False)
-    return "add_noise + sigma écrits et relus"
-check("B9  section ajout de bruit", b9)
-
-def b10():
-    sec = cw.algorithm_selection_section
-    names = [sec.algo_combo.itemText(i) for i in range(sec.algo_combo.count())]
-    assert names == ["None", "ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"], names
-    return f"{len(names)-1} solveurs proposés"
-check("B10 sélection d'algorithme : les 6 solveurs", b10)
-
-def b11():
-    sec = cw.algorithm_selection_section
-    sec.algo_combo.setCurrentText("ADAM")
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    assert cfg["algorithm"] == "ADAM", cfg["algorithm"]
-    keys = set(cfg["algo-params"])
-    assert {"max_iter", "lr"} <= keys, keys
-    return f"ADAM sélectionné, {len(keys)} paramètres écrits"
-check("B11 changement d'algorithme -> cache", b11)
-
-def b12():
-    sec = cw.algorithm_selection_section
-    w = sec.algo_widgets["ADAM"]
-    w.reset_default_values()
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    assert cfg["algo-params"]["max_iter"] == 1000
-    return "valeurs par défaut restaurées (max_iter=1000)"
-check("B12 bouton 'reset parameters'", b12)
-
-def b13():
-    from gui.estimators import attach
-    from solvers import SOLVERS as _S
-    MATIRF_SOLVERS = attach(_S, MATIRF.ui.estimators, MATIRF)
-    p = MATIRF_SOLVERS["ADAM"].get_ui_params(MATIRF.features)
-    assert "extra_button" in p["delta"], "bouton Estimate absent de delta"
-    p2 = MATIRF_SOLVERS["MCMC"].get_ui_params(MATIRF.features)
-    assert "extra_button" in p2["lambda_rr"], "bouton Estimate absent de lambda_rr"
-    from solvers import SOLVERS
-    assert "extra_button" not in SOLVERS["ADAM"].get_ui_params(MATIRF.features)["delta"]
-    return "delta + lambda_rr ont un bouton; le registre partagé reste intact"
-check("B13 boutons 'Estimate' (matirf)", b13)
-
-def b14():
-    # on passe par le VRAI chemin câblé : le bouton tel que la fenêtre l'a monté
-    from gui.estimators import attach
-    from solvers import SOLVERS as _S
-    view = attach(_S, MATIRF.ui.estimators, MATIRF)
-    button = view["ADAM"].get_ui_params(MATIRF.features)["delta"]["extra_button"]
-    w = cw.algorithm_selection_section.algo_widgets["ADAM"]
-    n = len(SHOWN)
-    button["callback"](w, cw.update_cache_fn, cw.load_config, MATIRF_CONFIG_PATH)
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    d = cfg["algo-params"].get("delta")
-    assert isinstance(d, float) and d > 0, f"delta={d}, messages={SHOWN[n:]}"
-    return f"delta estimé = {d}"
-check("B14 callback Estimate delta (calcul réel)", b14)
-
-def b15():
-    # le dialogue réel est modeless (show + signal accepted) : on le retrouve parmi les
-    # fenêtres de premier niveau et on l'accepte, sans rien remplacer
-    from gui.estimators import attach
-    from gui.reusable import SingularValuePickerDialog
-    from solvers import SOLVERS as _S
-    view = attach(_S, MATIRF.ui.estimators, MATIRF)
-    button = view["MCMC"].get_ui_params(MATIRF.features)["lambda_rr"]["extra_button"]
-    w = cw.algorithm_selection_section.algo_widgets["MCMC"]
-    n = len(SHOWN)
-    button["callback"](w, cw.update_cache_fn, cw.load_config, MATIRF_CONFIG_PATH)
-    dialogs = [x for x in app.topLevelWidgets() if isinstance(x, SingularValuePickerDialog)]
-    assert dialogs, f"dialogue non ouvert (messages: {SHOWN[n:]})"
-    dialogs[-1].accept(); app.processEvents()
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    v = cfg["algo-params"].get("lambda_rr")
-    assert isinstance(v, float) and v > 0, f"lambda_rr={v}"
-    for d in dialogs: d.close()
-    return f"SVD de H, dialogue ouvert, lambda_rr écrit = {v:.4g}"
-check("B15 callback Estimate lambda_rr (SVD de H)", b15)
-
-def b16():
-    path = Path(tempfile.mkdtemp()) / "saved.toml"
-    cfg = cw.load_config(MATIRF_CONFIG_PATH)
-    cw.save_config(cfg, path)
-    reread = cw.load_config(path)
-    assert reread["algorithm"] == cfg["algorithm"]
-    cw.save_config(reread, MATIRF_CONFIG_PATH)
-    cw.load_cached_config()
-    return "config sauvegardée puis rechargée dans toutes les sections"
-check("B16 sauvegarder / charger une config", b16)
-
-print("\n=== C. EXÉCUTION + FENÊTRE D'AFFICHAGE ===")
-
-from pipeline import pipeline_for
-from problems.matirf import MATIRF
-from problems.deconv import DECONV
-from core import DataMode
-from core.enums import PipelineState
-
-def synth_cfg():
-    return {"algorithm": "ADAM",
-            "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": MJSON},
-            "oper-params": {"nz": 50, "z0": 0.0, "zN": 400.0, "normalize": False},
-            "add-noise": {},
-            "algo-params": {"max_iter": 15, "lr": 0.01, "K": 5, "EPS": 1e-14}}
-
-MP = pipeline_for(MATIRF)
-pipeline = MP.create(synth_cfg())
-
-DisplayWindow = display_window_class(MATIRF)
-disp = DisplayWindow(pipeline)
 
 def c1():
-    assert disp.figures_section is not None
-    assert disp.synthetic_section is not None, "section vérité synthétique manquante"
-    assert disp.switch_btn is not None, "bouton Go To Truth manquant"
-    return "figures + vérité synthétique + bouton de bascule"
-check("C1  fenêtre d'affichage construite (mode synthétique)", c1)
+    """Une valeur tapée doit traverser la conversion de type jusqu'au TOML."""
+    section = cw.oper_params
+    type_in(section.parameter_widgets["nz"], 37)
+    type_in(section.parameter_widgets["z0"], 12.5)
+    oper = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["oper-params"]
+    assert oper["nz"] == 37 and isinstance(oper["nz"], int), f"nz={oper['nz']!r}"
+    assert abs(oper["z0"] - 12.5) < 1e-9 and isinstance(oper["z0"], float)
+    type_in(section.parameter_widgets["nz"], 50)
+    type_in(section.parameter_widgets["z0"], 0.0)
+    return "int et float convertis correctement"
+check("C1  une valeur saisie atteint le TOML avec le bon type", c1)
+
 
 def c2():
-    msgs = []
-    pipeline.on_message = msgs.append
-    pipeline.start()
-    t0 = time.time()
-    while pipeline.is_running and time.time() - t0 < 90:
-        app.processEvents(); time.sleep(0.02)
-    for _ in range(50):
-        app.processEvents(); time.sleep(0.01)
-    assert pipeline.state is PipelineState.COMPLETED, pipeline.state
-    assert pipeline.result.f is not None
-    return f"run terminé, {len(msgs)} messages"
-check("C2  Run complet depuis la fenêtre", c2)
+    """La case normalize : False est une réponse valide, pas un réglage manquant."""
+    section = cw.oper_params
+    box = section.parameter_widgets["normalize"].checkbox
+    box.setChecked(True); app.processEvents()
+    assert load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["oper-params"]["normalize"] is True
+    box.setChecked(False); app.processEvents()
+    oper = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["oper-params"]
+    assert oper["normalize"] is False
+    assert not any("normalize" in e for e in MATIRF.validate({
+        "input-paths": {"tif": TIF, "json": MJSON},
+        "oper-params": oper, "add-noise": {}})), "False signalé à tort comme manquant"
+    return "cochée puis décochée ; False accepté par la validation"
+check("C2  la case « normalize » écrit les deux états", c2)
+
 
 def c3():
-    assert disp.save_btn.isEnabled(), "bouton Save non activé après le run"
-    assert disp.save_action.isEnabled()
-    return "bouton + menu Save activés"
-check("C3  Save activé à la fin du run", c3)
+    """La case « add noise » et sa valeur sigma font l'aller-retour vers le TOML.
+
+    Note : sigma ne déclare PAS de depends_on, il reste donc visible même sans bruit.
+    C'est le comportement actuel, pas un oubli du test — la visibilité conditionnelle
+    est vérifiée en C4, sur un paramètre qui la déclare réellement.
+    """
+    section = cw.add_noise
+    box = section.parameter_widgets["add_noise"].checkbox
+    box.setChecked(True); app.processEvents()
+    type_in(section.parameter_widgets["sigma"], 0.02)
+    written = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["add-noise"]
+    assert written["add_noise"] is True and abs(written["sigma"] - 0.02) < 1e-9, written
+    box.setChecked(False); app.processEvents()
+    assert load_or_create_toml(MATIRF_CONFIG_PATH,
+                               DEFAULT_MATIRF_CONFIG)["add-noise"]["add_noise"] is False
+    return "case et sigma écrits puis relus (sigma n'a pas de depends_on)"
+check("C3  depends_on : un paramètre apparaît selon un autre", c3)
+
 
 def c4():
-    fs = disp.figures_section
-    assert fs._initialized, "vues non créées"
-    assert len(fs._views) == 2, len(fs._views)
-    assert fs.supports_view1_export()
-    i0 = fs._current_view_index
-    fs._on_switch_toggled()
-    assert fs._current_view_index != i0
-    fs._on_switch_toggled()
-    return "2 vues, bascule OK, export PNG supporté"
-check("C4  section figures : 2 vues + bascule", c4)
+    """delta ne concerne que les régularisations qui pondèrent la dérivée axiale."""
+    section = cw.algorithm_selection_section
+    section.algo_combo.setCurrentText("ADAM"); app.processEvents()
+    widget = section.algo_widgets["ADAM"]
+    delta, reg = widget.parameter_widgets.get("delta"), widget.parameter_widgets.get("reg")
+    assert delta is not None and reg is not None, "delta ou reg absent du panneau ADAM"
+    reg.combo.setCurrentText("L1 norm"); app.processEvents()
+    without = delta.isHidden()
+    reg.combo.setCurrentText("L1 norm of the gradient"); app.processEvents()
+    with_grad = not delta.isHidden()
+    assert without and with_grad, f"caché avec L1={without}, montré avec TV={with_grad}"
+    return "delta masqué pour L1, révélé pour la variation totale"
+check("C4  depends_on : delta suit la régularisation choisie", c4)
+
 
 def c5():
-    out = Path(tempfile.mkdtemp()) / "view1.png"
-    disp.figures_section.export_view1(str(out))
-    assert out.exists() and out.stat().st_size > 1000, out.stat().st_size if out.exists() else "absent"
-    return f"PNG écrit ({out.stat().st_size // 1024} ko)"
-check("C5  export PNG de la vue 1", c5)
+    """Le bouton « Estimate » de delta, par clic — et il doit vraiment calculer.
+
+    La première version de ce test se contentait de « un float > 0 ». Elle passait donc
+    sur la valeur PAR DÉFAUT (0.05) : elle ne distinguait pas un bouton qui calcule d'un
+    bouton qui ne fait rien. On exige maintenant une valeur différente du défaut.
+    """
+    save_toml(matirf_ready_config(), MATIRF_CONFIG_PATH)
+    cw.load_cached_config()
+    section = cw.algorithm_selection_section
+    section.algo_combo.setCurrentText("ADAM"); app.processEvents()
+    widget = section.algo_widgets["ADAM"]
+    default = OBJECTIVE_UI_PARAMS["delta"]["param_info"]["default"]
+    n = len(SHOWN)
+    click(button(widget.parameter_widgets["delta"], "Estimate"))
+    value = load_or_create_toml(MATIRF_CONFIG_PATH,
+                                DEFAULT_MATIRF_CONFIG)["algo-params"].get("delta")
+    assert isinstance(value, float), f"delta={value}, messages={SHOWN[n:]}"
+    assert abs(value - default) > 1e-9, (
+        f"delta vaut encore le défaut ({default}) : le bouton n'a rien calculé")
+    return f"clic -> delta = {value:.4f} (défaut {default}, donc réellement estimé)"
+check("C5  bouton « Estimate » de delta, par clic", c5)
+
 
 def c6():
-    st = disp.synthetic_section
-    st.update_plot()
-    rows = st.table.rowCount()
-    assert rows > 0, "table de métriques vide"
-    names = [st.table.item(r, 0).text() for r in range(rows)]
-    curve = [r for r in range(rows) if st.table.cellWidget(r, 2) is not None]
-    assert "FSC" in names, names
-    assert curve, "aucune métrique courbe avec bouton"
-    return f"{rows} métriques dont FSC, {len(curve)} courbe(s)"
-check("C6  table des métriques (vérité synthétique)", c6)
+    from gui.reusable import SingularValuePickerDialog
+    section = cw.algorithm_selection_section
+    section.algo_combo.setCurrentText("MCMC"); app.processEvents()
+    widget = section.algo_widgets["MCMC"]
+    n = len(SHOWN)
+    click(button(widget.parameter_widgets["lambda_rr"], "Estimate"))
+    opened = top_level(SingularValuePickerDialog)
+    assert opened, f"dialogue non ouvert (messages: {SHOWN[n:]})"
+    opened[-1].accept(); app.processEvents()
+    value = load_or_create_toml(MATIRF_CONFIG_PATH,
+                                DEFAULT_MATIRF_CONFIG)["algo-params"].get("lambda_rr")
+    assert isinstance(value, float) and value > 0
+    for d in opened:
+        d.close()
+    return f"clic -> SVD de H -> dialogue -> lambda_rr = {value:.4g}"
+check("C6  bouton « Estimate » de lambda_rr, par clic", c6)
 
-def c7():
-    st = disp.synthetic_section
-    st._open_viewer()
-    assert st.viewer_window is not None
-    st.viewer_window.close()
-    return "fenêtre de différence ouverte"
-check("C7  visualiser la différence", c7)
 
-def c8():
-    st = disp.synthetic_section
-    r = st.table.rowCount()
-    row = next(i for i in range(r) if st.table.cellWidget(i, 2) is not None)
-    name = st.table.item(row, 0).text()
-    st.table.cellWidget(row, 2).click()
-    app.processEvents()
-    assert len(st._curve_windows) >= 1
-    for w in list(st._curve_windows): w.close()
-    return f"popup de courbe ouverte ({name})"
-check("C8  popup de courbe (métrique FSC)", c8)
+print("\n=== D. RUN ET FENÊTRE D'AFFICHAGE (clics réels) ===")
 
-def c9():
-    disp._change_right_column()
-    idx = disp.stack.currentIndex()
-    disp._change_right_column()
-    assert idx == 1, idx
-    return "bascule reconstruction <-> vérité"
-check("C9  bouton 'Go To Truth'", c9)
+DISPLAY = {}
 
-def c10():
-    d = Path(tempfile.mkdtemp()) / "run"
-    pipeline.save_results(str(d))
-    files = sorted(p.name for p in d.iterdir())
-    assert files == ["config.toml", "f.TIF", "f_true.TIF", "messages.txt", "metrics.json"], files
-    p2 = MP.create(synth_cfg()); p2.load_results(str(d)); MP.remove(p2)
-    assert p2.result.f is not None and p2.result.metrics
-    return f"{len(files)} fichiers écrits puis relus"
-check("C10 sauvegarde + réouverture d'une reconstruction", c10)
-
-def c11():
-    cfg = synth_cfg(); cfg["algo-params"] = {"max_iter": 5_000_000, "lr": 1e-4, "K": 2}
-    p = MP.create(cfg)
-    p.start()
-    t0 = time.time()
-    while p.latest_preview is None and time.time() - t0 < 30:
-        app.processEvents(); time.sleep(0.02)
-    got = p.latest_preview is not None
-    p.stop(); MP.remove(p)
-    assert got, "aucun instantané d'aperçu live"
-    assert p.state is PipelineState.INTERRUPTED, p.state
-    return "aperçu live obtenu, puis interruption"
-check("C11 aperçu live + interruption", c11)
-
-print("\n=== D. DECONV ===")
 
 def d1():
-    cfg = {"algorithm": "ADAM",
-           "input-paths": {"mode": DataMode.SYNTHETIC.value, "png": PNG, "json": DJSON},
-           "add-noise": {}, "algo-params": {"max_iter": 10, "lr": 0.02, "K": 5, "EPS": 1e-14}}
-    DP = pipeline_for(DECONV)
-    p = DP.create(cfg)
-    DDW = display_window_class(DECONV)
-    w = DDW(p)
-    p.start()
-    t0 = time.time()
-    while p.is_running and time.time() - t0 < 60:
-        app.processEvents(); time.sleep(0.02)
-    for _ in range(50): app.processEvents(); time.sleep(0.01)
-    assert p.state is PipelineState.COMPLETED, p.state
-    assert p.result.metrics and "FSC" not in p.result.metrics
-    DP.remove(p)
-    return f"run deconv complet, {len(p.result.metrics)} métriques (pas de FSC : 2D)"
-check("D1  deconv : fenêtre + run complet", d1)
+    """Le vrai parcours : on clique sur Run et une fenêtre d'affichage apparaît."""
+    save_toml(matirf_ready_config(), MATIRF_CONFIG_PATH)
+    cw.load_cached_config()
+    Display = display_window_class(MATIRF)
+    before = set(top_level(Display))
+    click(button(cw, "Run"))
+    opened = [w for w in top_level(Display) if w not in before]
+    assert opened, "aucune fenêtre d'affichage ouverte par le clic sur Run"
+    DISPLAY["window"] = opened[-1]
+    DISPLAY["pipeline"] = opened[-1].pipeline
+    assert wait_until(lambda: not DISPLAY["pipeline"].is_running), "run non terminé"
+    wait_until(lambda: DISPLAY["pipeline"].state is PipelineState.COMPLETED, timeout=10)
+    assert DISPLAY["pipeline"].state is PipelineState.COMPLETED, DISPLAY["pipeline"].state
+    return "Run cliqué -> fenêtre ouverte -> run terminé"
+check("D1  clic sur « Run » : la reconstruction va au bout", d1)
+
 
 def d2():
-    s = dw.input_files_section
-    s.image_selector.update_selected_file(PNG)
-    s.json_selector.update_selected_file(DJSON)
-    n = len(SHOWN)
-    s._open_preview(s.image_selector, s.IMAGE_SLOT.preview)
-    win = s.image_selector.sub_window
-    assert win is not None, f"aperçu non ouvert: {SHOWN[n:]}"
-    win.close()
-    return "aperçu deconv ouvert"
-check("D2  deconv : aperçu du prétraitement", d2)
+    window = DISPLAY["window"]
+    assert window.save_btn.isEnabled() and window.save_action.isEnabled()
+    assert window.synthetic_section is not None and window.switch_btn is not None
+    return "Save activé, section vérité et bascule présentes"
+check("D2  la fenêtre reflète la fin du run", d2)
+
 
 def d3():
-    from gui.estimators import attach
-    from solvers import SOLVERS as _S
-    DECONV_SOLVERS = attach(_S, DECONV.ui.estimators, DECONV)
-    D = DECONV
-    p = DECONV_SOLVERS["MCMC"].get_ui_params(D.features)
-    assert "extra_button" in p["lambda_rr"]
-    assert "delta" not in p, "delta ne doit pas apparaître sur un problème 2D"
-    return "Estimate lambda_rr présent; delta correctement absent (2D)"
-check("D3  deconv : bouton Estimate + filtrage de delta", d3)
+    figures = DISPLAY["window"].figures_section
+    assert figures._initialized and len(figures._views) == 2
+    first = figures._current_view_index
+    click_switch(figures._switch)
+    assert figures._current_view_index != first, "le clic n'a pas changé de vue"
+    click_switch(figures._switch)
+    return "2 vues, bascule par clic sur le commutateur"
+check("D3  bascule entre les vues, par clic", d3)
 
-print("\n=== E. GÉNÉRATEUR DE VÉRITÉ SYNTHÉTIQUE (matirf synth) ===")
+
+def d4():
+    out = Path(tempfile.mkdtemp()) / "vue.png"
+    figures = DISPLAY["window"].figures_section
+    with dialogs(save_path=str(out)):
+        click(button(figures, "Save view as PNG"))
+    assert out.exists() and out.stat().st_size > 1000
+    return f"clic -> PNG {out.stat().st_size // 1024} ko"
+check("D4  export PNG, par clic", d4)
+
+
+def d5():
+    section = DISPLAY["window"].synthetic_section
+    rows = section.table.rowCount()
+    assert rows > 0, "table de métriques vide"
+    names = [section.table.item(r, 0).text() for r in range(rows)]
+    curves = [r for r in range(rows) if section.table.cellWidget(r, 2) is not None]
+    assert "FSC" in names and curves
+    click(section.table.cellWidget(curves[0], 2))          # le bouton 📈
+    assert len(section._curve_windows) >= 1, "popup de courbe non ouverte"
+    for w in list(section._curve_windows):
+        w.close()
+    return f"{rows} métriques dont FSC ; popup de courbe par clic"
+check("D5  table des métriques et popup de courbe, par clic", d5)
+
+
+def d6():
+    section = DISPLAY["window"].synthetic_section
+    click(section.viewer_btn)
+    assert section.viewer_window is not None, "fenêtre de différence non ouverte"
+    section.viewer_window.close()
+    return "clic -> fenêtre de différence"
+check("D6  « Visualize difference », par clic", d6)
+
+
+def d7():
+    window = DISPLAY["window"]
+    first = window.stack.currentIndex()
+    click(window.switch_btn)
+    assert window.stack.currentIndex() != first, "la pile n'a pas changé"
+    click(window.switch_btn)
+    return "reconstruction <-> vérité, par clic"
+check("D7  « Go To Truth », par clic", d7)
+
+
+def d8():
+    out = Path(tempfile.mkdtemp()) / "run"
+    with dialogs(save_path=str(out)):
+        click(DISPLAY["window"].save_btn)
+    files = sorted(p.name for p in out.iterdir())
+    assert files == ["config.toml", "f.TIF", "f_true.TIF", "messages.txt", "metrics.json"], files
+    reopened = pipeline_for(MATIRF).create(matirf_ready_config())
+    reopened.load_results(str(out))
+    pipeline_for(MATIRF).remove(reopened)
+    assert reopened.result.f is not None and reopened.result.metrics
+    return f"clic sur Save -> {len(files)} fichiers, relus sans la session"
+check("D8  sauvegarde de la reconstruction, par clic, puis relecture", d8)
+
+
+def d9():
+    config = matirf_ready_config()
+    config["algo-params"] = {"max_iter": 5_000_000, "lr": 1e-4, "K": 3}
+    save_toml(config, MATIRF_CONFIG_PATH)
+    cw.load_cached_config()
+    Display = display_window_class(MATIRF)
+    before = set(top_level(Display))
+    click(button(cw, "Run"))
+    window = [w for w in top_level(Display) if w not in before][-1]
+    pipeline = window.pipeline
+    assert wait_until(lambda: pipeline.latest_preview is not None, timeout=60), \
+        "aucun instantané d'aperçu live"
+    pipeline.stop()
+    assert pipeline.state is PipelineState.INTERRUPTED, pipeline.state
+    window.close()
+    return "aperçu live obtenu pendant le run, puis interruption"
+check("D9  aperçu live pendant le run, puis interruption", d9)
+
+
+print("\n=== E. DÉCONVOLUTION ===")
+
 
 def e1():
-    from problems.matirf.synthetic.gui import SyntheticTruthGeneratorWindow
-    w = SyntheticTruthGeneratorWindow()
-    w._generate()
-    assert w.f_true is not None, "génération échouée"
-    shp = tuple(w.f_true.shape)
-    rng = (float(w.f_true.min()), float(w.f_true.max()))
-    globals()["_SYNTH_WIN"] = w
-    return f"vérité générée {shp}, valeurs dans [{rng[0]:.2f}, {rng[1]:.2f}]"
-check("E1  générer / prévisualiser", e1)
+    section = dw.input_files_section
+    with dialogs(open_path=PNG):
+        click(button(section.image_selector, "Choose .png file"))
+    with dialogs(open_path=DJSON):
+        click(button(section.json_selector, "Choose .json file"))
+    assert section.are_both_file_selected()
+    n = len(SHOWN)
+    click(section.image_selector._extra_btn)
+    assert section.image_selector.sub_window is not None, f"aperçu: {SHOWN[n:]}"
+    section.image_selector.sub_window.close()
+    return "fichiers choisis et aperçu ouverts par clic"
+check("E1  deconv : fichiers et aperçu, par clic", e1)
+
 
 def e2():
-    w = globals()["_SYNTH_WIN"]
-    assert w.figures is not None, "aperçu non affiché"
-    return "aperçu branché sur la section figures de matirf"
-check("E2  aperçu du générateur", e2)
+    config = {
+        "algorithm": "ADAM",
+        "input-paths": {"mode": DataMode.SYNTHETIC.value, "png": PNG, "json": DJSON},
+        "add-noise": {},
+        "algo-params": {"max_iter": 8, "lr": 0.02, "K": 4, "EPS": 1e-14},
+    }
+    save_toml(config, DECONV_CONFIG_PATH)
+    dw.load_cached_config()
+    Display = display_window_class(DECONV)
+    before = set(top_level(Display))
+    click(button(dw, "Run"))
+    window = [w for w in top_level(Display) if w not in before][-1]
+    assert wait_until(lambda: not window.pipeline.is_running)
+    wait_until(lambda: window.pipeline.state is PipelineState.COMPLETED, timeout=10)
+    metrics = window.pipeline.result.metrics
+    assert metrics and "FSC" not in metrics, "FSC ne doit pas apparaître sur un problème 2D"
+    window.close()
+    return f"Run cliqué, {len(metrics)} métriques, FSC correctement absente (2D)"
+check("E2  deconv : run complet par clic sur Run", e2)
+
 
 def e3():
-    import problems.matirf.synthetic.gui as G
-    w = globals()["_SYNTH_WIN"]
+    section = dw.algorithm_selection_section
+    section.algo_combo.setCurrentText("MCMC"); app.processEvents()
+    widget = section.algo_widgets["MCMC"]
+    assert "delta" not in widget.parameter_widgets, \
+        "delta ne doit pas exister sur un problème 2D"
+    button(widget.parameter_widgets["lambda_rr"], "Estimate")
+    return "« Estimate » présent ; delta correctement absent (2D)"
+check("E3  deconv : filtrage de delta par les features", e3)
+
+
+print("\n=== F. GÉNÉRATEUR DE VÉRITÉ SYNTHÉTIQUE ===")
+
+
+def f1():
+    from problems.matirf.synthetic.gui import SyntheticTruthGeneratorWindow
+    window = SyntheticTruthGeneratorWindow()
+    first = window.f_true.clone()
+    click(window.btn_generate)                    # le vrai bouton
+    assert window.f_true is not None
+    assert window.f_true.shape == first.shape
+    globals()["_SYNTH"] = window
+    return f"clic sur « Generate » -> {tuple(window.f_true.shape)}, valeurs dans [0, 1]"
+check("F1  générer, par clic (le bug corrigé)", f1)
+
+
+def f2():
+    window = globals()["_SYNTH"]
     out = Path(tempfile.mkdtemp()) / "truth.TIF"
-    G.save_file = lambda *a, **k: str(out)
-    p = w._save_tif_to(str(out), "t")
-    assert Path(p).exists()
-    return f"TIF écrit ({Path(p).stat().st_size // 1024} ko)"
-check("E3  sauvegarde en TIF", e3)
+    with dialogs(save_path=str(out)):
+        click(window.btn_save)
+    assert out.exists() and out.stat().st_size > 1000
+    return f"clic -> TIF {out.stat().st_size // 1024} ko"
+check("F2  sauvegarder en TIF, par clic", f2)
 
-def e4():
-    import problems.matirf.synthetic.gui as G
-    w = globals()["_SYNTH_WIN"]
+
+def f3():
+    window = globals()["_SYNTH"]
     out = Path(tempfile.mkdtemp()) / "used.TIF"
-    G.save_file = lambda *a, **k: str(out)
+    with dialogs(save_path=str(out)):
+        click(window.btn_use)
+    config = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
+    assert config["input-paths"]["mode"] == "synthetic-data"
+    assert config["input-paths"]["tif"] == str(out)
+    assert config["oper-params"]["nz"] == window.f_true.shape[0]
+    window.close()
+    return f"clic -> config matirf mise à jour (mode, tif, nz={config['oper-params']['nz']})"
+check("F3  « Use as MA-TIRF synthetic truth », par clic", f3)
+
+
+print("\n=== G. CHEMINS D'ERREUR ===")
+
+
+def g1():
+    """Un .json incomplet doit être refusé, pas accepté silencieusement."""
+    bad = Path(tempfile.mkdtemp()) / "incomplet.json"
+    bad.write_text('{"angles_deg": [60.0]}')
+    section = cw.input_files_section
+    before = section.json_selector.selected_path
+    with dialogs(open_path=str(bad)):
+        click(button(section.json_selector, "Choose .json file"))
+    assert section.json_selector.selected_path == before, \
+        "un .json auquel il manque des clés a été accepté"
+    return "json incomplet refusé, sélection précédente conservée"
+check("G1  un .json invalide est refusé", g1)
+
+
+def g2():
+    """Une config incomplète produit une LISTE lisible, jamais une trace d'exception."""
+    messages, errors = [], []
+    pipeline = pipeline_for(MATIRF).create(dict(DEFAULT_MATIRF_CONFIG))
+    pipeline.on_message, pipeline.on_error = messages.append, errors.append
+    pipeline.start()
+    pipeline_for(MATIRF).remove(pipeline)
+    assert errors and pipeline.state is PipelineState.IDLE
+    joined = "\n".join(messages)
+    for expected in ("Input file (TIF)", "'nz'", "'normalize'", "Algorithm: not selected"):
+        assert expected in joined, f"manque dans le rapport: {expected}"
+    assert "Traceback" not in joined
+    return f"{len(messages) - 1} problèmes listés, dont normalize"
+check("G2  config vide : une liste lisible, pas une exception", g2)
+
+
+def g3():
+    """Un aperçu impossible explique pourquoi, au lieu de montrer une trace.
+
+    Le cas choisi est réel : un .json déclarant moins d'angles qu'il n'y a de piles dans
+    le .tif. Le prétraitement ne peut pas associer les deux et lève une AssertionError,
+    que l'interface doit traduire en phrase compréhensible.
+    """
+    import json
+    mismatched = Path(tempfile.mkdtemp()) / "trop_peu_d_angles.json"
+    full = json.loads(Path(MJSON).read_text())
+    mismatched.write_text(json.dumps({**full, "angles_deg": full["angles_deg"][:5]}))
+
+    config = matirf_ready_config()
+    config["input-paths"] = {"mode": DataMode.REAL.value, "tif": TIF,
+                             "json": str(mismatched)}
+    save_toml(config, MATIRF_CONFIG_PATH)
+    cw.load_cached_config()
+    section = cw.input_files_section
+    section.image_selector.update_selected_file(TIF)
+    section.json_selector.update_selected_file(str(mismatched))
+
     n = len(SHOWN)
-    w._use_as_truth()
-    cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
-    assert cfg["input-paths"]["mode"] == "synthetic-data", cfg["input-paths"]["mode"]
-    assert cfg["input-paths"]["tif"] == str(out)
-    assert cfg["oper-params"]["nz"] == w.f_true.shape[0]
-    return f"config matirf mise à jour (mode, tif, nz={cfg['oper-params']['nz']}, z0, zN)"
-check("E4  'Use as MA-TIRF synthetic truth'", e4)
+    click(section.image_selector._extra_btn)
+    warned = [s for s in SHOWN[n:] if s[0] == "warning"]
+    assert warned, "aucun message alors que les fichiers sont incohérents"
+    text = warned[-1][2]
+    assert "Traceback" not in text, "une trace brute a été montrée à l'utilisateur"
+    assert "angles" in text or "stacks" in text, f"message peu explicite: {text[:80]}"
+    return "13 piles contre 5 angles -> message explicatif, pas une trace"
+check("G3  aperçu impossible : un message, pas une trace", g3)
 
-# ── restore the user's caches ────────────────────────────────────────────────
-for p, content in BACKUPS.items():
-    Path(p).write_text(content)
 
-print("\n" + "=" * 62)
-ok = sum(1 for r in RESULTS if r[0]); tot = len(RESULTS)
-print(f"RÉSULTAT : {ok}/{tot} vérifications passées")
-if ok < tot:
+print("\n=== H. LES DEUX PROBLÈMES EN PARALLÈLE ===")
+
+
+def h1():
+    """Chaque problème a son propre registre : arrêter l'un ne touche pas l'autre.
+
+    Les comptes sont RELATIFS : les fenêtres encore ouvertes des tests précédents gardent
+    légitimement leur pipeline enregistré — un pipeline n'est retiré qu'à la fermeture de
+    sa fenêtre. Un compte absolu testerait l'ordre des tests, pas le registre.
+    """
+    matirf_pipelines = pipeline_for(MATIRF)
+    deconv_pipelines = pipeline_for(DECONV)
+    assert matirf_pipelines is not deconv_pipelines
+    assert matirf_pipelines._running_pipelines is not deconv_pipelines._running_pipelines
+
+    before_deconv = len(deconv_pipelines.get_all())
+    matirf_pipelines.create(matirf_ready_config())
+    deconv_pipelines.create({"algorithm": "ADAM",
+                             "input-paths": {"mode": DataMode.SYNTHETIC.value,
+                                             "png": PNG, "json": DJSON},
+                             "add-noise": {}, "algo-params": {}})
+    assert len(deconv_pipelines.get_all()) == before_deconv + 1
+
+    matirf_pipelines.stop_all()
+    assert matirf_pipelines.get_all() == [], "le registre matirf devrait être vidé"
+    assert len(deconv_pipelines.get_all()) == before_deconv + 1, \
+        "arrêter matirf a touché les pipelines de deconv"
+    deconv_pipelines.stop_all()
+    return "registres indépendants ; arrêter matirf n'arrête pas deconv"
+check("H1  registres de pipelines indépendants par problème", h1)
+
+
+def h2():
+    """La classe liée à un problème doit être unique — sinon un run resterait orphelin."""
+    assert pipeline_for(MATIRF) is pipeline_for(MATIRF)
+    assert display_window_class(MATIRF) is display_window_class(MATIRF)
+    assert control_window_class(MATIRF) is control_window_class(MATIRF)
+    assert display_window_class(MATIRF) is not display_window_class(DECONV)
+    return "classes mémoïsées par problème, distinctes entre problèmes"
+check("H2  une seule classe liée par problème", h2)
+
+
+# ── restore the caches exactly as they were ───────────────────────────────────
+for path, content in BACKUPS.items():
+    Path(path).write_text(content)
+
+print("\n" + "=" * 66)
+ok = sum(1 for r in RESULTS if r[0])
+print(f"RÉSULTAT : {ok}/{len(RESULTS)} vérifications passées")
+if ok < len(RESULTS):
     print("\nÉCHECS :")
     for good, name, detail in RESULTS:
         if not good:
             print(f"  - {name}\n      {detail}")
-sys.exit(0 if ok == tot else 1)
+sys.exit(0 if ok == len(RESULTS) else 1)
