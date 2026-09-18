@@ -1,0 +1,292 @@
+"""
+Test and reference implementation of the `core` layer.
+
+Run it:
+    python -m core._tests
+
+`core` defines contracts, not implementations, so the honest way to test it is to build
+the smallest possible inverse problem that satisfies those contracts and check that the
+four objects compose. That is what this file is — and it doubles as the shortest complete
+example of how a real problem is declared.
+
+The toy problem is deliberately trivial: H is a small dense matrix, so every result can be
+checked against a closed form computed independently with torch.linalg. When a test here
+fails, the contract is broken — not the numerics.
+
+Contents:
+    _ToyOperator     a ForwardOperator over a small matrix (the "physics")
+    _Gaussian        a data fidelity, D(Hf, g) = 0.5 ||Hf - g||^2
+    _L2              a regularization with a closed-form prox, R(f) = 0.5 ||f||^2
+    TOY_PROBLEM      the InverseProblem declaration tying them together
+"""
+
+import torch
+
+from core import (
+    Feature, features, supports, catalogue,
+    ForwardOperator, Objective, lambda_from_v1,
+    InverseProblem, DataMode,
+)
+
+## float64 so conjugate gradient and the closed forms agree to tight tolerances:
+DTYPE = torch.float64
+torch.manual_seed(0)
+
+
+# ── the toy physics ───────────────────────────────────────────────────────────
+
+class _ToyOperator(ForwardOperator):
+    """H is an explicit (m, n) matrix, so apply/adjoint are matrix products."""
+
+    name = "toy"
+    features = features(Feature.TWO_D)
+
+    def __init__(self, matrix):
+        self.H = matrix
+
+    @classmethod
+    def from_config(cls, config):
+        # what `InverseProblem.make_operator` calls when no build_operator is given:
+        m, n = config["toy"]["m"], config["toy"]["n"]
+        generator = torch.Generator().manual_seed(config["toy"]["seed"])
+        return cls(torch.randn(m, n, generator=generator, dtype=DTYPE))
+
+    def apply(self, f):
+        return self.H @ f
+
+    def adjoint(self, y):
+        return self.H.T @ y
+
+
+class _Gaussian:
+    """D(Hf, g) = 0.5 ||Hf - g||^2 — the v1 DataFidelity interface."""
+    display_name = "gaussian"
+
+    def loss(self, Hf, g):
+        return 0.5 * ((Hf - g) ** 2).sum()
+
+
+class _L2:
+    """R(f) = 0.5 ||f||^2, whose prox of w*R is f / (1 + w) — the v1 Regularization interface."""
+    display_name = "l2"
+
+    def loss(self, f, diff_ops):
+        return 0.5 * (f ** 2).sum()
+
+    def prox(self, f, weight, diff_ops):
+        return f / (1.0 + weight)
+
+
+class _NoProx:
+    """A regularization WITHOUT a prox, to check the failure is loud and actionable."""
+    display_name = "no-prox"
+
+    def loss(self, f, diff_ops):
+        return f.abs().sum()
+
+
+# ── the declaration: a complete inverse problem, in one object ────────────────
+
+TOY_PROBLEM = InverseProblem(
+    name="toy",
+    operator_class=_ToyOperator,
+    load_measurement=lambda config: torch.tensor(config["data"]["g"], dtype=DTYPE),
+    load_truth=lambda config: torch.tensor(config["data"]["f_true"], dtype=DTYPE),
+    validate=lambda config: ([] if config.get("toy") else ["toy: section missing"]),
+    save_image=lambda image, path: None,
+    load_image=lambda path: None,
+    image_extension="pt",
+    description="A tiny dense-matrix problem used to test the core contracts.",
+)
+
+
+# ── tests ─────────────────────────────────────────────────────────────────────
+
+def test_features():
+    """Features are typed, set-like, and reject typos immediately."""
+    assert Feature.THREE_D == "3d", "str-backed: v1 string comparisons keep working"
+    assert str(Feature.ANISOTROPIC) == "anisotropic"
+
+    matirf_like = features(Feature.THREE_D, Feature.ANISOTROPIC)
+    assert features("3d", "anisotropic") == matirf_like, "strings and members are interchangeable"
+
+    # the matching rule of the whole framework:
+    assert supports(set(), matirf_like), "requiring nothing applies everywhere"
+    assert supports({Feature.THREE_D}, matirf_like)
+    assert not supports({Feature.TWO_D}, matirf_like)
+
+    # the v1 failure mode — a silent typo in a string set — is now an explicit error:
+    try:
+        features("3D")            # wrong case
+        raise AssertionError("a typo must raise")
+    except ValueError as e:
+        assert "Unknown feature" in str(e)
+
+    assert "reconstruction space is 3D" in catalogue()
+    print("  features        typed, matching rule, typo rejected")
+
+
+def test_operator():
+    """apply/adjoint are enough: every other operation has a correct default."""
+    H = torch.randn(6, 4, dtype=DTYPE)
+    op = _ToyOperator(H)
+    f = torch.randn(4, dtype=DTYPE)
+    y = torch.randn(6, dtype=DTYPE)
+
+    assert torch.allclose(op.apply(f), H @ f)
+    assert torch.allclose(op.gram(f), H.T @ (H @ f))
+
+    # the adjoint self-check: the single most valuable test for a new operator
+    assert op.check_adjoint(f, y) < 1e-10
+
+    # ridge_inverse (conjugate gradient, matrix-free) vs the closed form
+    lam = 0.7
+    expected = torch.linalg.solve(H.T @ H + lam * torch.eye(4, dtype=DTYPE), H.T @ y)
+    assert torch.allclose(op.ridge_inverse(y, lam, n_iter=200, tol=1e-14), expected, atol=1e-8), \
+        "conjugate gradient must reproduce (H^T H + lam I)^-1 H^T y"
+
+    # lipschitz (power iteration) vs the largest singular value squared
+    expected_L = float(torch.linalg.svdvals(H)[0] ** 2)
+    assert abs(op.lipschitz(f, n_iter=500) - expected_L) / expected_L < 1e-6
+
+    # a broken adjoint is caught rather than silently corrupting every gradient solver:
+    class _Broken(_ToyOperator):
+        def adjoint(self, y):
+            return (self.H.T @ y) * 2.0
+    try:
+        _Broken(H).check_adjoint(f, y)
+        raise AssertionError("a wrong adjoint must be detected")
+    except AssertionError as e:
+        assert "not the transpose" in str(e)
+
+    print("  operator        adjoint check, CG ridge inverse, lipschitz, broken adjoint caught")
+
+
+def test_objective():
+    """L(f) = D(Hf, g) + lambda * R(f), with autograd gradient and a proximal interface."""
+    op = _ToyOperator(torch.randn(6, 4, dtype=DTYPE))
+    g = torch.randn(6, dtype=DTYPE)
+    f = torch.randn(4, dtype=DTYPE)
+
+    # unregularized: L is exactly the data term
+    plain = Objective(op, g, _Gaussian())
+    assert not plain.is_regularized
+    assert torch.allclose(plain.value(f), 0.5 * ((op.apply(f) - g) ** 2).sum())
+    assert torch.allclose(plain.residual(f), op.apply(f) - g)
+    assert torch.allclose(plain.prox_reg(f, 1.0), f), "prox of the zero function is identity"
+
+    # regularized: the STANDARD convention D + lambda*R (v1 used (1-l)D + l*R)
+    lam = 0.25
+    obj = Objective(op, g, _Gaussian(), _L2(), lambda_reg=lam)
+    assert torch.allclose(obj.value(f), obj.data_term(f) + lam * obj.reg_term(f))
+
+    # gradient by autograd, against the analytic one: H^T(Hf - g) + lam * f
+    analytic = op.adjoint(op.apply(f) - g) + lam * f
+    assert torch.allclose(obj.grad(f), analytic, atol=1e-10)
+    assert not f.requires_grad, "grad() must not disturb the tensor it is given"
+
+    # proximal interface
+    assert torch.allclose(obj.prox_reg(f, 2.0), f / (1.0 + 2.0 * lam))
+
+    # a prox-less regularizer must fail at setup, loudly, not produce a wrong result
+    try:
+        Objective(op, g, _Gaussian(), _NoProx(), lambda_reg=0.1).prox_reg(f)
+        raise AssertionError("a missing prox must raise")
+    except NotImplementedError as e:
+        assert "proximal solver" in str(e)
+
+    # a negative weight is meaningless and is refused at construction
+    try:
+        Objective(op, g, _Gaussian(), _L2(), lambda_reg=-1.0)
+        raise AssertionError("a negative lambda_reg must raise")
+    except ValueError:
+        pass
+
+    # v1 -> v2 weight conversion leaves the minimizer unchanged
+    assert abs(lambda_from_v1(0.5) - 1.0) < 1e-12
+    assert abs(lambda_from_v1(0.1) - 0.1 / 0.9) < 1e-12
+    assert "gaussian" in obj.describe() and "l2" in obj.describe()
+    print("  objective       value, autograd grad, prox, missing prox, v1 conversion")
+
+
+def test_problem():
+    """One declaration answers: what kind of problem, is the config valid, what do I solve."""
+    config = {
+        "toy": {"m": 6, "n": 4, "seed": 3},
+        "input-paths": {"mode": DataMode.REAL.value},
+        "data": {"g": [0.0] * 6, "f_true": [1.0] * 4},
+    }
+
+    # 1. what kind of problem — read from the operator, declared nowhere else
+    assert TOY_PROBLEM.features == features(Feature.TWO_D)
+    assert TOY_PROBLEM.supports_synthetic
+
+    # 2. is the config usable
+    assert TOY_PROBLEM.validate(config) == []
+    assert TOY_PROBLEM.validate({}) == ["toy: section missing"]
+
+    # 3. what am I solving — REAL: g comes from disk, there is no truth
+    real = TOY_PROBLEM.prepare(config)
+    assert real.mode is DataMode.REAL and not real.has_truth and real.f_true is None
+    assert real.g.shape == (6,)
+    assert isinstance(real.operator, _ToyOperator), "built via operator_class.from_config"
+
+    # SYNTHETIC: the truth is loaded and the measurement is simulated as g = H f_true
+    config["input-paths"]["mode"] = DataMode.SYNTHETIC.value
+    synth = TOY_PROBLEM.prepare(config)
+    assert synth.mode is DataMode.SYNTHETIC and synth.has_truth
+    assert torch.allclose(synth.g, synth.operator.apply(synth.f_true))
+
+    # an absent mode key defaults to REAL rather than crashing (reset-robustness)
+    assert DataMode.from_config({}) is DataMode.REAL
+
+    # a problem with no truth loader refuses synthetic mode with an explicit message
+    real_only = InverseProblem(
+        name="real-only", operator_class=_ToyOperator,
+        load_measurement=TOY_PROBLEM.load_measurement, validate=lambda c: [],
+        save_image=lambda i, p: None, load_image=lambda p: None, image_extension="pt",
+    )
+    assert not real_only.supports_synthetic
+    try:
+        real_only.prepare(config)
+        raise AssertionError("synthetic mode must be refused")
+    except ValueError as e:
+        assert "does not support synthetic mode" in str(e)
+
+    print("  problem         features from operator, validate, prepare in both modes")
+
+
+def test_end_to_end():
+    """The four objects compose: declare a problem, build an objective, minimize it."""
+    config = {
+        "toy": {"m": 12, "n": 5, "seed": 7},
+        "input-paths": {"mode": DataMode.SYNTHETIC.value},
+        "data": {"f_true": [1.0, 2.0, 3.0, 4.0, 5.0], "g": []},
+    }
+    prepared = TOY_PROBLEM.prepare(config)
+    objective = Objective(prepared.operator, prepared.g, _Gaussian(), _L2(), lambda_reg=1e-6)
+
+    # a plain gradient descent — note it never mentions the problem, only the objective.
+    # This is the whole point: this loop is a solver, and it works for ANY problem.
+    step = 1.0 / objective.operator.lipschitz(prepared.f_true)
+    f = torch.zeros_like(prepared.f_true)
+    for _ in range(4000):
+        f = f - step * objective.grad(f)
+
+    error = (f - prepared.f_true).norm() / prepared.f_true.norm()
+    assert error < 1e-3, f"gradient descent should recover f_true, relative error {error:.2e}"
+    print(f"  end-to-end      solver recovered f_true (relative error {error:.1e})")
+
+
+def main():
+    print("core — contract tests\n")
+    test_features()
+    test_operator()
+    test_objective()
+    test_problem()
+    test_end_to_end()
+    print("\nAll core contracts hold.")
+
+
+if __name__ == "__main__":
+    main()
