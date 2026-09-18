@@ -20,7 +20,7 @@ Two things make this operator worth reading as an example of the v2 contract:
 
 import torch
 
-import common.settings as settings
+import settings as settings
 from core import Feature, ForwardOperator, features
 from . import physics
 
@@ -47,7 +47,7 @@ class MatirfOperator(ForwardOperator):
     @classmethod
     def from_config(cls, config: dict) -> "MatirfOperator":
         """Build H by reading the measurement .json named in the config."""
-        from common.in_out import load_json
+        from fileio import load_json
 
         return cls.from_measurement(load_json(config["input-paths"]["json"]),
                                     config.get("oper-params", {}))

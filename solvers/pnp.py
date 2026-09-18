@@ -34,7 +34,7 @@ import torch
 
 from solvers.base import Solver
 from solvers.denoising import resolve, denoise, warn_if_slice_by_slice
-from common.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
+from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
 from core.features import Feature
 
 

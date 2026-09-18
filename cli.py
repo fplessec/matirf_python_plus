@@ -19,8 +19,8 @@ package contains a 'synthetic/' sub-package (today: matirf).
     settings gui                # open settings GUI
 
 Each command name (matirf, deconv, ...) is auto-detected from sys.argv[0].
-A new inverse problem is discovered automatically if it has a main.py
-and a cache/ directory with a config.toml.
+A new inverse problem is discovered automatically: drop a package under problems/
+with a main.py, and it appears here with no change to this file.
 """
 
 import sys
@@ -29,15 +29,19 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+PROBLEMS_DIR = PROJECT_ROOT / "problems"
 
 # Commands that are not inverse problem names
 UTILITY_COMMANDS = {"cli", "list", "help", "settings", "inverse-problems", "__main__"}
 
 
-# Auto-discover inverse problem packages: any subdirectory with a main.py
+# Auto-discover inverse problems: every package under problems/ with a main.py.
+# Adding a directory there is the ONLY step needed for a new problem to appear in the CLI.
 def _discover_problems():
     problems = {}
-    for d in sorted(PROJECT_ROOT.iterdir()):
+    if not PROBLEMS_DIR.is_dir():
+        return problems
+    for d in sorted(PROBLEMS_DIR.iterdir()):
         if d.is_dir() and (d / "main.py").exists() and (d / "__init__.py").exists():
             problems[d.name] = d
     return problems
@@ -86,7 +90,7 @@ def _reset_problem(problem_name, problem_path):
 
 
 def _handle_settings(args):
-    from common.settings import _settings
+    from settings import _settings
 
     if not args or args[0] == "show":
         print(_settings.show())
@@ -119,7 +123,7 @@ def _handle_settings(args):
         return
 
     if args[0] == "gui":
-        from common.settings.gui import open_settings_gui
+        from settings.gui import open_settings_gui
         open_settings_gui()
         return
 
@@ -185,7 +189,7 @@ def main():
         return
 
     # "matirf gui" or "matirf cli ..." — delegate to the problem's main.py
-    problem_main = importlib.import_module(f"{cmd}.main")
+    problem_main = importlib.import_module(f"problems.{cmd}.main")
     problem_main.main()
 
 

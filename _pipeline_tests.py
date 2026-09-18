@@ -19,10 +19,10 @@ from pathlib import Path
 
 import torch
 
-from common.core.enums import PipelineState
+from core.enums import PipelineState
 from core import DataMode
-from deconv import DECONV_MEASUREMENTS_DIR
-from matirf import MATIRF_MEASUREMENTS_DIR
+from problems.deconv import DECONV_MEASUREMENTS_DIR
+from problems.matirf import MATIRF_MEASUREMENTS_DIR
 from pipeline import Pipeline, build_objective
 from problems.deconv import DECONV
 from problems.matirf import MATIRF

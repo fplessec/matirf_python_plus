@@ -51,8 +51,8 @@ def check(name, fn):
         print(f"  FAIL  {name}  — {type(e).__name__}: {e}")
         traceback.print_exc(limit=3)
 
-from matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_CONFIG_PATH
-from deconv import DECONV_MEASUREMENTS_DIR, DECONV_CONFIG_PATH
+from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_CONFIG_PATH
+from problems.deconv import DECONV_MEASUREMENTS_DIR, DECONV_CONFIG_PATH
 
 TIF  = str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF")
 MJSON = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")
@@ -68,10 +68,10 @@ for p in (MATIRF_CONFIG_PATH, DECONV_CONFIG_PATH):
 
 print("\n=== B. FENÊTRE DE CONTRÔLE ===")
 
-from matirf.gui.control_window import ControlWindow
-from deconv.gui.control_window import DeconvControlWindow
-from common.in_out import load_or_create_toml, save_toml
-from matirf import DEFAULT_MATIRF_CONFIG
+from problems.matirf.gui.control_window import ControlWindow
+from problems.deconv.gui.control_window import DeconvControlWindow
+from fileio import load_or_create_toml, save_toml
+from problems.matirf import DEFAULT_MATIRF_CONFIG
 
 cw = ControlWindow()
 dw = DeconvControlWindow()
@@ -187,7 +187,7 @@ def b12():
 check("B12 bouton 'reset parameters'", b12)
 
 def b13():
-    from matirf.gui.control_window import MATIRF_SOLVERS
+    from problems.matirf.gui.control_window import MATIRF_SOLVERS
     from problems.matirf import MATIRF
     p = MATIRF_SOLVERS["ADAM"].get_ui_params(MATIRF.features)
     assert "extra_button" in p["delta"], "bouton Estimate absent de delta"
@@ -199,7 +199,7 @@ def b13():
 check("B13 boutons 'Estimate' (matirf)", b13)
 
 def b14():
-    from matirf.gui.estimate_delta import estimate_delta
+    from problems.matirf.gui.estimate_delta import estimate_delta
     sec = cw.algorithm_selection_section
     w = sec.algo_widgets["ADAM"]
     n = len(SHOWN)
@@ -213,8 +213,8 @@ check("B14 callback Estimate delta (calcul réel)", b14)
 def b15():
     # le vrai dialogue est NON modal (show + signal accepted) : on le capture pour
     # l'accepter, sans le remplacer — la SVD et le tracé sont donc réellement exercés
-    import matirf.gui.estimate_lambda_rr as M
-    from matirf.gui.estimate_lambda_rr import estimate_lambda_rr
+    import problems.matirf.gui.estimate_lambda_rr as M
+    from problems.matirf.gui.estimate_lambda_rr import estimate_lambda_rr
     created, orig = [], M.SingularValuePickerDialog
     class Capture(orig):
         def __init__(self, *a, **k):
@@ -252,7 +252,7 @@ from pipeline import pipeline_for
 from problems.matirf import MATIRF
 from problems.deconv import DECONV
 from core import DataMode
-from common.core.enums import PipelineState
+from core.enums import PipelineState
 
 def synth_cfg():
     return {"algorithm": "ADAM",
@@ -264,7 +264,7 @@ def synth_cfg():
 MP = pipeline_for(MATIRF)
 pipeline = MP.create(synth_cfg())
 
-from matirf.gui.display_window import DisplayWindow
+from problems.matirf.gui.display_window import DisplayWindow
 disp = DisplayWindow(pipeline)
 
 def c1():
@@ -385,7 +385,7 @@ def d1():
            "add-noise": {}, "algo-params": {"max_iter": 10, "lr": 0.02, "K": 5, "EPS": 1e-14}}
     DP = pipeline_for(DECONV)
     p = DP.create(cfg)
-    from deconv.gui.display_window import DeconvDisplayWindow as DDW
+    from problems.deconv.gui.display_window import DeconvDisplayWindow as DDW
     w = DDW(p)
     p.start()
     t0 = time.time()
@@ -411,7 +411,7 @@ def d2():
 check("D2  deconv : aperçu du prétraitement", d2)
 
 def d3():
-    from deconv.gui.control_window import DECONV_SOLVERS
+    from problems.deconv.gui.control_window import DECONV_SOLVERS
     from problems.deconv import DECONV as D
     p = DECONV_SOLVERS["MCMC"].get_ui_params(D.features)
     assert "extra_button" in p["lambda_rr"]
@@ -422,7 +422,7 @@ check("D3  deconv : bouton Estimate + filtrage de delta", d3)
 print("\n=== E. GÉNÉRATEUR DE VÉRITÉ SYNTHÉTIQUE (matirf synth) ===")
 
 def e1():
-    from matirf.synthetic.gui import SyntheticTruthGeneratorWindow
+    from problems.matirf.synthetic.gui import SyntheticTruthGeneratorWindow
     w = SyntheticTruthGeneratorWindow()
     w._generate()
     assert w.f_true is not None, "génération échouée"
@@ -439,7 +439,7 @@ def e2():
 check("E2  aperçu du générateur", e2)
 
 def e3():
-    import matirf.synthetic.gui as G
+    import problems.matirf.synthetic.gui as G
     w = globals()["_SYNTH_WIN"]
     out = Path(tempfile.mkdtemp()) / "truth.TIF"
     G.save_file = lambda *a, **k: str(out)
@@ -449,7 +449,7 @@ def e3():
 check("E3  sauvegarde en TIF", e3)
 
 def e4():
-    import matirf.synthetic.gui as G
+    import problems.matirf.synthetic.gui as G
     w = globals()["_SYNTH_WIN"]
     out = Path(tempfile.mkdtemp()) / "used.TIF"
     G.save_file = lambda *a, **k: str(out)

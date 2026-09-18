@@ -35,8 +35,8 @@ import torch
 
 from core import DataMode, Objective
 from core.result import Result
-from common.core.enums import PipelineState
-from common.in_out import save_toml, save_txt, load_txt, save_json, load_json
+from core.enums import PipelineState
+from fileio import save_toml, save_txt, load_txt, save_json, load_json
 from solvers import SOLVERS
 from solvers.differential_operators import DifferentialOperators
 from solvers.fidelities import DATA_FIDELITY_REGISTRY, GaussianFidelity
@@ -80,7 +80,7 @@ def build_objective(prepared, params: dict, uses_regularization: bool = True) ->
 
 def _accepted_kwargs(cls, params: dict) -> dict:
     """The subset of `params` this class's constructor actually declares."""
-    from common.utils import extract_init_kwargs
+    from core.utils import extract_init_kwargs
     return extract_init_kwargs(cls, params)
 
 
@@ -289,7 +289,7 @@ class Pipeline:
         determined only up to a positive constant, so the raw difference would mostly show
         that constant rather than the reconstruction error.
         """
-        from common.core.metrics import compute_all_metrics, optimal_scale
+        from core.metrics import compute_all_metrics, optimal_scale
 
         f, f_true = self.result.f, self.result.f_true
         features = {str(feature) for feature in self.problem.features}

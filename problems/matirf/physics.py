@@ -49,8 +49,8 @@ from math import pi
 import numpy as np
 import torch
 
-import common.settings as settings
-import matirf.settings as matirf_settings
+import settings as settings
+import problems.matirf.settings as matirf_settings
 
 
 # ── geometry: which angles are usable ─────────────────────────────────────────

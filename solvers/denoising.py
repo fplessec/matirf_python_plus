@@ -25,7 +25,7 @@ result ever produced, so the v1 behaviour is preserved deliberately. See `Mcmc`.
 
 import torch
 
-from common.denoisers import DENOISER_REGISTRY
+from solvers.denoisers import DENOISER_REGISTRY
 
 
 ## denoisers are calibrated for the [0, 255] intensity convention:

@@ -10,7 +10,7 @@ When the image is 2D this module will use slicing both for GPU and CPU.
 import torch
 import torch.nn.functional as F
 
-import common.settings as settings
+import settings as settings
 
 
 class DifferentialOperators:

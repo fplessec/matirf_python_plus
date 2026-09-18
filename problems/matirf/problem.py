@@ -13,9 +13,9 @@ problem because it provides a ForwardOperator, and for no other reason.
 import torch
 
 from core import InverseProblem
-from common.add_noise import add_noise_to_measurement
-from common.in_out import load_tif, save_tif, load_json
-import matirf.settings as matirf_settings
+from core.noise import add_noise_to_measurement
+from fileio import load_tif, save_tif, load_json
+import problems.matirf.settings as matirf_settings
 from .operator import MatirfOperator
 from . import physics
 

@@ -27,7 +27,7 @@ iterative conjugate gradient into one FFT round trip.
 
 import torch
 
-import common.settings as settings
+import settings as settings
 from core import Feature, ForwardOperator, features
 
 
@@ -60,7 +60,7 @@ class DeconvOperator(ForwardOperator):
 
     @classmethod
     def from_config(cls, config: dict) -> "DeconvOperator":
-        from common.in_out import load_json
+        from fileio import load_json
 
         params = load_json(config["input-paths"]["json"])
         return cls(gaussian_psf(params["sigma"], params["kernel_size"]), params)

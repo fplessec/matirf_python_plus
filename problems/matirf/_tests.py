@@ -23,9 +23,9 @@ from pathlib import Path
 
 import torch
 
-from common.in_out import load_json, load_tif
+from fileio import load_json, load_tif
 from core import DataMode, Feature, features
-from matirf import MATIRF_MEASUREMENTS_DIR
+from problems.matirf import MATIRF_MEASUREMENTS_DIR
 from solvers import Adam
 from core import Objective
 
@@ -240,7 +240,7 @@ def test_ridge_warm_start_helps():
     distance to the truth is measured AFTER fitting the optimal scale. Comparing without
     that step would measure an arbitrary constant rather than the reconstruction.
     """
-    from common.core.metrics import optimal_scale
+    from core.metrics import optimal_scale
 
     prepared = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=99))
 

@@ -37,7 +37,7 @@ import torch
 from solvers.base import Solver
 from solvers.denoising import resolve, warn_if_slice_by_slice, NO_DENOISER
 from solvers.objective_params import INIT_UI_PARAM
-from common.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
+from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
 from core.features import Feature
 
 

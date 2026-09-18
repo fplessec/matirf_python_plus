@@ -10,8 +10,8 @@ to carry machinery it does not need.
 import torch
 
 from core import InverseProblem
-from common.add_noise import add_noise_to_measurement
-from common.in_out import load_png, save_png
+from core.noise import add_noise_to_measurement
+from fileio import load_png, save_png
 from .operator import DeconvOperator
 
 
