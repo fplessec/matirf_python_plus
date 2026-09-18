@@ -23,12 +23,22 @@ from common.algorithms.reusable.regularizations import (
 from core.features import Feature
 
 
-OBJECTIVE_UI_PARAMS = {
+## Which noise model D(Hf, g) measures the discrepancy. Offered to any solver that
+## evaluates D through the objective (Adam, PPXA, MCMC) — but NOT to the splitting solvers
+## whose data step is a hardcoded quadratic (ADMM, PnP, PnP-ADMM), where choosing a Poisson
+## fidelity would have no effect and would only mislead the user.
+DATA_FIDELITY_UI_PARAM = {
     "data_fidelity": {
         "title": "Data fidelity (noise model)",
         "type": "option",
         "param_info": {"options_list": DATA_FIDELITY_LIST},
     },
+}
+
+
+## The explicit prior R(f) and its weight. Offered only to solvers that actually consult
+## the objective's regularization term.
+REGULARIZATION_UI_PARAMS = {
     "reg": {
         "title": "Regularization",
         "type": "option",
@@ -70,6 +80,10 @@ OBJECTIVE_UI_PARAMS = {
         },
     },
 }
+
+
+## Everything describing the objective — what `Solver.get_ui_params` merges in.
+OBJECTIVE_UI_PARAMS = {**DATA_FIDELITY_UI_PARAM, **REGULARIZATION_UI_PARAMS}
 
 
 ## Where the iteration starts. Generic since ForwardOperator.ridge_inverse exists for every

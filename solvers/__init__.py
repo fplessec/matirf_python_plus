@@ -13,15 +13,31 @@ inherits all of them for free.
 `available_for(features)` narrows the registry to the solvers a given problem can actually
 run, which is what the GUI lists.
 
-MIGRATION (day 2): Adam is ported. PPXA, ADMM, PnP, ADMM-PnP and MCMC follow on day 3, at
-which point `common/algorithms/` and the per-problem `*/algorithms/` packages are deleted.
+All six algorithms are ported (day 3). Together they replace `common/algorithms/` and both
+per-problem `*/algorithms/` packages — about 470 lines of pure plumbing — which are deleted
+once matirf and deconv are ported onto `core` (day 5).
+
+The unlock was `ForwardOperator.solve_normal`: PPXA, ADMM, PnP and PnP-ADMM were
+problem-specific in v1 only because each needed to invert (H^T H + lam I) its own way, and
+MCMC only because its data-consistency step needed a ridge inverse. One primitive on the
+operator removed every one of those subclasses.
 """
 
 from .base import Solver
 from .adam import Adam
+from .ppxa import Ppxa
+from .admm import Admm
+from .pnp import Pnp, PnpAdmm
+from .mcmc import Mcmc
 
+## Registration order is the order the GUI lists them in.
 SOLVERS = {cls.name: cls for cls in [
     Adam,
+    Ppxa,
+    Admm,
+    Pnp,
+    PnpAdmm,
+    Mcmc,
 ]}
 
 
@@ -30,4 +46,5 @@ def available_for(problem_features) -> dict:
     return {name: cls for name, cls in SOLVERS.items() if cls.supported_by(problem_features)}
 
 
-__all__ = ["Solver", "Adam", "SOLVERS", "available_for"]
+__all__ = ["Solver", "Adam", "Ppxa", "Admm", "Pnp", "PnpAdmm", "Mcmc",
+           "SOLVERS", "available_for"]

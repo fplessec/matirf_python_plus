@@ -26,7 +26,7 @@ import time
 import torch
 
 from core import Feature, features, ForwardOperator, Objective
-from solvers import SOLVERS, available_for, Adam
+from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, Pnp, PnpAdmm, Mcmc
 
 DTYPE = torch.float64
 
@@ -99,17 +99,31 @@ def _random_matrix_operator(m: int, n: int, seed: int = 0) -> _MatrixOperator:
     return _MatrixOperator(torch.randn(m, n, dtype=DTYPE) / math.sqrt(m))
 
 
+def _step_signal(n: int) -> torch.Tensor:
+    """A piecewise-constant 1D signal: a plateau and a spike, easy to judge by eye."""
+    signal = torch.zeros(n, dtype=DTYPE)
+    signal[8:14] = 1.0
+    signal[20] = 2.0
+    return signal
+
+
 # ── tests ─────────────────────────────────────────────────────────────────────
 
 def test_registry():
     """The registry answers which solvers a given problem can run."""
-    assert "ADAM" in SOLVERS and SOLVERS["ADAM"] is Adam
-    # Adam requires nothing, so it is available to every problem — the normal case now
-    assert "ADAM" in available_for(features(Feature.TWO_D))
-    assert "ADAM" in available_for(features(Feature.THREE_D, Feature.ANISOTROPIC))
-    assert Adam.supported_by(set())
+    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"}
+    assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc
+
+    # no solver requires any feature any more, so every problem gets all six — that is the
+    # whole promise of the layer, and it is checked rather than asserted in prose:
+    for feats in (features(Feature.TWO_D),
+                  features(Feature.THREE_D, Feature.ANISOTROPIC, Feature.SCALE_AMBIGUOUS)):
+        assert len(available_for(feats)) == 6, f"all six solvers must serve {feats}"
+
+    assert Mcmc.estimator_type == "MMSE", "MCMC is the only posterior-mean estimator"
+    assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if n != "MCMC")
     assert "MAP" in Adam.description() and "ADAM" in Adam.description()
-    print("  registry        lookup, availability by features, description")
+    print("  registry        six solvers, all available to every problem, MAP/MMSE split")
 
 
 def test_ui_params():
@@ -128,11 +142,19 @@ def test_ui_params():
     anisotropic = Adam.get_ui_params(features(Feature.THREE_D, Feature.ANISOTROPIC))
     assert "delta" in anisotropic
 
-    # a solver that ignores regularization gets none of the objective parameters
-    class _Plain(Adam):
-        uses_regularization = False
-    assert "lambda_reg" not in _Plain.get_ui_params(features(Feature.TWO_D))
-    print("  ui params       objective params merged, delta gated by ANISOTROPIC")
+    # the noise model and the prior are gated independently, which matters:
+    #   Adam/PPXA  evaluate D and R      -> both offered
+    #   MCMC       evaluates D only      -> noise model, no prior
+    #   ADMM/PnP   hardcode a quadratic  -> neither, since choosing one would do nothing
+    for solver in (Adam, Ppxa):
+        keys = solver.get_ui_params(features(Feature.TWO_D))
+        assert "data_fidelity" in keys and "lambda_reg" in keys, solver.name
+    mcmc_keys = Mcmc.get_ui_params(features(Feature.TWO_D))
+    assert "data_fidelity" in mcmc_keys and "lambda_reg" not in mcmc_keys
+    for solver in (Admm, Pnp, PnpAdmm):
+        keys = solver.get_ui_params(features(Feature.TWO_D))
+        assert "data_fidelity" not in keys and "lambda_reg" not in keys, solver.name
+    print("  ui params       noise model and prior gated independently, delta by ANISOTROPIC")
 
 
 def test_initial_guess():
@@ -167,6 +189,72 @@ def _recover(operator, f_true, params, lambda_reg=0.0):
     return (f - f_true).norm() / f_true.norm()
 
 
+def test_solve_normal():
+    """The primitive that made every splitting solver problem-agnostic."""
+    op = _random_matrix_operator(12, 5, seed=4)
+    b = torch.randn(5, dtype=DTYPE)
+    lam = 0.6
+    expected = torch.linalg.solve(op.H.T @ op.H + lam * torch.eye(5, dtype=DTYPE), b)
+    assert torch.allclose(op.solve_normal(b, lam, n_iter=200, tol=1e-14), expected, atol=1e-8)
+
+    # ridge_inverse is solve_normal applied to H^t y, so overriding one accelerates both
+    y = torch.randn(12, dtype=DTYPE)
+    assert torch.allclose(op.ridge_inverse(y, lam, n_iter=200, tol=1e-14),
+                          op.solve_normal(op.adjoint(y), lam, n_iter=200, tol=1e-14))
+
+    # an override is picked up by every solver without touching any of them
+    class _Direct(_MatrixOperator):
+        def solve_normal(self, b, lam=0.0, **kwargs):
+            n = self.H.shape[1]
+            return torch.linalg.solve(self.H.T @ self.H + lam * torch.eye(n, dtype=DTYPE), b)
+    direct = _Direct(op.H)
+    assert torch.allclose(direct.solve_normal(b, lam), expected, atol=1e-12)
+    assert torch.allclose(direct.ridge_inverse(y, lam),
+                          op.ridge_inverse(y, lam, n_iter=200, tol=1e-14), atol=1e-8)
+    print("  solve_normal    matches the closed form, ridge_inverse built on it, override works")
+
+
+def test_every_solver_on_both_physics():
+    """
+    The central claim, checked exhaustively: all six solvers run on both physics.
+
+    Each is given a modest budget and only has to get meaningfully closer to the truth than
+    the back-projection it starts from. This is a contract test, not a benchmark — the real
+    quality comparison belongs in benchmarks/, on real data.
+    """
+    budgets = {
+        "ADAM": {"max_iter": 400, "lr": 0.05, "K": 200, "EPS": 1e-14},
+        "PPXA": {"max_iter": 300, "lambda_relax": 1.0, "gamma": 0.5, "K": 150, "EPS": 1e-14},
+        "ADMM": {"iter": 30, "mu": 0.1, "threshold_ratio": 0.0},
+        "PNP": {"iter": 8, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
+        "ADMM-PnP": {"iter": 20, "rho": 0.1, "sigma": 5.0, "denoiser": "None"},
+        "MCMC": {"max_iter": 60, "beta": 1e-3, "sigma": 0.01, "K": 30, "lambda_rr": 1e-3},
+    }
+
+    problems = {
+        "matrix": (_random_matrix_operator(14, 6, seed=0),
+                   torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=DTYPE)),
+        "blur": (_BlurOperator(torch.tensor([0.25, 0.5, 0.25], dtype=DTYPE), 32),
+                 _step_signal(32)),
+    }
+
+    for physics, (operator, f_true) in problems.items():
+        g = operator.apply(f_true)
+        baseline = (operator.adjoint(g) - f_true).norm() / f_true.norm()
+        for name, solver_class in SOLVERS.items():
+            torch.manual_seed(7)
+            objective = Objective(operator, g, _Gaussian())
+            solver = solver_class()
+            f0 = solver.initial_guess(objective, budgets[name])
+            f = solver.solve(objective, f0, budgets[name])
+            error = ((f - f_true).norm() / f_true.norm()).item()
+            assert torch.isfinite(f).all(), f"{name} on {physics} produced non-finite values"
+            assert error < baseline, (
+                f"{name} on {physics}: error {error:.3e} is no better than the "
+                f"back-projection it started from ({baseline:.3e})")
+    print(f"  all solvers     six solvers x two physics: every run improved on H^t g")
+
+
 def test_same_solver_two_physics():
     """The point of the whole layer: one Adam, two unrelated forward models."""
     params = {"max_iter": 3000, "lr": 0.05, "K": 500, "EPS": 1e-14}
@@ -179,11 +267,8 @@ def test_same_solver_two_physics():
     assert matrix_error < 1e-6, f"matrix problem not recovered ({matrix_error:.2e})"
 
     # physics 2: a circular convolution, computed in Fourier — nothing in common with above
-    n = 32
-    signal = torch.zeros(n, dtype=DTYPE)
-    signal[8:14] = 1.0
-    signal[20] = 2.0
-    blur_op = _BlurOperator(torch.tensor([0.25, 0.5, 0.25], dtype=DTYPE), n)
+    signal = _step_signal(32)
+    blur_op = _BlurOperator(torch.tensor([0.25, 0.5, 0.25], dtype=DTYPE), 32)
     assert blur_op.check_adjoint(signal, signal) < 1e-10
     blur_error = _recover(blur_op, signal, {**params, "lr": 0.02, "max_iter": 6000})
     assert blur_error < 1e-6, f"blur problem not recovered ({blur_error:.2e})"
@@ -250,6 +335,8 @@ def main():
     test_registry()
     test_ui_params()
     test_initial_guess()
+    test_solve_normal()
+    test_every_solver_on_both_physics()
     test_same_solver_two_physics()
     test_regularization_and_reporting()
     test_threading_and_interruption()

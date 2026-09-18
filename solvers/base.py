@@ -68,6 +68,12 @@ class Solver(ABC):
         the normal case now that solvers are problem-agnostic. `supported_by()` applies the
         framework's single matching rule.
 
+    >> uses_data_fidelity : bool
+        Whether the solver evaluates D through the objective, and so lets the user choose
+        the noise model. False for the splitting solvers whose data step is a hardcoded
+        quadratic (ADMM, PnP, PnP-ADMM): offering them a Poisson fidelity would change
+        nothing and mislead.
+
     >> uses_regularization / uses_denoiser : bool
         Whether the solver consults the objective's regularization term, or a denoiser.
         Used by the UI to show only the parameters that actually affect this solver.
@@ -109,6 +115,7 @@ class Solver(ABC):
     name: str = ""
     estimator_type: str = "MAP"
     requires: frozenset = NO_FEATURES
+    uses_data_fidelity: bool = True
     uses_regularization: bool = False
     uses_denoiser: bool = False
     ui_params: dict = {}
@@ -125,19 +132,26 @@ class Solver(ABC):
         """
         Every parameter the user may set for this solver, filtered by the problem.
 
-        Two sources are merged, so a solver declares only what is specific to it:
-            > the shared objective parameters (data fidelity, regularization, lambda_reg,
-              delta, rho) when `uses_regularization` — see solvers/objective_params.py
+        Three sources are merged, so a solver declares only what is specific to it:
+            > the noise model, when `uses_data_fidelity`
+            > the prior and its weight (reg, lambda_reg, delta, rho), when `uses_regularization`
             > this solver's own `ui_params`, which override the shared ones on a key clash
+        See solvers/objective_params.py.
 
         A parameter may declare `"requires": {...}` and is dropped when the problem lacks
         those features. That is how `delta` (the anisotropy ratio) disappears on an
         isotropic problem without any solver writing a conditional.
         """
-        from solvers.objective_params import OBJECTIVE_UI_PARAMS
+        from solvers.objective_params import (
+            DATA_FIDELITY_UI_PARAM, REGULARIZATION_UI_PARAMS,
+        )
 
         available = problem_features if problem_features is not None else cls.requires
-        merged = dict(OBJECTIVE_UI_PARAMS) if cls.uses_regularization else {}
+        merged = {}
+        if cls.uses_data_fidelity:
+            merged.update(DATA_FIDELITY_UI_PARAM)
+        if cls.uses_regularization:
+            merged.update(REGULARIZATION_UI_PARAMS)
         merged.update(cls.ui_params)
         return {
             key: param for key, param in merged.items()

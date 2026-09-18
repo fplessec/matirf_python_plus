@@ -31,14 +31,18 @@ Everything else has a working default built from those two, so a new problem is 
 immediately:
 
     gram(f)               H^T H f
-    ridge_inverse(y, lam) (H^T H + lam I)^-1 H^T y   by conjugate gradient
+    solve_normal(b, lam)  (H^T H + lam I)^-1 b        by conjugate gradient
+    ridge_inverse(y, lam) (H^T H + lam I)^-1 H^T y    = solve_normal(H^T y, lam)
     lipschitz(like)       ||H^T H||, by power iteration
 
-Override a default only when the structure of H gives a better route — that is a genuine
-optimization, not a requirement:
+`solve_normal` is the important one: every proximal solver's data step reduces to it, so
+providing it once here is what makes PPXA, ADMM, PnP and PnP-ADMM problem-agnostic.
 
-    > MA-TIRF   H is a small dense matrix  -> ridge_inverse in closed form (torch.inverse)
-    > deconv    H is a convolution         -> ridge_inverse as a Wiener filter in Fourier
+Override a default only when the structure of H gives a better route — that is a genuine
+optimization, not a requirement, and overriding `solve_normal` alone speeds up all four:
+
+    > MA-TIRF   H is a small dense matrix  -> factorize / invert once (torch.inverse)
+    > deconv    H is a convolution         -> a pointwise division in Fourier (Wiener)
 
 Both defaults are deliberately matrix-free: they only ever call `apply` and `adjoint`, so
 they work even when H is never formed explicitly.
@@ -117,29 +121,34 @@ class ForwardOperator(ABC):
         """H^T H f — the normal operator, which drives every least-squares method."""
         return self.adjoint(self.apply(f))
 
-    def ridge_inverse(self, y: torch.Tensor, lam: float = 0.0,
-                      *, n_iter: int = 50, tol: float = 1e-6) -> torch.Tensor:
+    def solve_normal(self, b: torch.Tensor, lam: float = 0.0,
+                     *, n_iter: int = 50, tol: float = 1e-6) -> torch.Tensor:
         """
-        Solve the ridge (Tikhonov-regularized least squares) problem
+        Solve the regularized normal equations  (H^T H + lam I) x = b,  with b already in
+        reconstruction space.
 
-            argmin_x  ||H x - y||^2 + lam ||x||^2        i.e.  (H^T H + lam I) x = H^T y
+        This is THE primitive of proximal reconstruction: every splitting method reduces its
+        data step to it, which is precisely why v1 needed a problem-specific subclass of each
+        of them and v2 does not.
 
-        Used as a warm-start initialization and as the data-consistency step of MCMC.
-        `lam` > 0 stabilizes an ill-conditioned H; the larger it is, the more the result is
-        pulled toward zero.
+            PPXA      data prox        (I + c H^T H)^-1 w   = (1/c) solve_normal(w, 1/c)
+            ADMM      u-step           (H^T H + mu I)^-1 (H^T g + mu v)
+            PnP       HQS inversion    (H^T H + alpha I)^-1 (H^T g + alpha z)
+            PnP-ADMM  x-step           (H^T H + rho I)^-1 (H^T g + rho (v - u))
 
-        The default is conjugate gradient, which needs only `apply` and `adjoint` — so it
-        works for any operator, including ones too large to form explicitly. It converges
-        in at most rank(H) iterations, and `tol` stops it early once the residual is small.
+        The default is conjugate gradient, which touches H only through `apply` and
+        `adjoint`, so it works even when H is never formed. It converges in at most rank(H)
+        iterations; `tol` stops it as soon as the residual is small.
 
-        Override when H has structure that gives a direct solve (see the module docstring).
+        Override this one method when H has exploitable structure — a small dense matrix
+        (factorize once) or a convolution (a pointwise division in Fourier) — and every
+        solver above gets faster at no further cost.
         """
-        b = self.adjoint(y)
         x = torch.zeros_like(b)
         r = b.clone()                       # residual b - A x, with x = 0
         p = r.clone()                       # search direction
         rs = torch.dot(r.flatten(), r.flatten())
-        if rs.sqrt() <= tol:                # H^T y is already ~0: x = 0 is the solution
+        if rs.sqrt() <= tol:                # b is already ~0: x = 0 is the solution
             return x
         for _ in range(n_iter):
             Ap = self.gram(p) + lam * p     # A p, with A = H^T H + lam I
@@ -155,6 +164,21 @@ class ForwardOperator(ABC):
             p = r + (rs_next / rs) * p
             rs = rs_next
         return x
+
+    def ridge_inverse(self, y: torch.Tensor, lam: float = 0.0, **kwargs) -> torch.Tensor:
+        """
+        Ridge (Tikhonov-regularized least squares) solution from a MEASUREMENT y:
+
+            argmin_x  ||H x - y||^2 + lam ||x||^2      i.e.  (H^T H + lam I)^-1 H^T y
+
+        A warm-start initialization, and the data-consistency step of MCMC. `lam` > 0
+        stabilizes an ill-conditioned H; the larger it is, the more the result is pulled
+        toward zero.
+
+        It is `solve_normal` applied to H^T y, so overriding `solve_normal` is enough to
+        accelerate this too.
+        """
+        return self.solve_normal(self.adjoint(y), lam, **kwargs)
 
     def lipschitz(self, like: torch.Tensor, *, n_iter: int = 50, tol: float = 1e-6) -> float:
         """
