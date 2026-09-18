@@ -41,7 +41,7 @@ def _config(mode=DataMode.REAL, nz=10, z0=0.0, zN=400.0, add_noise=None):
     return {
         "input-paths": {"mode": mode.value, "tif": TIF if mode is DataMode.REAL else TRUTH,
                         "json": JSON},
-        "oper-params": {"nz": nz, "z0": z0, "zN": zN},
+        "oper-params": {"nz": nz, "z0": z0, "zN": zN, "normalize": False},
         "add-noise": add_noise or {},
         "algo-params": {},
     }
@@ -176,7 +176,11 @@ def test_problem_declaration():
 
     assert MATIRF.validate(_config()) == []
     empty = MATIRF.validate({})                       # what a fresh `matirf reset` leaves
-    assert len(empty) == 5 and not any("KeyError" in e for e in empty), empty
+    assert len(empty) == 6 and not any("KeyError" in e for e in empty), empty
+    ## `normalize` is a checkbox: absent means unset, but False is a valid answer
+    assert any("normalize" in e for e in empty)
+    ticked = {**_config(), "oper-params": {**_config()["oper-params"], "normalize": False}}
+    assert not any("normalize" in e for e in MATIRF.validate(ticked))
     noisy = MATIRF.validate({**_config(), "add-noise": {"add_noise": True, "sigma": "None"}})
     assert noisy == ["Noise sigma: required when 'add noise' is enabled"]
     print("  declaration     features, validation survives an empty config")

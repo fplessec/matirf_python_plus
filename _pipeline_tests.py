@@ -45,7 +45,7 @@ def _matirf_config(algorithm="ADAM", **algo_params):
         "input-paths": {"mode": DataMode.SYNTHETIC.value,
                         "tif": str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth0.TIF"),
                         "json": str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")},
-        "oper-params": {"nz": 50, "z0": 0.0, "zN": 400.0},
+        "oper-params": {"nz": 50, "z0": 0.0, "zN": 400.0, "normalize": False},
         "add-noise": {},
         "algo-params": {"max_iter": 20, "lr": 0.01, "K": 20, "EPS": 1e-14, **algo_params},
     }

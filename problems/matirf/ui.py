@@ -50,6 +50,9 @@ def _preview_errors(config):
                        ("zN", "Largest depth")):
         if oper.get(key, "None") == "None":
             messages.append(f"{label} is None, please define a value.")
+    ## a checkbox never touched is absent from the TOML; False is a valid answer, not a gap
+    if oper.get("normalize", "None") in (None, "None", "null"):
+        messages.append("Normalize Operator is not set, please tick or untick the box.")
     return messages
 
 

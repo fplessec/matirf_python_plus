@@ -175,6 +175,13 @@ def validate(config: dict) -> list:
                        ("zN", "deepest depth")):
         if oper.get(key, "None") == "None":
             errors.append(f"Operator parameter '{key}' ({label}): not set")
+
+    ## `normalize` is required like the rest, but it is a CHECKBOX, and a checkbox the user
+    ## never touched is not written to the TOML at all. So "unset" here means absent or
+    ## null — and explicitly NOT `False`, which is a perfectly valid answer. A plain
+    ## truthiness test would report every "no, do not normalize" as a missing setting.
+    if oper.get("normalize", "None") in (None, "None", "null"):
+        errors.append("Operator parameter 'normalize' (normalize the operator): not set")
     if add_noise.get("add_noise", False) and add_noise.get("sigma", "None") == "None":
         errors.append("Noise sigma: required when 'add noise' is enabled")
     return errors

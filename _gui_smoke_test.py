@@ -146,6 +146,7 @@ def b8():
     cw.update_cache_fn(["oper-params", "nz"], 10)
     cw.update_cache_fn(["oper-params", "z0"], 0.0)
     cw.update_cache_fn(["oper-params", "zN"], 400.0)
+    cw.update_cache_fn(["oper-params", "normalize"], False)
     sec.update_ui_from_toml(MATIRF_CONFIG_PATH)
     cfg = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
     assert cfg["oper-params"]["nz"] == 10
@@ -260,7 +261,7 @@ from core.enums import PipelineState
 def synth_cfg():
     return {"algorithm": "ADAM",
             "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": MJSON},
-            "oper-params": {"nz": 50, "z0": 0.0, "zN": 400.0},
+            "oper-params": {"nz": 50, "z0": 0.0, "zN": 400.0, "normalize": False},
             "add-noise": {},
             "algo-params": {"max_iter": 15, "lr": 0.01, "K": 5, "EPS": 1e-14}}
 
