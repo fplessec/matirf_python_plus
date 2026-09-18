@@ -12,7 +12,7 @@ import torch
 
 from common.in_out import load_json, load_png
 from common.gui.reusable import FrequencyCutoffDialog
-from deconv.core.operations import compute_psf_from_params, _psf_to_fft_kernel
+from problems.deconv.operator import DeconvOperator, gaussian_psf
 
 
 def estimate_lambda_rr(widget, update_cache_fn, load_toml_fn, config_path):
@@ -56,10 +56,9 @@ def estimate_lambda_rr(widget, update_cache_fn, load_toml_fn, config_path):
         return
 
     try:
-        H = compute_psf_from_params(psf_params)
-        H_padded = _psf_to_fft_kernel(H, image.shape)
-        H_fft = torch.fft.fft2(H_padded)
-        S = H_fft.abs().flatten().sort(descending=True).values
+        # spectrum_magnitudes() is a capability of the operator, not of the GUI
+        H = gaussian_psf(psf_params['sigma'], psf_params['kernel_size'])
+        S = DeconvOperator(H, psf_params).spectrum_magnitudes(image.shape)
     except Exception as e:
         QMessageBox.warning(widget, "Cannot estimate lambda_rr", f"{type(e).__name__}: {e}")
         return

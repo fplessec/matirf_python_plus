@@ -12,7 +12,7 @@ import torch
 
 from common.in_out import load_json
 from common.gui.reusable import SingularValuePickerDialog
-from matirf.core.operations import compute_matirf_operator_from_params
+from problems.matirf.operator import MatirfOperator
 
 
 def estimate_lambda_rr(widget, update_cache_fn, load_toml_fn, config_path):
@@ -54,7 +54,8 @@ def estimate_lambda_rr(widget, update_cache_fn, load_toml_fn, config_path):
         return
 
     try:
-        H = compute_matirf_operator_from_params(measurement_params, oper_params)
+        # the operator owns the physics; the GUI only reads its matrix
+        H = MatirfOperator.from_measurement(measurement_params, oper_params).H
         S = torch.linalg.svdvals(H)
     except Exception as e:
         QMessageBox.warning(widget, "Cannot estimate lambda_rr", f"{type(e).__name__}: {e}")

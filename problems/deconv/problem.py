@@ -69,6 +69,7 @@ DECONV = InverseProblem(
     save_image=save_png,
     load_image=load_png,
     image_extension="png",
+    raw_path_key="png",
     description="2D deconvolution: recover a sharp image from one blurred by a known "
                 "point-spread function.",
 )

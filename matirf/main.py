@@ -4,7 +4,8 @@ from common.gui.app import run_app
 from common.in_out import load_or_create_toml
 from matirf import DEFAULT_MATIRF_CONFIG
 from matirf.gui.control_window import ControlWindow
-from matirf.core import MaTirfPipeline
+from pipeline import pipeline_for
+from problems.matirf import MATIRF
 
 
 ## sub-commands handled here, before the generic run_app dispatcher:
@@ -20,7 +21,7 @@ def main():
 
     run_app(
         control_window_class=ControlWindow,
-        pipeline_class=MaTirfPipeline,
+        pipeline_class=pipeline_for(MATIRF),
         load_config_fn=partial(load_or_create_toml, default_config=DEFAULT_MATIRF_CONFIG),
         name="MA-TIRF Reconstruction",
     )

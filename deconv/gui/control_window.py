@@ -1,25 +1,42 @@
 from common.gui.specializable.control_window import BaseControlWindow
-from common.gui.reusable import AlgorithmSelectionSection, ADD_NOISE_PARAMETERS_UI
+from common.gui.reusable import (
+    AlgorithmSelectionSection, ADD_NOISE_PARAMETERS_UI, with_extra_buttons,
+)
+from solvers import SOLVERS
+from pipeline import pipeline_for
+from problems.deconv import DECONV
+from deconv import DECONV_CONFIG_PATH, DECONV_RESULTS_DIR, DEFAULT_DECONV_CONFIG
 from .input_files_section import DeconvInputFilesSection
 from .display_window_manager import DeconvDisplayWindowManager
-from deconv import DECONV_CONFIG_PATH, DECONV_RESULTS_DIR, DEFAULT_DECONV_CONFIG, DECONV_FEATURES
-from deconv.core import DeconvPipeline
-from deconv.algorithms import DECONV_ALGORITHMS
+from .estimate_lambda_rr import estimate_lambda_rr
+
+
+## Same declarative pattern as MA-TIRF, with one estimate button instead of two: there is no
+## `delta` on an isotropic 2D problem, so the framework never shows that parameter and the
+## button mapping for it would simply be skipped. See matirf/gui/control_window.py.
+DECONV_SOLVERS = with_extra_buttons(SOLVERS, {
+    "lambda_rr": {
+        "label": "Estimate",
+        "tooltip": "Estimate lambda_rr from the Fourier spectrum of the PSF.\n"
+                   "Displays the sorted |H_fft| values and lets you\n"
+                   "choose which frequency to use as cutoff.",
+        "callback": estimate_lambda_rr,
+    },
+})
 
 
 class DeconvControlWindow(BaseControlWindow):
     """Deconvolution control window.
 
-    Same declarative pattern as the MA-TIRF ControlWindow.
-    See BaseControlWindow and matirf/gui/control_window/control_window.py
-    for detailed comments on the architecture.
+    Same declarative pattern as the MA-TIRF ControlWindow; see that file for the
+    detailed comments on the architecture.
     """
 
     window_title = "Deconvolution Parameter Selection"
     cached_config_path = DECONV_CONFIG_PATH
     default_config = DEFAULT_DECONV_CONFIG
     results_dir = DECONV_RESULTS_DIR
-    pipeline_class = DeconvPipeline
+    pipeline_class = pipeline_for(DECONV)
     display_window_manager_class = DeconvDisplayWindowManager
 
     # ── section descriptors ─────────────────────────────────────────────
@@ -30,14 +47,9 @@ class DeconvControlWindow(BaseControlWindow):
     ]
 
     sections_right = [
-        # No extra_widget_factory needed for deconv (no "Estimate" button)
-        (AlgorithmSelectionSection, {'algorithms_dict': DECONV_ALGORITHMS, 'problem_features': DECONV_FEATURES}),
+        (AlgorithmSelectionSection,
+         {'algorithms_dict': DECONV_SOLVERS, 'problem_features': DECONV.features}),
     ]
-
-    # ── auto-named attributes ───────────────────────────────────────────
-    # DeconvInputFilesSection    → self.deconv_input_files_section
-    # 'add-noise'                → self.add_noise
-    # AlgorithmSelectionSection  → self.algorithm_selection_section
 
     def on_close_cleanup(self):
         """Close sub-windows (editor / preview) opened from the input-files selectors."""

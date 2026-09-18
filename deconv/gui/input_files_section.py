@@ -18,9 +18,9 @@ _PREVIEW_TITLES = {
 
 
 def _compute_preview(config, mode):
-    # lazy import: deconv.gui is imported before deconv.core (see main.py).
-    from deconv.core.pipeline_operations import DeconvOperations
-    return DeconvOperations.compute_preprocessing_preview(config, mode)
+    # the problem previews itself; see matirf/gui/input_files_section.py
+    from problems.deconv import DECONV
+    return DECONV.preview(config)
 
 
 def _preview_errors(config):

@@ -352,3 +352,46 @@ class Pipeline:
     def __repr__(self) -> str:
         return (f"<Pipeline {self.problem.name!r} {self.mode.value} "
                 f"state={self.state.value}>")
+
+
+## One bound class per problem, reused on every call — see `pipeline_for`.
+_BOUND_PIPELINES = {}
+
+
+def pipeline_for(problem) -> type:
+    """
+    A Pipeline subclass bound to one problem, so `create(config)` needs no problem argument.
+
+    The GUI holds a `pipeline_class` and calls `create(config)`, `stop_all()` and
+    `remove(p)` on it without knowing which problem it serves — that indirection is what
+    lets one control window serve every problem. Each subclass gets its OWN registry of
+    running pipelines, so closing the MA-TIRF window does not stop a deconvolution run.
+
+    The result is MEMOIZED per problem, and that matters: the control window and the
+    display window both ask for their problem's pipeline class. Returning a fresh class to
+    each would give them separate registries, so a window would try to remove a pipeline
+    from a registry it was never added to — the run would linger forever and never be
+    stopped. One problem, one bound class.
+
+        MatirfPipeline = pipeline_for(MATIRF)
+        MatirfPipeline.create(config).start()
+    """
+    cached = _BOUND_PIPELINES.get(problem.name)
+    if cached is not None:
+        return cached
+    name = f"{problem.name.capitalize()}Pipeline"
+    namespace = {
+        "PROBLEM": problem,
+        "_running_pipelines": [],
+        "__doc__": f"Pipeline bound to the {problem.name!r} inverse problem.",
+    }
+
+    def create(cls, config):
+        pipeline = cls(cls.PROBLEM, config)
+        cls._running_pipelines.append(pipeline)
+        return pipeline
+
+    namespace["create"] = classmethod(create)
+    bound = type(name, (Pipeline,), namespace)
+    _BOUND_PIPELINES[problem.name] = bound
+    return bound

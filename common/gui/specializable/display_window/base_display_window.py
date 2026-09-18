@@ -115,11 +115,9 @@ class BaseDisplayWindow(QMainWindow):
         elif new_state in (PipelineState.COMPLETED, PipelineState.FAILED, PipelineState.INTERRUPTED):
             self._live_preview_timer.stop()
 
-    ## polls the algorithm's latest f snapshot for live preview
+    ## polls the solver's latest f snapshot for live preview
     def _poll_live_preview(self):
-        if self.pipeline.algorithm is None:
-            return
-        f = self.pipeline.algorithm._latest_f
+        f = self.pipeline.latest_preview
         if f is None or f is self._last_polled_f:
             return
         self._last_polled_f = f

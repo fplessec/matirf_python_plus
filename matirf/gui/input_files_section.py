@@ -20,10 +20,10 @@ _PREVIEW_TITLES = {
 
 
 def _compute_preview(config, mode):
-    # lazy import: matirf.gui is imported before matirf.core (see main.py), so importing
-    # the operations at module load would reopen a circular import.
-    from matirf.core.pipeline_operations import MaTirfOperations
-    return MaTirfOperations.compute_preprocessing_preview(config, mode)
+    # the problem previews itself, through the same code path a real run takes, so the
+    # preview can never disagree with the reconstruction that follows.
+    from problems.matirf import MATIRF
+    return MATIRF.preview(config)
 
 
 def _preview_errors(config):

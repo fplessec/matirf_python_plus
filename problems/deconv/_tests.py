@@ -9,6 +9,9 @@ ships alongside, and the CONTRACTS every solver relies on. The interesting one h
 Wiener closed form — an exact inverse that the base class could only approximate.
 """
 
+import json
+from pathlib import Path
+
 import torch
 
 from common.in_out import load_json, load_png
@@ -34,27 +37,48 @@ def _config(mode=DataMode.SYNTHETIC, add_noise=None):
 
 # ── regression against v1 ─────────────────────────────────────────────────────
 
+def _fingerprint(t):
+    flat = t.detach().flatten().double()
+    idx = [0, len(flat) // 7, len(flat) // 3, len(flat) // 2, len(flat) - 1]
+    return {"shape": list(t.shape),
+            "sum": float(flat.sum()), "mean": float(flat.mean()), "std": float(flat.std()),
+            "min": float(flat.min()), "max": float(flat.max()),
+            "samples": [float(flat[i]) for i in idx]}
+
+
+def _assert_fingerprint(actual, expected, what):
+    assert actual["shape"] == expected["shape"], f"{what}: shape changed"
+    for key in ("sum", "mean", "std", "min", "max"):
+        assert abs(actual[key] - expected[key]) <= 1e-4 * max(abs(expected[key]), 1.0), \
+            f"{what}: {key} drifted ({actual[key]:.8g} vs {expected[key]:.8g})"
+    for i, (a, e) in enumerate(zip(actual["samples"], expected["samples"])):
+        assert abs(a - e) <= 1e-4 * max(abs(e), 1.0), f"{what}: sample {i} drifted"
+
+
 def test_matches_v1():
-    """The ported PSF and convolution must reproduce v1 exactly."""
-    from deconv.core.operations import compute_psf_from_params, apply_psf
+    """
+    The PSF and the convolution must still produce what v1 produced.
+
+    Compared against outputs recorded before the v1 implementation was deleted, so the
+    guarantee outlives the code it was written against. The PSF is small enough to store
+    whole; the blurred images are stored as a fingerprint (see problems/matirf/_tests.py).
+    """
+    reference = json.loads((Path(__file__).parent / "_v1_reference.json").read_text())
 
     params = load_json(JSON)
-    v1_psf = compute_psf_from_params(params)
-    v2_psf = gaussian_psf(params["sigma"], params["kernel_size"])
-    assert torch.equal(v1_psf, v2_psf), "the PSF differs from v1"
+    psf = gaussian_psf(params["sigma"], params["kernel_size"])
+    assert torch.allclose(psf, torch.tensor(reference["psf"], dtype=psf.dtype), atol=1e-8), \
+        "the PSF changed"
 
-    operator = DeconvOperator(v2_psf, params)
+    operator = DeconvOperator(psf, params)
     image = load_png(PNG)
-    assert torch.allclose(operator.apply(image), apply_psf(v1_psf, image), atol=1e-6), \
-        "the blur differs from v1"
-    assert torch.allclose(operator.adjoint(image),
-                          apply_psf(v1_psf, image, adjoint=True), atol=1e-6), \
-        "the adjoint differs from v1"
+    _assert_fingerprint(_fingerprint(operator.apply(image)), reference["blurred"], "blur")
+    _assert_fingerprint(_fingerprint(operator.adjoint(image)), reference["correlated"], "adjoint")
 
     # an even kernel size is still forced odd, as v1 did
     assert gaussian_psf(2.0, 8).shape == (9, 9)
     assert abs(float(gaussian_psf(3.0, 15).sum()) - 1.0) < 1e-6, "a PSF must preserve intensity"
-    print("  regression      PSF, blur and adjoint identical to v1")
+    print("  regression      PSF, blur and adjoint unchanged since v1")
 
 
 # ── the operator contract ─────────────────────────────────────────────────────

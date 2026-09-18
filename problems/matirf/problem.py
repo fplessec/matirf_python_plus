@@ -189,6 +189,7 @@ MATIRF = InverseProblem(
     save_image=save_tif,
     load_image=load_tif,
     image_extension="TIF",
+    raw_path_key="tif",
     description="Multi-angle TIRF: recover a 3D object from stacks measured at several "
                 "incidence angles, each probing a different depth.",
 )

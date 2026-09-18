@@ -18,6 +18,9 @@ Two kinds of check, and the first matters more than the second:
 Everything runs on the real measurement in matirf/data/measurements/.
 """
 
+import json
+from pathlib import Path
+
 import torch
 
 from common.in_out import load_json, load_tif
@@ -46,18 +49,44 @@ def _config(mode=DataMode.REAL, nz=10, z0=0.0, zN=400.0, add_noise=None):
 
 # ── regression against v1 ─────────────────────────────────────────────────────
 
-def test_physics_matches_v1():
-    """The ported optics must reproduce v1's operator bit for bit."""
-    from matirf.core.operations import (
-        compute_matirf_operator_from_params, compute_tirf_critical_angle,
-        compute_tirf_max_angle, estimate_delta_anisotropy_from_params,
-    )
+def _reference():
+    """
+    The frozen v1 outputs, recorded before the v1 implementation was deleted.
 
+    The regression check has to outlive the code it was written against, otherwise the
+    guarantee disappears exactly when it starts mattering — when someone later "tidies up"
+    physics.py. Small results (the operator matrices) are stored whole; large ones are
+    stored as a fingerprint: shape, sum, mean, std, min, max and a few fixed samples. Any
+    real change to the optics moves at least one of those.
+    """
+    return json.loads((Path(__file__).parent / "_v1_reference.json").read_text())
+
+
+def _fingerprint(t):
+    flat = t.detach().flatten().double()
+    idx = [0, len(flat) // 7, len(flat) // 3, len(flat) // 2, len(flat) - 1]
+    return {"shape": list(t.shape),
+            "sum": float(flat.sum()), "mean": float(flat.mean()), "std": float(flat.std()),
+            "min": float(flat.min()), "max": float(flat.max()),
+            "samples": [float(flat[i]) for i in idx]}
+
+
+def _assert_fingerprint(actual, expected, what):
+    assert actual["shape"] == expected["shape"], f"{what}: shape changed"
+    for key in ("sum", "mean", "std", "min", "max"):
+        assert abs(actual[key] - expected[key]) <= 1e-4 * max(abs(expected[key]), 1.0), \
+            f"{what}: {key} drifted ({actual[key]:.8g} vs {expected[key]:.8g})"
+    for i, (a, e) in enumerate(zip(actual["samples"], expected["samples"])):
+        assert abs(a - e) <= 1e-4 * max(abs(e), 1.0), f"{what}: sample {i} drifted"
+
+
+def test_physics_matches_v1():
+    """The optics must still produce exactly what v1 produced."""
+    reference = _reference()
     measurement = load_json(JSON)
-    for oper in ({"nz": 10, "z0": 0.0, "zN": 400.0},
-                 {"nz": 25, "z0": 50.0, "zN": 300.0, "normalize": True}):
-        v1 = compute_matirf_operator_from_params(measurement, oper)
-        v2 = physics.build_operator_matrix(
+
+    for oper, expected in zip(reference["cases"], reference["operator"]):
+        produced = physics.build_operator_matrix(
             angles_deg=measurement["angles_deg"],
             nz=oper["nz"], z0=oper["z0"], zN=oper["zN"],
             n_glass=measurement["n_glass"], n_medium=measurement["n_medium"],
@@ -66,29 +95,27 @@ def test_physics_matches_v1():
             beam_divergence_deg=measurement["beam_divergence_deg"],
             normalize=oper.get("normalize", False),
         )
-        assert torch.equal(v1, v2), f"operator differs from v1 for {oper}"
+        assert torch.allclose(produced, torch.tensor(expected, dtype=produced.dtype),
+                              atol=1e-6), f"the operator matrix changed for {oper}"
 
-    # the angle helpers, renamed but unchanged
-    assert physics.critical_angle(1.518, 1.34) == compute_tirf_critical_angle(1.518, 1.34)
-    assert physics.max_angle(1.33, 1.4) == compute_tirf_max_angle(1.33, 1.4)
+    for oper, expected in zip(reference["cases"], reference["delta"]):
+        produced = MatirfOperator.from_measurement(measurement, oper).estimate_anisotropy_ratio()
+        assert abs(produced - expected) < 1e-9, "the anisotropy estimate changed"
 
-    oper = {"nz": 10, "z0": 0.0, "zN": 400.0}
-    v1_delta = estimate_delta_anisotropy_from_params(measurement, oper)
-    v2_delta = MatirfOperator.from_measurement(measurement, oper).estimate_anisotropy_ratio()
-    assert abs(v1_delta - v2_delta) < 1e-12
-    print("  regression      operator matrix, angle bounds and delta identical to v1")
+    # the angle bounds, against the recorded v1 values (never transcribed by hand)
+    angles = reference["angles"]
+    assert abs(physics.critical_angle(1.518, 1.34) - angles["critical_1.518_1.34"]) < 1e-9
+    assert abs(physics.max_angle(1.33, 1.4) - angles["max_1.33_1.4"]) < 1e-9
+    print("  regression      operator matrix, angle bounds and delta unchanged since v1")
 
 
 def test_preprocessing_matches_v1():
-    """Background removal and normalization must reproduce v1 too."""
-    from matirf.core.preprocess_measurement import preprocess_measurement_stack
-
+    """Background removal and normalization must still produce what v1 produced."""
+    reference = _reference()
     raw = load_tif(TIF)
-    # v1 mutates the dict it is given, so each side gets its own copy:
-    v1_g, v1_params = preprocess_measurement_stack(raw.clone(), load_json(JSON), {})
-    v2_g, v2_params = matirf_problem.preprocess(raw.clone(), load_json(JSON), {})
-    assert torch.allclose(v1_g, v2_g, atol=0, rtol=0), "preprocessed measurement differs from v1"
-    assert v1_params["angles_deg"] == v2_params["angles_deg"]
+    g, params = matirf_problem.preprocess(raw.clone(), load_json(JSON), {})
+    _assert_fingerprint(_fingerprint(g), reference["preprocessed_g"], "preprocessed measurement")
+    assert params["angles_deg"] == reference["angles_after_preprocessing"]
 
     # this file has no background stack; fabricate one to exercise that branch, which is
     # what makes the angle list (and so the operator's shape) change
@@ -99,7 +126,7 @@ def test_preprocessing_matches_v1():
     assert g.shape[0] == raw.shape[0] - 1, "the background stack must be removed"
     assert len(refined["angles_deg"]) == len(measurement["angles_deg"]) - 1
     assert measurement["angles_deg"][-1] not in refined["angles_deg"]
-    print("  preprocessing   identical to v1; background stacks drop their angles too")
+    print("  preprocessing   unchanged since v1; background stacks drop their angles too")
 
 
 # ── the operator contract ─────────────────────────────────────────────────────

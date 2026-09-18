@@ -127,6 +127,10 @@ class InverseProblem:
     >> image_extension : str
         Extension used when saving results, e.g. "TIF" or "png".
 
+    >> raw_path_key : str
+        Key under '[input-paths]' holding the measurement file, e.g. "tif" or "png". Used
+        by `preview` to show the file as it is on disk, next to its preprocessed form.
+
     ----------
     > Example :
     ----------
@@ -149,6 +153,7 @@ class InverseProblem:
     save_image: Callable
     load_image: Callable
     image_extension: str
+    raw_path_key: str = "tif"
     build_operator: Optional[Callable[[dict], ForwardOperator]] = None
     load_truth: Optional[Callable[[dict], torch.Tensor]] = None
     simulate: Optional[Callable[[ForwardOperator, torch.Tensor], torch.Tensor]] = None
@@ -227,6 +232,29 @@ class InverseProblem:
         operator = self.make_operator(config)
         simulate = self.simulate or (lambda op, f, cfg: op.apply(f))
         return PreparedProblem(operator, simulate(operator, f_true, config), f_true, mode, config)
+
+    def preview(self, config: dict) -> tuple:
+        """
+        The two images the GUI shows side by side before a run: input, and what the
+        pipeline will actually feed the solver.
+
+        It answers the question a user asks before committing to a reconstruction — "is my
+        preprocessing doing what I think?" — and it answers it with the SAME code path the
+        run will take, so a preview can never disagree with the run that follows.
+
+            REAL       (the file as loaded, the measurement after preprocessing)
+            SYNTHETIC  (the ground truth, the measurement simulated from it)
+
+        May raise: an inconsistent file or a missing parameter surfaces here rather than at
+        the start of a long run, which is the point.
+        """
+        mode = DataMode.from_config(config)
+        if mode is DataMode.SYNTHETIC:
+            prepared = self.prepare(config)
+            return prepared.f_true, prepared.g
+        raw = self.load_image(config["input-paths"][self.raw_path_key])
+        preprocessed, _ = self._load(self.load_measurement, config)
+        return raw, preprocessed
 
     def __repr__(self) -> str:
         feats = ", ".join(sorted(str(f) for f in self.features)) or "none"

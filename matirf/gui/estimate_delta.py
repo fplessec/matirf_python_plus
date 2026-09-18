@@ -12,7 +12,7 @@ is the standard 'extra_button' callback interface defined by SimpleParameterWidg
 from PyQt5.QtWidgets import QMessageBox
 
 from common.in_out import load_json
-from matirf.core.operations import estimate_delta_anisotropy_from_params
+from problems.matirf.physics import estimate_anisotropy_ratio
 
 
 def estimate_delta(widget, update_cache_fn, load_toml_fn, config_path):
@@ -46,7 +46,11 @@ def estimate_delta(widget, update_cache_fn, load_toml_fn, config_path):
         )
         return
     try:
-        delta = round(estimate_delta_anisotropy_from_params(measurement_params, oper_params), 4)
+        delta = round(estimate_anisotropy_ratio(
+            nz=oper_params['nz'], z0=oper_params['z0'], zN=oper_params['zN'],
+            n_medium=measurement_params['n_medium'],
+            numerical_aperture=measurement_params['numerical_aperture'],
+            wavelength_nm=measurement_params['wavelength_nm']), 4)
     except Exception as e:
         QMessageBox.warning(widget, "Cannot estimate delta", f"{type(e).__name__}: {e}")
         return
