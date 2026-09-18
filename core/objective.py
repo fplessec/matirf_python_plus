@@ -1,11 +1,18 @@
 """
 The objective function a solver minimizes — assembled by the problem, consumed by solvers.
 
-    L(f) = D(H f, g)  +  lambda_reg * R(f)
-           \________/     \____________/
-            fidelity        regularization
-        "explain the        "and be a plausible
-         measurement"        image while doing it"
+    L(f) = (1 - lambda_reg) * D(H f, g)  +  lambda_reg * R(f)
+                              \________/        \____________/
+                               fidelity          regularization
+                           "explain the          "and be a plausible
+                            measurement"          image while doing it"
+
+lambda_reg is a blend in [0, 1]: 0 is pure data fidelity, 1 is pure prior (and ignores the
+measurement entirely). The two weights sum to 1, so raising the regularization necessarily
+loosens the fidelity — they trade against each other rather than varying independently.
+
+This is the convention carried over from v1, kept deliberately so that every lambda_reg
+already tuned and saved in a config.toml keeps its exact meaning.
 
 --------------------------------------------------------------------------------------
 Why the problem builds this, and not the solver
@@ -37,17 +44,12 @@ The contract solvers rely on
 A solver declares which of these it needs; a term that cannot provide one (a regularizer
 with no proximal operator, say) fails loudly at setup rather than silently mid-run.
 
---------------------------------------------------------------------------------------
-Convention change from v1 — read this
---------------------------------------------------------------------------------------
-
-v1 weighted the two terms as  (1 - lambda_reg) * D + lambda_reg * R,  which forces
-lambda_reg into [0, 1] and couples the two weights: raising the regularization necessarily
-weakens the fidelity. v2 uses the standard form  D + lambda_reg * R,  where lambda_reg is
-a free positive number and the terms are independent.
-
-Consequence for saved configs: a v1 value lam1 corresponds to  lam2 = lam1 / (1 - lam1).
-For example 0.1 -> 0.111, 0.5 -> 1.0, 0.9 -> 9.0. `lambda_from_v1()` below does it.
+A note for whoever reads this next: textbooks usually write the objective as
+D + lambda * R, with lambda a free positive number. The blended form used here is
+equivalent up to a reparametrization (lambda_textbook = lambda_reg / (1 - lambda_reg)), so
+no result differs — only the scale on which the weight is expressed. Do not "fix" it to
+the textbook form without converting every stored config, or previously tuned
+reconstructions will silently change.
 """
 
 from typing import Optional
@@ -80,8 +82,9 @@ class Objective:
         `prox(f, weight, diff_ops)`. None means no regularization.
 
     >> lambda_reg : float
-        Weight of the regularization, >= 0, in the standard convention D + lambda_reg * R
-        (see the module docstring). 0 disables the regularization term entirely.
+        The fidelity/prior blend, in [0, 1] (see the module docstring):
+        L = (1 - lambda_reg) * D + lambda_reg * R. 0 disables the regularization term;
+        1 discards the measurement entirely and is almost never what you want.
 
     >> diff_ops : DifferentialOperators or None
         Spatial derivative helpers (gradient, divergence, laplacian, hessian) that
@@ -100,8 +103,11 @@ class Objective:
     def __init__(self, operator: ForwardOperator, g: torch.Tensor,
                  data_fidelity, regularization=None, lambda_reg: float = 0.0,
                  diff_ops=None):
-        if lambda_reg < 0:
-            raise ValueError(f"lambda_reg must be >= 0, got {lambda_reg}")
+        if not 0.0 <= lambda_reg <= 1.0:
+            raise ValueError(
+                f"lambda_reg is a blend weight and must lie in [0, 1], got {lambda_reg}. "
+                f"L = (1 - lambda_reg) * D + lambda_reg * R."
+            )
         self.operator = operator
         self.g = g
         self.data_fidelity = data_fidelity
@@ -115,6 +121,16 @@ class Objective:
     def is_regularized(self) -> bool:
         """True when a regularization term actually contributes (non-None and weighted)."""
         return self.regularization is not None and self.lambda_reg > 0.0
+
+    @property
+    def data_weight(self) -> float:
+        """
+        The weight actually applied to the data term, i.e. (1 - lambda_reg).
+
+        Splitting solvers need it explicitly: their data-consistency step minimizes
+        `data_weight * D`, not `D`.
+        """
+        return 1.0 - self.lambda_reg if self.is_regularized else 1.0
 
     def residual(self, f: torch.Tensor) -> torch.Tensor:
         """H f - g. The data-consistency error, used directly by MCMC proposals."""
@@ -132,15 +148,18 @@ class Objective:
 
     def value(self, f: torch.Tensor) -> torch.Tensor:
         """
-        L(f) = D(H f, g) + lambda_reg * R(f), as a differentiable scalar tensor.
+        L(f) = (1 - lambda_reg) * D(H f, g) + lambda_reg * R(f), a differentiable scalar.
 
         Kept differentiable on purpose: gradient solvers can simply call .backward() on it,
         exactly as v1's Adam did, so no gradient has to be derived by hand.
+
+        When lambda_reg is 0 the data term is returned untouched — not multiplied by 1.0 —
+        so an unregularized run is bit-for-bit what v1 computed.
         """
-        total = self.data_term(f)
-        if self.is_regularized:
-            total = total + self.lambda_reg * self.reg_term(f)
-        return total
+        if not self.is_regularized:
+            return self.data_term(f)
+        return ((1.0 - self.lambda_reg) * self.data_term(f)
+                + self.lambda_reg * self.reg_term(f))
 
     def __call__(self, f: torch.Tensor) -> torch.Tensor:
         """Alias for `value`, so an Objective can be passed anywhere a loss callable is."""
@@ -188,19 +207,8 @@ class Objective:
         if not self.is_regularized:
             return f"L(f) = {fidelity}(Hf, g)"
         reg = getattr(self.regularization, "display_name", type(self.regularization).__name__)
-        return f"L(f) = {fidelity}(Hf, g) + {self.lambda_reg:g} * {reg}(f)"
+        return (f"L(f) = {self.data_weight:g} * {fidelity}(Hf, g) "
+                f"+ {self.lambda_reg:g} * {reg}(f)")
 
     def __repr__(self) -> str:
         return f"<Objective {self.describe()}>"
-
-
-def lambda_from_v1(lambda_v1: float) -> float:
-    """
-    Convert a v1 regularization weight to its v2 equivalent.
-
-    v1 minimized (1 - l) * D + l * R with l in [0, 1); v2 minimizes D + lam * R. Dividing
-    the v1 objective by (1 - l) leaves the minimizer unchanged, so lam = l / (1 - l).
-    """
-    if not 0.0 <= lambda_v1 < 1.0:
-        raise ValueError(f"a v1 lambda_reg lies in [0, 1), got {lambda_v1}")
-    return lambda_v1 / (1.0 - lambda_v1)

@@ -24,7 +24,7 @@ import torch
 
 from core import (
     Feature, features, supports, catalogue,
-    ForwardOperator, Objective, lambda_from_v1,
+    ForwardOperator, Objective,
     InverseProblem, DataMode,
 )
 
@@ -168,20 +168,21 @@ def test_objective():
     g = torch.randn(6, dtype=DTYPE)
     f = torch.randn(4, dtype=DTYPE)
 
-    # unregularized: L is exactly the data term
+    # unregularized: L is exactly the data term, untouched (bit-for-bit what v1 computed)
     plain = Objective(op, g, _Gaussian())
-    assert not plain.is_regularized
+    assert not plain.is_regularized and plain.data_weight == 1.0
     assert torch.allclose(plain.value(f), 0.5 * ((op.apply(f) - g) ** 2).sum())
     assert torch.allclose(plain.residual(f), op.apply(f) - g)
     assert torch.allclose(plain.prox_reg(f, 1.0), f), "prox of the zero function is identity"
 
-    # regularized: the STANDARD convention D + lambda*R (v1 used (1-l)D + l*R)
+    # regularized: the v1 blend convention  (1 - lam) * D + lam * R
     lam = 0.25
     obj = Objective(op, g, _Gaussian(), _L2(), lambda_reg=lam)
-    assert torch.allclose(obj.value(f), obj.data_term(f) + lam * obj.reg_term(f))
+    assert obj.data_weight == 1.0 - lam
+    assert torch.allclose(obj.value(f), (1 - lam) * obj.data_term(f) + lam * obj.reg_term(f))
 
-    # gradient by autograd, against the analytic one: H^T(Hf - g) + lam * f
-    analytic = op.adjoint(op.apply(f) - g) + lam * f
+    # gradient by autograd, against the analytic one: (1-lam) H^T(Hf - g) + lam * f
+    analytic = (1 - lam) * op.adjoint(op.apply(f) - g) + lam * f
     assert torch.allclose(obj.grad(f), analytic, atol=1e-10)
     assert not f.requires_grad, "grad() must not disturb the tensor it is given"
 
@@ -195,18 +196,22 @@ def test_objective():
     except NotImplementedError as e:
         assert "proximal solver" in str(e)
 
-    # a negative weight is meaningless and is refused at construction
-    try:
-        Objective(op, g, _Gaussian(), _L2(), lambda_reg=-1.0)
-        raise AssertionError("a negative lambda_reg must raise")
-    except ValueError:
-        pass
+    # lambda_reg is a blend: anything outside [0, 1] is refused at construction
+    for bad in (-1.0, 1.5):
+        try:
+            Objective(op, g, _Gaussian(), _L2(), lambda_reg=bad)
+            raise AssertionError(f"lambda_reg={bad} must raise")
+        except ValueError as e:
+            assert "[0, 1]" in str(e)
 
-    # v1 -> v2 weight conversion leaves the minimizer unchanged
-    assert abs(lambda_from_v1(0.5) - 1.0) < 1e-12
-    assert abs(lambda_from_v1(0.1) - 0.1 / 0.9) < 1e-12
+    # the two extremes of the blend behave as the convention says
+    pure_data = Objective(op, g, _Gaussian(), _L2(), lambda_reg=0.0)
+    assert torch.allclose(pure_data.value(f), plain.value(f)), "lam=0 is pure data fidelity"
+    pure_prior = Objective(op, g, _Gaussian(), _L2(), lambda_reg=1.0)
+    assert torch.allclose(pure_prior.value(f), pure_prior.reg_term(f)), "lam=1 ignores the data"
+
     assert "gaussian" in obj.describe() and "l2" in obj.describe()
-    print("  objective       value, autograd grad, prox, missing prox, v1 conversion")
+    print("  objective       v1 blend convention, autograd grad, prox, missing prox")
 
 
 def test_problem():

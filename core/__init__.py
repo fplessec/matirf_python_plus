@@ -25,12 +25,12 @@ other three files explain the pieces it refers to.
 
 from .features import Feature, NO_FEATURES, features, supports, catalogue
 from .operator import ForwardOperator
-from .objective import Objective, lambda_from_v1
+from .objective import Objective
 from .problem import InverseProblem, PreparedProblem, DataMode
 
 __all__ = [
     "Feature", "NO_FEATURES", "features", "supports", "catalogue",
     "ForwardOperator",
-    "Objective", "lambda_from_v1",
+    "Objective",
     "InverseProblem", "PreparedProblem", "DataMode",
 ]
