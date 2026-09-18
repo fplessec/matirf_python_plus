@@ -1,32 +1,13 @@
-from .base import Regularization
-from .no_reg import NoRegularization
-from .l1 import L1Regularization
-from .l2 import L2Regularization
-from .tikhonov import TikhonovRegularization
-from .tv import TVRegularization
-from .hessian_frobenius import HessianFrobeniusRegularization
-from .shv import SHVRegularization
+"""
+MIGRATION SHIM (v1 -> v2). The regularizations now live in `solvers/regularizers/`.
 
+This module only re-exports them so the v1 algorithm stack keeps running while both
+versions coexist. It is deleted together with `common/algorithms/`. New code imports from
+`solvers.regularizers`.
+"""
 
-_ALL_REGULARIZATIONS = [
-    NoRegularization,
-    L1Regularization,
-    L2Regularization,
-    TikhonovRegularization,
-    TVRegularization,
-    HessianFrobeniusRegularization,
-    SHVRegularization,
-]
-
-# Registry maps display_name -> class (primary key, used by UI and config.toml).
-# Also maps name -> class (fallback, for backward compatibility).
-REGULARIZATION_REGISTRY = {}
-for cls in _ALL_REGULARIZATIONS:
-    REGULARIZATION_REGISTRY[cls.display_name] = cls
-    REGULARIZATION_REGISTRY[cls.name] = cls
-
-# List for UI options (display_name only).
-REGULARIZATION_LIST = [cls.display_name for cls in _ALL_REGULARIZATIONS]
-
-# Regularizations that use differential operators (benefit from delta in 3D anisotropic).
-ANISOTROPIC_REGULARIZATIONS = [cls.display_name for cls in _ALL_REGULARIZATIONS if cls.uses_diff_ops]
+from solvers.regularizers import *          # noqa: F401,F403
+from solvers.regularizers import (          # noqa: F401
+    Regularization, NoRegularization, REGULARIZATION_REGISTRY, REGULARIZATION_LIST,
+    ANISOTROPIC_REGULARIZATIONS,
+)

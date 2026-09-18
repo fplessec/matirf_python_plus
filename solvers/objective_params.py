@@ -10,14 +10,13 @@ Here they are declared once. Any solver with `uses_regularization = True` receiv
 automatically (see `Solver.get_ui_params`), and its own ui_params contain only what is
 genuinely specific to that algorithm — iterations, learning rate, step size.
 
-MIGRATION NOTE: the option lists are still imported from `common.algorithms.reusable`,
-where v1's fidelities and regularizations live. They move under `solvers/` on day 3; until
-then v1 must keep running, so the new code borrows the old modules rather than copying
-them. This import is the only remaining link from `solvers/` to `common/`.
+The fidelities and regularizations themselves live under `solvers/` — they describe the
+objective, not any problem, so this is where they belong. The old paths under
+`common/algorithms/reusable/` are re-export shims kept only until the v1 stack is deleted.
 """
 
-from common.algorithms.reusable.data_fidelities import DATA_FIDELITY_LIST
-from common.algorithms.reusable.regularizations import (
+from solvers.fidelities import DATA_FIDELITY_LIST
+from solvers.regularizers import (
     REGULARIZATION_LIST, ANISOTROPIC_REGULARIZATIONS,
 )
 from core.features import Feature

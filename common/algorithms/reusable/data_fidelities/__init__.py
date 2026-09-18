@@ -1,21 +1,13 @@
-from .base import DataFidelity
-from .gaussian import GaussianFidelity
-from .poisson import PoissonFidelity
-from .poisson_gaussian import PoissonGaussianFidelity
+"""
+MIGRATION SHIM (v1 -> v2). The data fidelities now live in `solvers/fidelities/`.
 
+This module only re-exports them so the v1 algorithm stack keeps running while both
+versions coexist. It is deleted together with `common/algorithms/`. New code imports from
+`solvers.fidelities`.
+"""
 
-_ALL_DATA_FIDELITIES = [
-    GaussianFidelity,
-    PoissonFidelity,
-    PoissonGaussianFidelity,
-]
-
-# Registry maps display_name -> class (primary key, used by UI and config.toml).
-# Also maps name -> class (fallback, for backward compatibility).
-DATA_FIDELITY_REGISTRY = {}
-for cls in _ALL_DATA_FIDELITIES:
-    DATA_FIDELITY_REGISTRY[cls.display_name] = cls
-    DATA_FIDELITY_REGISTRY[cls.name] = cls
-
-# List for UI options (display_name only).
-DATA_FIDELITY_LIST = [cls.display_name for cls in _ALL_DATA_FIDELITIES]
+from solvers.fidelities import *            # noqa: F401,F403
+from solvers.fidelities import (            # noqa: F401
+    DataFidelity, GaussianFidelity, PoissonFidelity, PoissonGaussianFidelity,
+    DATA_FIDELITY_REGISTRY, DATA_FIDELITY_LIST,
+)
