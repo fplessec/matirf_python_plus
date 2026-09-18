@@ -7,18 +7,19 @@
 #     source env/bin/activate
 #     pip install -e .
 #
-# You can import your modules from anywhere in the venv:
-#     from common.algorithms import BaseAdam
-#     from common.denoisers import DENOISER_REGISTRY
-#     ...
+# You can import the framework from anywhere in the venv:
+#     from core import InverseProblem, Objective
+#     from solvers import SOLVERS
+#     from problems.matirf import MATIRF
 #
 # Console entry points:
 #     matirf gui                  # launch matirf GUI
 #     matirf cli -c config.toml   # launch matirf CLI
 #     matirf reset                # delete the cached config.toml
 #     deconv gui                  # launch deconv GUI
+#     matirf synth                # design a synthetic ground truth
 #     deconv reset                # delete the cached config.toml
-#     inverse-problems list       # list available inverse problems
+#     list                        # list available inverse problems
 # =============================================================================
 
 
@@ -53,9 +54,9 @@ dependencies = [
     "numpy>=2.0",              # nlridge.py, abstract_algo.py, viewers, etc.
     "matplotlib>=3.10.3",      # GUI viewers, qlatexlabel
     "PyQt5>=5.15.11",          # graphical interface
-    "tifffile>=2025.5.10",     # in_out/tif_file.py
-    "tomli>=2.2.1",            # in_out/toml_file.py (reading)
-    "tomli_w>=1.2.0",          # in_out/toml_file.py + display_window.py (writing)
+    "tifffile>=2025.5.10",     # fileio/tif_file.py
+    "tomli>=2.2.1",            # fileio/toml_file.py (reading)
+    "tomli_w>=1.2.0",          # fileio/toml_file.py + the pipeline (writing)
     "Pillow>=10.0",            # algorithms/denoisers/tests/__init__.py + denoise_tv_bregman.py
     "scikit-image>=0.22",      # reconstruction_metrics (SSIM), pnp_algo, nlridge, denoise_tv_bregman (estimate_sigma)
     "einops>=0.7",             # algorithms/denoisers/nlridge.py (rearrange, repeat)
@@ -80,9 +81,11 @@ dev = [
 # "inverse-problems" is a utility command to list available problems.
 #
 # To add a new inverse problem (e.g. superres):
-#   1. Create the superres/ package with main.py and cache/
+#   1. Create problems/superres/ with problem.py, operator.py and ui.py
 #   2. Add here:  superres = "cli:main"
 #   3. pip install -e .
+# Nothing else: cli.py discovers the problem from its problem.py, and the GUI is
+# generated from its ui.py.
 # -----------------------------------------------------------------------------
 [project.scripts]
 matirf = "cli:main"
@@ -100,19 +103,25 @@ settings = "cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = [
-    "common*",
-    "matirf*",
-    "deconv*",
+    "core*",        # the contracts and the metrics
+    "solvers*",     # the algorithms, fidelities, regularizers, denoisers
+    "problems*",    # one package per inverse problem
+    "gui*",         # the interface engine
+    "fileio*",      # reading and writing files
+    "settings*",    # application settings
 ]
 exclude = [
     "env*",
+    "old*",         # the superseded v1, kept for reference only — never installed
     "*.data*",
     "__pycache__*",
 ]
 
 # -----------------------------------------------------------------------------
-# Top-level Python modules to install alongside the packages.
-# cli.py is the centralized entry point at the project root.
+# Top-level Python modules installed alongside the packages.
+#   cli.py       the entry point every console command routes through
+#   pipeline.py  the composition layer; it sits at the root rather than in core/
+#                because it is the only module aware of BOTH problems and solvers
 # -----------------------------------------------------------------------------
 [tool.setuptools]
-py-modules = ["cli"]
+py-modules = ["cli", "pipeline"]
