@@ -108,10 +108,50 @@ deconv cli
 
 ### Launch the synthetic ground-truth generator (matirf only)
 
-Generates reproducible 3D synthetic ground truths (ellipsoids, filaments, membranes, double layers) to benchmark the reconstruction algorithms on data whose truth is known:
-
 ```bash
-matirf synth
+matirf synth              # or: python -m matirf.synthetic
+```
+
+**What it is for.** To judge whether a reconstruction algorithm is good, you need data whose exact answer you already know. `matirf synth` designs such an answer: a reproducible 3D object `f_true`. The reconstruction pipeline then simulates the measurement from it (`g = H · f_true`, plus noise), runs an algorithm, and compares the result against `f_true` with the quality metrics. This is how the algorithms (ADAM, PPXA, ADMM, PnP, ADMM-PnP, MCMC) are compared on equal footing.
+
+**Two files, two concerns.** The generator is driven entirely by TOML, stored in `matirf/synthetic/cache/`:
+
+| File | Describes |
+|---|---|
+| `ground_truth.toml` | *what* the objects are — one section per object type, each with a `count` and its characteristic parameters, expressed in nanometres (grid-independent). Plus a master `seed`. |
+| `grid.toml` | *how* that continuous truth is sampled onto the flat anisotropic MA-TIRF slab: `nz`, `z0_nm`, `zN_nm`, lateral extent. |
+
+Separating them means you can re-sample the same objects on a finer grid, or change the objects without touching the grid.
+
+**Object types available.** Each is a `SyntheticObjectType` registered in `OBJECT_TYPES` — the exact analogue of an entry in the algorithm registry. Setting a type's `count` to `0` disables it.
+
+| Type | Shape |
+|---|---|
+| `Ellipsoid` | Gaussian blobs, flat-ish (MA-TIRF observes a thin slab), `sharpness > 1` gives a flat-top "soft binary" |
+| `Filament3D` | curved filaments |
+| `Membrane` | a corrugated membrane sheet |
+| `DoubleLayerType` | two parallel layers, to probe axial resolution |
+
+**Typical workflow.**
+
+1. `matirf synth` — the window shows one section per TOML section on the left, a preview on the right.
+2. Adjust the grid, the seed and the object counts/parameters. Every edit is written straight to the TOML.
+3. **Generate / preview** — builds `f_true`, normalised to `[0, 1]`, and displays it (depth map + profiles, or image + 3D histogram).
+4. Then either:
+   - **Save as TIF…** — write the truth to disk and use it however you like, or
+   - **Use as MA-TIRF synthetic truth** — saves the TIF *and* updates the MA-TIRF config for you: sets mode to `synthetic-data`, points `input-paths.tif` at the file, and copies `nz`, `z0`, `zN` into `oper-params` so the operator matches the grid.
+5. `matirf gui` — pick a measurement JSON and an algorithm, then run. The reconstruction is compared to your truth automatically.
+
+**Reproducibility.** Objects are sampled from a master `seed`, and the registry order is fixed, so the RNG is consumed in a fixed order: the same two TOML files always produce the exact same `f_true`. Keep them next to your results and the experiment is reproducible.
+
+**Noise is deliberately not part of the truth.** `f_true` is noiseless. The measurement noise is applied by the reconstruction pipeline through the `[add-noise]` section of the MA-TIRF config, so you can re-run the same truth at several noise levels.
+
+**Programmatic use** (for scripted benchmarks, no GUI):
+
+```python
+from matirf.synthetic import load_grid_config, load_gt_config, generate_ground_truth
+
+f_true = generate_ground_truth(load_grid_config(), load_gt_config())   # (nz, ny, nx) in [0, 1]
 ```
 
 ### Reset the cached configuration

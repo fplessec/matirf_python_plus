@@ -4,11 +4,15 @@ Centralized CLI entry point for all inverse problems.
 Usage:
     matirf gui                  # launch matirf GUI
     matirf cli -c config.toml   # launch matirf CLI
+    matirf synth                # design a synthetic ground truth (matirf only)
     matirf reset                # delete matirf cached config.toml
     deconv gui                  # launch deconv GUI
     deconv reset                # delete deconv cached config.toml
     list                        # list available inverse problems
     help                        # show available commands
+
+The 'synth' sub-command is offered automatically by any inverse problem whose
+package contains a 'synthetic/' sub-package (today: matirf).
     settings show               # display current settings
     settings set <key> <value>  # change a setting
     settings reset [<key>]      # reset one or all settings to defaults
@@ -47,9 +51,13 @@ def _get_command_name():
 def _print_help(problems):
     print("matirf_python_plus - Generic inverse problem solver\n")
     print("Commands:\n")
-    for name in problems:
+    for name, path in problems.items():
         print(f"  {name} gui             Launch the graphical interface")
         print(f"  {name} cli             Launch the command-line interface")
+        # a problem that ships a synthetic/ package also offers a ground-truth generator:
+        if (path / "synthetic").is_dir():
+            print(f"  {name} synth           Design a synthetic ground truth "
+                  f"(benchmark algorithms on known data)")
         print(f"  {name} reset           Delete the cached config.toml")
         print()
     print(f"  list                   List available inverse problems")
@@ -155,10 +163,25 @@ def main():
 
     # "matirf help"
     if args and args[0] == "help":
-        extra = " | synth" if (problem_path / "synthetic").is_dir() else ""
-        print(f"Usage:  {cmd} gui | cli{extra} | reset | help")
-        if extra:
-            print(f"        {cmd} synth   Open the synthetic ground-truth generator GUI")
+        has_synth = (problem_path / "synthetic").is_dir()
+        extra = " | synth" if has_synth else ""
+        print(f"Usage:  {cmd} gui | cli{extra} | reset | help\n")
+        # the description column starts right after the longest "  <cmd> <sub>  " prefix:
+        pad = len(f"  {cmd} synth   ") if has_synth else len(f"  {cmd} reset   ")
+        def line(sub, text):
+            print(f"  {cmd} {sub}".ljust(pad) + text)
+        line("gui", "Open the reconstruction GUI (choose inputs, algorithm, run)")
+        line("cli", "Run a reconstruction headless from a .toml config")
+        if has_synth:
+            line("synth", "Open the synthetic ground-truth generator GUI.")
+            for text in (
+                "Designs a reproducible 3D truth f_true (ellipsoids, filaments,",
+                "membranes, double layers) from two TOML files, previews it, and",
+                f"can set it directly as the synthetic truth of the {cmd} config.",
+                "Use it to compare algorithms on data whose exact answer is known.",
+            ):
+                print(" " * pad + text)
+        line("reset", "Delete the cached config.toml (back to defaults)")
         return
 
     # "matirf gui" or "matirf cli ..." — delegate to the problem's main.py

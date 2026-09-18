@@ -17,6 +17,12 @@ run_app(
 - `matirf gui` → opens the GUI via `_open_gui`
 - `matirf cli -c config.toml -o output/` → runs headless via `_run_cli`
 
+`matirf/main.py` intercepts one sub-command *before* `run_app`:
+- `matirf synth` → opens the synthetic ground-truth generator (see below)
+
+`cli.py` advertises `synth` for any problem whose package contains a `synthetic/`
+sub-package, so the help text stays correct if another problem gains one.
+
 
 ## Three packages
 
@@ -197,3 +203,46 @@ save_dir/
 
 `BasePipeline.load_results(directory)` reads the folder back, recomputes
 synthetic outputs if applicable, and sets state to COMPLETED.
+
+
+## Synthetic ground truth (`matirf synth`)
+
+A side entry point, independent of the reconstruction pipeline. It produces the
+`f_true` that synthetic mode consumes, so that algorithms can be compared on data
+whose exact answer is known.
+
+```
+matirf synth  ──►  SyntheticTruthGeneratorWindow  (matirf/synthetic/gui.py)
+                        │
+                        ├─ reads/writes  cache/grid.toml          [grid]      how it is sampled
+                        ├─ reads/writes  cache/ground_truth.toml  [sampling]  master seed
+                        │                                         [<object>]  one per type
+                        │
+                        ├─ generate_ground_truth(grid_cfg, gt_cfg)  ──►  f_true  (nz,ny,nx) in [0,1]
+                        │       └─ iterates OBJECT_TYPES in registry order (fixed RNG order)
+                        │
+                        └─ "Use as MA-TIRF synthetic truth"
+                                saves the .TIF, then updates the MA-TIRF config:
+                                    input-paths.mode = "synthetic-data"
+                                    input-paths.tif  = <path>
+                                    oper-params.nz / z0 / zN  = the grid's values
+```
+
+The design deliberately mirrors the algorithm layer: each object type is a
+`SyntheticObjectType` with `name` / `toml_key` / `ui_params` and a `sample()`, registered
+in `OBJECT_TYPES` exactly as an algorithm is registered in `ALGORITHMS`. Adding a class
+to that registry automatically creates both its GUI section and its TOML section — no
+GUI code to write.
+
+Two invariants worth knowing:
+
+- **Objects are continuous, defined in nm**, then integrated onto the anisotropic voxel
+  grid (midpoint super-sampling). They are never drawn directly onto voxels, which avoids
+  grid-aligned artefacts.
+- **Noise is not baked into the truth.** `f_true` is noiseless; `g = H · f_true` and its
+  noise are produced by the reconstruction pipeline via the config's `[add-noise]`
+  section. The same truth can therefore be replayed at several noise levels.
+
+From there the flow rejoins the normal pipeline: `build_g_H_synthetic(config)` loads
+`f_true` from `input-paths.tif`, and `compute_synthetic_outputs` fills the metrics and
+the difference image.
