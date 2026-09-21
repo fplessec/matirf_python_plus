@@ -12,5 +12,5 @@ class NoRegularization(Regularization):
     def loss(self, f, diff_ops):
         return torch.zeros((), dtype=f.dtype, device=f.device)
 
-    def prox(self, f, lambda_reg, diff_ops, **kwargs):
+    def prox_sum(self, f, lambda_reg, diff_ops, **kwargs):
         return f

@@ -1,14 +1,20 @@
 import torch
+import torch.nn.functional as F
 
 from .base import Regularization
 
 
 class TikhonovRegularization(Regularization):
     """
-    Tikhonov regularization (L2 norm of the gradient):
-        R(f) = ||∇f||₂ = sqrt(sum((∂f/∂xi)²))
+    Tikhonov regularization (squared L2 norm of the gradient):
+        R(f) = (1/N) sum_x ||∇f(x)||² = (1/N) sum_x sum_i (∂f/∂x_i)²
 
     Promotes smooth solutions. Works in 2D and 3D via diff_ops.
+
+    CHANGE FROM V1: v1's loss was mean_x ||∇f(x)|| — the norm, not its square, which is the
+    isotropic total variation — while its prox solved the squared problem. Adam and PPXA
+    therefore minimized two different priors under one name. Both are now the square: the
+    classical Tikhonov prior, and the one the prox below actually computes.
     """
 
     name = "tikhonov"
@@ -21,11 +27,23 @@ class TikhonovRegularization(Regularization):
     def __init__(self, n_iter=25):
         self.n_iter = n_iter
 
-    def loss(self, f, diff_ops, eps=1e-8):
-        components = diff_ops.spatial_grad(f)
-        return torch.sqrt(sum(c ** 2 for c in components) + eps ** 2).mean()
+    def loss(self, f, diff_ops):
+        """
+        mean of the squared FORWARD differences, zero outside the image.
 
-    def prox(self, f, lambda_reg, diff_ops, **kwargs):
+        Forward differences, not the central ones of `spatial_grad`: minus the divergence of
+        a zero-padded forward difference is exactly the zero-padded 3-point Laplacian the
+        prox uses, so this loss and that prox describe the same discrete prior.
+        """
+        delta = getattr(diff_ops, "delta", 1.0) if diff_ops is not None else 1.0
+        padded = F.pad(f.unsqueeze(0), (1, 1) * f.dim()).squeeze(0)
+        total = torch.zeros((), dtype=f.dtype, device=f.device)
+        for axis in range(f.dim()):
+            weight = delta ** 2 if (f.dim() == 3 and axis == 0) else 1.0
+            total = total + weight * torch.diff(padded, dim=axis).square().sum()
+        return total / f.numel()
+
+    def prox_sum(self, f, lambda_reg, diff_ops, **kwargs):
         """
         Proximal operator of the L2 gradient norm, by gradient descent.
 

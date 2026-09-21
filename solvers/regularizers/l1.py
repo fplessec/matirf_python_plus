@@ -16,6 +16,6 @@ class L1Regularization(Regularization):
     def loss(self, f, diff_ops):
         return f.abs().mean()
 
-    def prox(self, f, lambda_reg, diff_ops, **kwargs):
+    def prox_sum(self, f, lambda_reg, diff_ops, **kwargs):
         """Soft-thresholding proximal for L1 norm"""
         return torch.sign(f) * torch.clamp(torch.abs(f) - lambda_reg, min=0)

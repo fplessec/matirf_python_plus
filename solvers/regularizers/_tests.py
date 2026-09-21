@@ -1,5 +1,5 @@
 """
-Tests of the Hessian regularizations — Hessian-Frobenius and SHV.
+Tests of the regularizations — every prox against its loss, then Hessian-Frobenius and SHV.
 
 Run it:
     python -m solvers.regularizers._tests
@@ -13,6 +13,11 @@ Three kinds of check:
                  fooled by a curved image whose Hessian entries cancel.
     PROX         the proximal operator must actually minimise 1/2||u - f||^2 + lam R(u):
                  the adjoint is exact, the output beats the input and every perturbation.
+    CONTRACT     for EVERY regularization, `prox` and `loss` describe the same R, on the
+                 same scale (a mean over the voxels). A gradient solver and a proximal one
+                 then minimize the same objective. This caught two v1 bugs: Tikhonov's
+                 loss was the norm of the gradient while its prox used the square, and the
+                 TV prox's dual step had the wrong sign.
 """
 
 import torch
@@ -198,8 +203,31 @@ def test_gradients_are_finite():
     print("  autograd        finite gradients, including over zero regions")
 
 
+def test_every_prox_matches_its_loss():
+    """prox(f, w) minimizes 1/2 ||u - f||^2 + w * loss(u), for every registered regularization."""
+    from solvers.regularizers import REGULARIZATION_REGISTRY
+    torch.manual_seed(0)
+    classes = list(dict.fromkeys(REGULARIZATION_REGISTRY.values()))
+    for shape, ops in (((24, 24), DifferentialOperators()),
+                       ((5, 12, 12), DifferentialOperators(delta=0.6))):
+        f = torch.rand(shape, dtype=torch.float64)
+        for cls in classes:
+            reg = cls()
+            w = 0.05 * f.numel()           # R is a mean, so w scales with the voxel count
+            u = reg.prox(f, w, ops)
+            J = lambda v: float(0.5 * ((v - f) ** 2).sum() + w * reg.loss(v, ops))
+            gain = J(f) - J(u)
+            assert gain >= 0, f"{cls.__name__} {len(shape)}D: the prox made things worse"
+            ## the iterative proxes stop after a fixed budget: allow a sliver of the gain
+            worst = min(J(u + 1e-3 * torch.randn_like(u)) for _ in range(20))
+            assert worst >= J(u) - 1e-3 * max(gain, 1e-12), \
+                f"{cls.__name__} {len(shape)}D: a random perturbation beats the prox"
+    print(f"  contract        all {len(classes)} proxes minimize their own loss, 2D and 3D")
+
+
 def main():
-    print("solvers.regularizers — Hessian-Frobenius and SHV\n")
+    print("solvers.regularizers — every prox against its loss, Hessian-Frobenius and SHV\n")
+    test_every_prox_matches_its_loss()
     test_matches_spitfire()
     test_frobenius_is_the_standard_definition()
     test_adjoint_is_exact()
@@ -207,7 +235,7 @@ def main():
     test_prox_minimises()
     test_prox_leaves_linear_images_alone()
     test_gradients_are_finite()
-    print("\nThe Hessian regularizations match their definitions.")
+    print("\nThe regularizations match their definitions.")
 
 
 if __name__ == "__main__":

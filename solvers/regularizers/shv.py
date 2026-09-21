@@ -38,7 +38,7 @@ class SHVRegularization(Regularization):
     def loss(self, f, diff_ops):
         return _hessian.norm_map(f, _delta(diff_ops), weight=self.rho).mean()
 
-    def prox(self, f, lambda_reg, diff_ops, **kwargs):
+    def prox_sum(self, f, lambda_reg, diff_ops, **kwargs):
         """Proximal operator of lambda_reg * R(f), by projected dual iterations."""
         return _hessian.prox(f, lambda_reg, _delta(diff_ops), weight=self.rho,
                              n_iter=self.n_iter)

@@ -14,6 +14,6 @@ class L2Regularization(Regularization):
     def loss(self, f, diff_ops):
         return f.square().mean()
 
-    def prox(self, f, lambda_reg, diff_ops, **kwargs):
+    def prox_sum(self, f, lambda_reg, diff_ops, **kwargs):
         """Proximal of L2 norm: shrinkage."""
         return f / (1 + 2 * lambda_reg)
