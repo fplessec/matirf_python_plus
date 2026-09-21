@@ -48,6 +48,23 @@ from core.features import NO_FEATURES, supports
 from solvers.fidelities import NOISE_MODEL_NAMES
 
 
+def ridge_weight(objective, value) -> float:
+    """
+    The ridge weight lambda_rr as a number; unset or "auto" means the operator's largest
+    singular value s1 = sqrt(||H^T H||), from a power iteration — available for any operator.
+
+    (H^T H + lambda I)^-1 H^T keeps the singular directions with s^2 >> lambda and cuts the
+    others. On MA-TIRF only 2-3 directions per depth column are determined by the data
+    (singular values 39, 6.0, 0.56, 0.03, ... for 13 angles over 50 planes): any lambda
+    between s2 and s1 keeps the determined ones and cuts the noise-dominated rest; below s3
+    the inverse amplifies noise, far above s1 (the old 1e4) it barely acts.
+    """
+    if value in (None, "", "auto", "None", "null"):
+        like = objective.operator.adjoint(objective.g)
+        return float(objective.operator.lipschitz(like)) ** 0.5
+    return float(value)
+
+
 class Solver(ABC):
     """
     Base class for reconstruction algorithms.
@@ -208,7 +225,7 @@ class Solver(ABC):
         strategy = params.get("init", "adjoint")
         operator, g = objective.operator, objective.g
         if strategy == "ridge":
-            return operator.ridge_inverse(g, params.get("lambda_rr", 1e4)).detach()
+            return operator.ridge_inverse(g, ridge_weight(objective, params.get("lambda_rr", 1e4))).detach()
         if strategy == "adjoint":
             return operator.adjoint(g).detach().clone()
         raise ValueError(f"Unknown init strategy {strategy!r}; expected 'adjoint' or 'ridge'.")

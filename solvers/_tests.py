@@ -232,7 +232,7 @@ def test_every_solver_on_both_physics():
         "ADMM": {"iter": 30, "mu": 0.1, "threshold_ratio": 0.0},
         "PNP": {"iter": 8, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
         "ADMM-PnP": {"iter": 20, "rho": 0.1, "sigma": 5.0, "denoiser": "None"},
-        "MCMC": {"max_iter": 60, "beta": 1e-3, "sigma": 0.01, "K": 30, "lambda_rr": 1e-3},
+        "MCMC": {"max_iter": 60, "sigma": 0.03, "K": 30},
     }
 
     problems = {
@@ -436,6 +436,33 @@ def test_adam_and_ppxa_minimize_the_same_objective():
           f"images {distance:.1e} apart)")
 
 
+def test_mcmc_is_robust_to_its_temperature():
+    """
+    What the MCMC study established, frozen: beta is calibrated, so the relative temperature
+    no longer decides whether the chain works; lambda_rr defaults to s1; the meaningless
+    `proposal_method` switch is gone.
+    """
+    from solvers.base import ridge_weight
+    op = _random_matrix_operator(40, 30, seed=11)
+    f_true = torch.rand(30, dtype=DTYPE)
+    objective = Objective(op, op.apply(f_true) + 0.01 * torch.randn(40, dtype=DTYPE), _Gaussian())
+    assert abs(ridge_weight(objective, None) - float(torch.linalg.svdvals(op.H)[0])) < 1e-3 * \
+        float(torch.linalg.svdvals(op.H)[0]), "automatic lambda_rr = the largest singular value"
+
+    rates = []
+    for temperature in (0.3, 1.0, 10.0):
+        mcmc, log = Mcmc(), []
+        mcmc.on_message = log.append
+        mcmc.solve(objective, op.adjoint(objective.g),
+                   {"max_iter": 100, "sigma": 0.03, "temperature": temperature, "K": 100})
+        line = next(l for l in log if l.startswith("Accepted"))
+        rates.append(float(line.split("(")[1].split("%")[0]))
+    assert min(rates) > 50, f"a calibrated chain must move at any sensible temperature: {rates}"
+    assert "proposal_method" not in Mcmc.ui_params
+    print(f"  mcmc            acceptance {min(rates):.0f}-{max(rates):.0f}% for temperatures "
+          f"0.3-10; lambda_rr auto = s1; no proposal switch")
+
+
 def main():
     print("solvers — contract tests\n")
     test_registry()
@@ -448,6 +475,7 @@ def main():
     test_threading_and_interruption()
     test_fidelities_are_scaled_likelihoods()
     test_adam_and_ppxa_minimize_the_same_objective()
+    test_mcmc_is_robust_to_its_temperature()
     print("\nAll solver contracts hold.")
 
 

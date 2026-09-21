@@ -241,7 +241,7 @@ def test_every_solver_through_the_pipeline():
         "ADMM": {"iter": 8, "mu": 0.05, "threshold_ratio": 0.0},
         "PNP": {"iter": 4, "sigma": 5.0, "denoiser": "None"},
         "ADMM-PnP": {"iter": 8, "rho": 0.05, "sigma": 5.0, "denoiser": "None"},
-        "MCMC": {"max_iter": 20, "beta": 1e-4, "sigma": 0.005, "K": 20, "lambda_rr": 0.05},
+        "MCMC": {"max_iter": 20, "sigma": 0.03, "K": 20},
     }
     for name, params in budgets.items():
         config = _deconv_config(algorithm=name)
