@@ -198,7 +198,8 @@ back-projection).
 **Prediction:** (i) with a strong enough prior and enough iterations, all starts converge to
 the same image; (ii) with Adam's budget, `adjoint` fails on MA-TIRF whatever the prior;
 (iii) `ridge` with $\lambda_{rr} \in [s_2, s_1]$ converges fastest. Recommendation: `ridge`,
-fixed — and a scale-free alternative would be to rescale any start to match $\lVert gVert$
+fixed — and a scale-free alternative would be to rescale any start to match $\lVert g
+Vert$
 (a proposal, not a change). For PPXA the start matters far less: its data prox rescales
 toward the data within a few iterations.
 
@@ -254,10 +255,13 @@ the same rule predicts $\gamma \sim 1$.
 
 #### `lambda_relax` — relaxation *(keep fixed)*
 
-Theory: $(0, 2)$; $> 1$ over-relaxes (faster when proxes are exact), $\to 2$ is the stability
-edge. The code halves it whenever the loss rises — a v1 heuristic that, with inexact proxes
-(which make the loss wobble), can drive it towards 0 and freeze the iteration.
-**Recommendation: 1.0–1.5, fixed** (the default 1.9 is risky with non-smooth priors).
+Theory: any constant in $(0, 2)$ converges; $> 1$ over-relaxes (faster when the proxes are
+exact), $\to 2$ is the stability edge. **The relaxation is now fixed** (default 1.5; v1 halved
+it whenever the loss rose — see `solvers/ppxa.py` for why that was dropped: a geometric decay
+breaks the convergence condition $\sum \rho_n(2-\rho_n) = \infty$, and PPXA's loss is not
+monotone, so the halving fired on normal transients). *(measured, 1500 iterations)*: fixed
+1.5 never let the loss rise and ended within 1–2 % of the best $L$; fixed 1.9 reached the
+same $L$ but could oscillate; the halving ended up to 7 % higher. **Recommendation: 1.0–1.5.**
 
 #### `init`, `lambda_rr`, `max_iter`, `K`, `EPS`
 
@@ -287,7 +291,7 @@ step size is wrong.
 |---|---|---|---|
 | shared | `reg`, `lambda_reg`, `rho` (SHV) | `delta` (estimated), noise model (L2) | — |
 | Adam | — (`lr` only if too small) | `init = ridge`, `lr` $\in [\max f_0, 10\max f_0]$ | `max_iter`, `K`, `EPS` |
-| PPXA | `gamma` (speed, and correctness with non-smooth priors) | `lambda_relax` $\in [1, 1.5]$, `init = ridge` | `max_iter`, `K`, `EPS` |
+| PPXA | `gamma` (speed, and correctness with non-smooth priors) | `lambda_relax` fixed $\in [1, 1.5]$, `init = ridge` | `max_iter`, `K`, `EPS` |
 
 For a user, Adam and PPXA therefore come down to **three decisions: which prior, how much,
 and (SHV) how sparse** — everything else follows from the data or can be left at its rule.
@@ -303,7 +307,7 @@ and (SHV) how sparse** — everything else follows from the data or can be left 
 | H3 | Adam: same result for `lr` $\in [\max f_0, 10\max f_0]$, failure below $0.1\max f_0$ | `lr` sweep |
 | H4 | Adam from `adjoint` fails within budget on MA-TIRF; `ridge` in $[s_2, s_1]$ converges fastest; with a strong prior and a long run, all starts agree | init × $\lambda$ × iterations |
 | H5 | PPXA: $\gamma \in [1/s_1^2, 1/s_2^2]$; failure far outside | $\gamma$ sweep, MA-TIRF and deconvolution |
-| H6 | `lambda_relax` $\in [1, 1.5]$ is as good as 1.9 and safer | relaxation sweep, TV/SHV |
+| H6 | a fixed `lambda_relax` $\in [1, 1.5]$ is as good as 1.9 and safer *(partly shown, see §3.2)* | relaxation sweep, TV/SHV |
 | H7 | Adam = PPXA (image) when H5 holds and the prior weighs | paired runs, angle between images |
 | H8 | SHV: $\rho \approx 0.3$–0.6 for sparse truths, $\to 1$ for the membrane | $\rho$ sweep per truth |
 | H9 | SHV / TV / L1 beat L2 / Tikhonov on these truths | comparison at each prior's best $\lambda$ |
