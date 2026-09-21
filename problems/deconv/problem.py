@@ -13,19 +13,16 @@ from core import InverseProblem
 from problems.deconv import (  # paths defined before this module is imported
     DECONV_CONFIG_PATH, DEFAULT_DECONV_CONFIG, DECONV_RESULTS_DIR, DECONV_MEASUREMENTS_DIR,
 )
-from core.noise import add_noise_to_measurement
+from core import noise
 from fileio import load_png, save_png
 from .operator import DeconvOperator
 from .ui import DECONV_UI
 
 
 def _add_configured_noise(g: torch.Tensor, config: dict) -> torch.Tensor:
-    """Apply the noise the user asked for, if any. `.get` throughout: the section may be
-    empty right after a cache reset, which means no noise rather than a crash."""
-    add_noise = config.get("add-noise", {})
-    if add_noise.get("add_noise", False):
-        return add_noise_to_measurement(g, add_noise)
-    return g
+    """Apply the noise the user asked for, if any. The section may be empty right after a
+    cache reset, which means no noise rather than a crash (see core/noise.py)."""
+    return noise.add_noise_to_measurement(g, config.get("add-noise", {}))
 
 
 def load_measurement(config: dict) -> torch.Tensor:
@@ -58,8 +55,7 @@ def validate(config: dict) -> list:
         errors.append("Input file (PNG): not provided")
     if paths.get("json", "None") == "None":
         errors.append("PSF parameters file (JSON): not provided")
-    if add_noise.get("add_noise", False) and add_noise.get("sigma", "None") == "None":
-        errors.append("Noise sigma: required when 'add noise' is enabled")
+    errors.extend(noise.validate(add_noise))
     return errors
 
 

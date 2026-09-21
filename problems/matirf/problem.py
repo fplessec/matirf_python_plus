@@ -16,7 +16,7 @@ from core import InverseProblem
 from problems.matirf import (  # paths defined before this module is imported
     MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG, MATIRF_RESULTS_DIR, MATIRF_MEASUREMENTS_DIR,
 )
-from core.noise import add_noise_to_measurement
+from core import noise
 from fileio import load_tif, save_tif, load_json
 import problems.matirf.settings as matirf_settings
 from .operator import MatirfOperator
@@ -87,9 +87,7 @@ def preprocess(g: torch.Tensor, measurement_params: dict, config: dict):
     """Background removal, normalization, then the optional simulated noise."""
     g, measurement_params = split_background(g, measurement_params)
     g = normalize_measurement(g)
-    add_noise = config.get("add-noise", {})
-    if add_noise.get("add_noise", False):
-        g = add_noise_to_measurement(g, add_noise)
+    g = noise.add_noise_to_measurement(g, config.get("add-noise", {}))   # no-op if disabled
     return g, measurement_params
 
 
@@ -131,10 +129,7 @@ def simulate(operator, f_true: torch.Tensor, config: dict) -> torch.Tensor:
     """SYNTHETIC mode: g = H f_true, then the same preprocessing a real measurement gets."""
     g = operator.apply(f_true)
     g = normalize_measurement(g)
-    add_noise = config.get("add-noise", {})
-    if add_noise.get("add_noise", False):
-        g = add_noise_to_measurement(g, add_noise)
-    return g
+    return noise.add_noise_to_measurement(g, config.get("add-noise", {}))
 
 
 def build_operator(config: dict) -> MatirfOperator:
@@ -182,8 +177,7 @@ def validate(config: dict) -> list:
     ## truthiness test would report every "no, do not normalize" as a missing setting.
     if oper.get("normalize", "None") in (None, "None", "null"):
         errors.append("Operator parameter 'normalize' (normalize the operator): not set")
-    if add_noise.get("add_noise", False) and add_noise.get("sigma", "None") == "None":
-        errors.append("Noise sigma: required when 'add noise' is enabled")
+    errors.extend(noise.validate(add_noise))
     return errors
 
 

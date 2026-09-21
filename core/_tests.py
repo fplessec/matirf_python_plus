@@ -283,6 +283,76 @@ def test_end_to_end():
     print(f"  end-to-end      solver recovered f_true (relative error {error:.1e})")
 
 
+def test_noise():
+    """
+    The Poisson-Gaussian noise model: its STATISTICS, not just that it runs.
+
+    Checked on large constant images, where the theory gives exact targets:
+        read noise      variance = sigma^2, whatever the signal
+        photon noise    variance = signal * scale / N   (it GROWS with the signal)
+        both            the two variances add
+    """
+    from core import noise
+
+    n = 200_000
+    flat = lambda level: torch.full((n,), level, dtype=DTYPE)
+
+    # everything off -> the measurement is returned untouched (no `if` needed by callers)
+    g = torch.rand(100, dtype=DTYPE)
+    assert noise.add_noise_to_measurement(g, {}) is g
+    assert not noise.noise_model({"poisson_noise": False, "gaussian_noise": False}).enabled
+
+    # 100% Gaussian: variance sigma^2, independent of the level
+    sigma = 0.05
+    for level in (0.2, 0.9):
+        out = noise.add_noise_to_measurement(flat(level), {"gaussian_noise": True, "sigma": sigma})
+        assert abs(float(out.mean()) - level) < 1e-3
+        assert abs(float(out.var()) / sigma ** 2 - 1) < 0.02
+
+    # 100% Poisson: variance proportional to the signal (scale = max = 1 here)
+    photons = 50.0
+    signal = torch.cat([flat(0.25), flat(1.0)])
+    out = noise.add_noise_to_measurement(signal, {"poisson_noise": True, "photons": photons})
+    dim, bright = out[:n], out[n:]
+    assert abs(float(bright.mean()) - 1.0) < 1e-2, "photon noise must be unbiased"
+    assert abs(float(dim.var()) / (0.25 / photons) - 1) < 0.03
+    assert abs(float(bright.var()) / (1.0 / photons) - 1) < 0.03
+    ## the defining property: brighter is noisier in absolute terms, cleaner in relative terms
+    assert float(bright.var()) > float(dim.var())
+    assert float(bright.std() / bright.mean()) < float(dim.std() / dim.mean())
+
+    # Poisson-Gaussian: the two variances add
+    both = noise.add_noise_to_measurement(
+        signal, {"poisson_noise": True, "photons": photons, "gaussian_noise": True, "sigma": sigma})
+    assert abs(float(both[n:].var()) / (1.0 / photons + sigma ** 2) - 1) < 0.03
+
+    # the v1 failure: Poisson on a [0, 1] image without a photon count was binary speckle.
+    # With a photon count, the noisy image stays a faithful, graded version of the signal.
+    assert float(out.unique().numel()) > 20, "photon noise must not collapse to 0/1 values"
+
+    # reproducibility: same seed, same draw; another seed, another draw
+    config = {"gaussian_noise": True, "sigma": 0.1, "seed": 3}
+    a = noise.add_noise_to_measurement(g, config)
+    b = noise.add_noise_to_measurement(g, config)
+    c = noise.add_noise_to_measurement(g, {**config, "seed": 4})
+    assert torch.equal(a, b) and not torch.equal(a, c)
+
+    # a v1 config keeps working, and gives the Gaussian noise v1 actually produced
+    legacy = noise.noise_model({"add_noise": True, "is_gaussian": False, "sigma": 0.02})
+    assert legacy.sigma == 0.02 and legacy.photons is None
+    assert not noise.noise_model({"add_noise": False, "sigma": 0.02}).enabled
+
+    # validation: one readable message per unusable setting
+    assert noise.validate({}) == []
+    assert noise.validate({"gaussian_noise": True, "sigma": "None"}) == [
+        "Read noise: sigma is required when it is enabled"]
+    assert noise.validate({"poisson_noise": True, "photons": 0}) == [
+        "Photon noise: the photon count must be positive (got 0)"]
+    assert noise.validate({"poisson_noise": True}) == [
+        "Photon noise: the photon count is required when it is enabled"]
+    print("  noise           Gaussian var = sigma^2, Poisson var = signal/N, they add, seeded")
+
+
 def main():
     print("core — contract tests\n")
     test_features()
@@ -290,6 +360,7 @@ def main():
     test_objective()
     test_problem()
     test_end_to_end()
+    test_noise()
     print("\nAll core contracts hold.")
 
 

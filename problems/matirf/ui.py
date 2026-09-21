@@ -42,10 +42,9 @@ def _preview(config, mode):
 
 def _preview_errors(config):
     """Readable reasons the preview could not be computed, shown instead of a traceback."""
-    add_noise, oper = config.get("add-noise", {}), config.get("oper-params", {})
-    messages = []
-    if add_noise.get("add_noise", False) and add_noise.get("sigma", "None") == "None":
-        messages.append("Noise standard deviation is None, please define a value.")
+    from core import noise
+    oper = config.get("oper-params", {})
+    messages = list(noise.validate(config.get("add-noise", {})))
     for key, label in (("nz", "Number of cuts on z"), ("z0", "Smallest depth"),
                        ("zN", "Largest depth")):
         if oper.get(key, "None") == "None":

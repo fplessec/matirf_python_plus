@@ -32,10 +32,8 @@ def _preview(config, mode):
 
 
 def _preview_errors(config):
-    add_noise = config.get("add-noise", {})
-    if add_noise.get("add_noise", False) and add_noise.get("sigma", "None") == "None":
-        return ["Noise standard deviation is None, please define a value."]
-    return []
+    from core import noise
+    return noise.validate(config.get("add-noise", {}))
 
 
 # ── the Estimate button ───────────────────────────────────────────────────────

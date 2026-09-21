@@ -132,7 +132,7 @@ def test_problem_declaration():
     assert not real.has_truth and real.f_true is None
 
     noisy = DECONV.prepare(_config(DataMode.SYNTHETIC,
-                                   {"add_noise": True, "sigma": 0.05, "is_gaussian": True}))
+                                   {"gaussian_noise": True, "sigma": 0.05}))
     clean = DECONV.prepare(_config(DataMode.SYNTHETIC))
     assert (noisy.g - clean.g).abs().mean() > 1e-3, "the configured noise must be applied"
     print("  declaration     validation, both modes, noise applied when configured")
@@ -213,7 +213,7 @@ def test_wiener_and_the_regularization_tradeoff():
 
     # ── the same image, now noisy ────────────────────────────────────────────
     noisy = DECONV.prepare(_config(DataMode.SYNTHETIC,
-                                   {"add_noise": True, "sigma": 0.01, "is_gaussian": True}))
+                                   {"gaussian_noise": True, "sigma": 0.01}))
     gn = noisy.g
     noisy_small_lam = error(operator.ridge_inverse(gn, 1e-5), f_true)
     noisy_large_lam = error(operator.ridge_inverse(gn, 1e-2), f_true)

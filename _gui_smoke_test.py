@@ -378,23 +378,44 @@ check("C2  la case « normalize » écrit les deux états", c2)
 
 
 def c3():
-    """La case « add noise » et sa valeur sigma font l'aller-retour vers le TOML.
+    """
+    La section de bruit : deux interrupteurs indépendants, et leurs paramètres qui
+    n'apparaissent que lorsqu'ils servent (depends_on).
 
-    Note : sigma ne déclare PAS de depends_on, il reste donc visible même sans bruit.
-    C'est le comportement actuel, pas un oubli du test — la visibilité conditionnelle
-    est vérifiée en C4, sur un paramètre qui la déclare réellement.
+    photon seul -> Poisson pur, lecture seule -> gaussien pur, les deux -> Poisson-gaussien.
     """
     section = cw.add_noise
-    box = section.parameter_widgets["add_noise"].checkbox
-    box.setChecked(True); app.processEvents()
-    type_in(section.parameter_widgets["sigma"], 0.02)
+    widgets = section.parameter_widgets
+    poisson, gaussian = widgets["poisson_noise"].checkbox, widgets["gaussian_noise"].checkbox
+
+    for box in (poisson, gaussian):
+        box.setChecked(False); app.processEvents()
+    assert widgets["photons"].isHidden() and widgets["sigma"].isHidden(), \
+        "les paramètres d'un bruit désactivé doivent être masqués"
+
+    poisson.setChecked(True); app.processEvents()
+    assert not widgets["photons"].isHidden() and widgets["sigma"].isHidden()
+    type_in(widgets["photons"], 250)
+    gaussian.setChecked(True); app.processEvents()
+    assert not widgets["sigma"].isHidden()
+    type_in(widgets["sigma"], 0.02)
+    type_in(widgets["seed"], 7)
+
     written = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["add-noise"]
-    assert written["add_noise"] is True and abs(written["sigma"] - 0.02) < 1e-9, written
-    box.setChecked(False); app.processEvents()
-    assert load_or_create_toml(MATIRF_CONFIG_PATH,
-                               DEFAULT_MATIRF_CONFIG)["add-noise"]["add_noise"] is False
-    return "case et sigma écrits puis relus (sigma n'a pas de depends_on)"
-check("C3  depends_on : un paramètre apparaît selon un autre", c3)
+    assert written["poisson_noise"] is True and written["gaussian_noise"] is True, written
+    assert written["photons"] == 250 and abs(written["sigma"] - 0.02) < 1e-9, written
+    assert written["seed"] == 7
+
+    from core.noise import noise_model
+    model = noise_model(written)
+    assert model.photons == 250 and model.sigma == 0.02 and model.seed == 7
+
+    for box in (poisson, gaussian):
+        box.setChecked(False); app.processEvents()
+    assert not noise_model(load_or_create_toml(MATIRF_CONFIG_PATH,
+                                               DEFAULT_MATIRF_CONFIG)["add-noise"]).enabled
+    return "Poisson + gaussien réglés par clic ; paramètres masqués quand inutiles"
+check("C3  section de bruit : Poisson, gaussien, masquage des paramètres", c3)
 
 
 def c4():

@@ -93,7 +93,7 @@ DUMMY_DEFAULT_CONFIG = {
     'algorithm': 'None',
     'algo-params': {},
     'demo-section': {'count': 2, 'size': 100.0, 'kind': 'A'},
-    'add-noise': {'add_noise': False, 'is_gaussian': True, 'sigma': 'null'},
+    'add-noise': {'poisson_noise': False, 'gaussian_noise': False},
     'input-paths': {'mode': DataMode.REAL.value},
 }
 

@@ -181,8 +181,10 @@ def test_problem_declaration():
     assert any("normalize" in e for e in empty)
     ticked = {**_config(), "oper-params": {**_config()["oper-params"], "normalize": False}}
     assert not any("normalize" in e for e in MATIRF.validate(ticked))
-    noisy = MATIRF.validate({**_config(), "add-noise": {"add_noise": True, "sigma": "None"}})
-    assert noisy == ["Noise sigma: required when 'add noise' is enabled"]
+    noisy = MATIRF.validate({**_config(), "add-noise": {"gaussian_noise": True, "sigma": "None"}})
+    assert noisy == ["Read noise: sigma is required when it is enabled"], noisy
+    photons = MATIRF.validate({**_config(), "add-noise": {"poisson_noise": True, "photons": "None"}})
+    assert photons == ["Photon noise: the photon count is required when it is enabled"], photons
     print("  declaration     features, validation survives an empty config")
 
 
