@@ -96,23 +96,84 @@ def load_measurement(config: dict):
     return g, _refined_config(config, measurement_params)
 
 
+def _reconstruction_planes(truth_planes: int, configured) -> int:
+    """
+    How many planes to reconstruct a truth of `truth_planes` planes on.
+
+    The configured `nz` when it divides the truth's planes — the truth is then finer than
+    the reconstruction, the measurement is simulated from the fine truth, and there is no
+    inverse crime (see problems/matirf/synthetic/grid.py). Otherwise the truth's own count:
+    simulating requires an H whose columns match the planes actually in the file.
+    """
+    try:
+        nz = int(configured)
+    except (TypeError, ValueError):
+        return truth_planes
+    return nz if 0 < nz <= truth_planes and truth_planes % nz == 0 else truth_planes
+
+
 def load_truth(config: dict):
     """
-    SYNTHETIC mode: read the known object f_true.
+    SYNTHETIC mode: read the known object f_true, on the reconstruction's planes.
 
-    The truth's own depth count wins over the configured `nz`: simulating requires an H
-    whose columns match the slices actually present in the file, whatever the user typed.
+    A truth finer than the reconstruction (synthetic truths are generated so, see
+    `_reconstruction_planes`) is averaged down to it — exact, since each voxel is the mean
+    density over its volume — and the fine version is left for `simulate`.
     """
-    f_true = load_tif(config["input-paths"]["tif"])
+    from .synthetic.generator import downsample_z
+    f_fine = load_tif(config["input-paths"]["tif"])
+    planes = f_fine.shape[0]
+    nz = _reconstruction_planes(planes, config.get("oper-params", {}).get("nz"))
     measurement_params = load_json(config["input-paths"]["json"])
     refined = _refined_config(config, measurement_params)
-    refined["oper-params"] = {**config.get("oper-params", {}), "nz": f_true.shape[0]}
-    return f_true, refined
+    refined["oper-params"] = {**config.get("oper-params", {}), "nz": nz}
+    if nz != planes:
+        refined["_simulation"] = {"planes": planes}
+    return downsample_z(f_fine, planes // nz), refined
 
 
 def simulate(operator, f_true: torch.Tensor, config: dict) -> torch.Tensor:
-    """SYNTHETIC mode: g = H f_true, then the same normalization and noise a real one gets."""
-    return normalize_and_add_noise(operator.apply(f_true), config)
+    """
+    SYNTHETIC mode: g = H f_true, then the same normalization and noise a real one gets.
+
+    When the truth file is finer than the reconstruction, g is computed from the FINE truth
+    with an operator on its planes — the measurement a microscope would give of the finer
+    object — so the reconstruction never inverts the discretization that produced its data.
+    """
+    fine = config.get("_simulation")
+    if fine:
+        fine_config = {**config, "oper-params": {**config["oper-params"], "nz": fine["planes"]}}
+        g = build_operator(fine_config).apply(load_tif(config["input-paths"]["tif"]))
+    else:
+        g = operator.apply(f_true)
+    return normalize_and_add_noise(g, config)
+
+
+def truth_geometry_errors(config: dict) -> list:
+    """
+    A synthetic truth records the depth range it was generated in (<name>.truth.json):
+    reconstructing it on another range would silently misplace every object in depth.
+    """
+    from .synthetic.generator import read_record
+    paths, oper = config.get("input-paths", {}), config.get("oper-params", {})
+    if paths.get("mode") != "synthetic-data" or paths.get("tif", "None") in (None, "None"):
+        return []
+    try:
+        record = read_record(paths["tif"])
+    except (OSError, ValueError):
+        return []
+    if not record or "geometry" not in record:
+        return []
+    geometry, errors = record["geometry"], []
+    for key, label in (("z0", "z0_nm"), ("zN", "zN_nm")):
+        try:
+            if abs(float(oper.get(key)) - float(geometry[label])) > 1e-6:
+                errors.append(f"Operator parameter '{key}' = {oper.get(key)} nm, but the truth "
+                              f"was generated with {key} = {geometry[label]:g} nm (see its "
+                              f".truth.json): set the same depth range")
+        except (TypeError, ValueError):
+            pass
+    return errors
 
 
 def build_operator(config: dict) -> MatirfOperator:
@@ -162,6 +223,7 @@ def validate(config: dict) -> list:
         errors.append("Operator parameter 'normalize' (normalize the operator): not set")
     errors.extend(noise.validate(add_noise))
     errors.extend(normalization.validate(config.get("input-paths", {}).get("normalization")))
+    errors.extend(truth_geometry_errors(config))
     return errors
 
 

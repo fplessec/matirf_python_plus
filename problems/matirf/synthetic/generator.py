@@ -1,96 +1,136 @@
 """
-Generation: two TOML configs -> continuous objects -> anisotropic voxels -> f_true.
+From a scene to a ground truth: draw the objects, integrate them on the grid, save.
 
-    1. Build the continuous objects from the ground-truth config: for each object type
-       in the registry, its '[section]' provides a 'count' and characteristic params; a
-       single seeded torch.Generator draws every instance (reproducible).
-    2. INTEGRATE the summed density onto the anisotropic grid by midpoint quadrature —
-       each voxel is the average over 'ssxy × ssxy × ssz' sub-samples of its physical
-       extent. This separates the true object from its discretization.
-    3. Normalize to [0, 1].
+    generate(scene) -> f_true                  (planes, ny, nx) tensor in [0, 1]
+    save_truth(f_true, path, scene)            the TIF, plus its record <name>.truth.json
+    read_record(tif_path) -> dict | None       that record, if the TIF has one
+    regenerate(tif_path) -> f_true             the truth again, from its record alone
+    downsample_z(f, factor)                    a fine truth averaged to coarser planes
 
-Noise is NOT added here: g = H·f_true and its noise are produced by the reconstruction
-pipeline via the '[add-noise]' section of the MA-TIRF config.
+The steps of `generate`:
+    1. one seeded generator draws every object, kind after kind in the fixed order of
+       OBJECTS: the same scene always gives the same objects
+    2. each voxel becomes the MEAN of the summed density over its volume (midpoint
+       quadrature on sub-samples ~`fine_step_nm` apart). The truth is thereby an average,
+       which is what makes averaging planes (downsample_z) exact, and it separates the
+       continuous object from its discretization. An object is evaluated only inside its
+       bounding box, and only on the planes its box reaches
+    3. normalized to [0, 1]
 
-Output: a (nz, ny, nx) torch tensor in [0, 1], ready to be saved as a TIF and used by
-the existing synthetic mode.
+No noise here: g = H f_true and its noise are the reconstruction pipeline's business
+('[add-noise]'), so one truth serves every noise level.
+
+The record (<name>.truth.json) makes a TIF self-describing: its geometry — which the
+MA-TIRF problem checks and uses (the depth range it lives in, the number of planes to
+reconstruct) — and the complete scene, from which it is reproduced bit for bit.
 """
+
+import json
+from pathlib import Path
 
 import torch
 
 import settings as settings
 from fileio import save_tif
-from .grid import Grid
-from .objects import OBJECT_TYPES
-from .config import (
-    load_grid_config, load_gt_config, GRID_TOML_KEY, SAMPLING_TOML_KEY,
-)
+from .grid import Grid, GRID_TOML_KEY
+from .objects import OBJECTS
+from .scene import complete, SAMPLING_TOML_KEY
+
+RECORD_FORMAT = "matirf-synthetic-truth/2"
 
 
-def build_objects(gt_config: dict, grid: Grid, seed: int) -> list:
-    """Instantiates every object of every type from the ground-truth config (reproducible)."""
-    gen = torch.Generator().manual_seed(int(seed))
+def build_objects(scene: dict, grid: Grid) -> list:
+    """Every object of the scene, drawn from its seed (reproducible)."""
+    generator = torch.Generator().manual_seed(int(scene[SAMPLING_TOML_KEY]["seed"]))
     objects = []
-    for key, cls in OBJECT_TYPES.items():  # fixed order -> reproducible RNG consumption
-        params = gt_config.get(key, {})
-        objects += cls.build(params, gen, grid)
+    for key, cls in OBJECTS.items():              # fixed order: fixed RNG consumption
+        objects += cls.build(scene.get(key, {}), generator, grid)
     return objects
 
 
-def integrate_objects(objects: list, grid: Grid,
-                      fine_step_nm: float = 25.0, supersample_cap: int = 8) -> torch.Tensor:
-    """
-    Integrates a list of continuous objects onto the anisotropic 'grid' by midpoint
-    quadrature, returning a (nz, ny, nx) tensor. Memory is bounded by processing one
-    axial voxel at a time.
-    """
-    ssxy, ssz = grid.subvoxel_factors(fine_step_nm, cap=supersample_cap)
-    xf, yf = grid.fine_lateral_axes(ssxy)
-    Yf, Xf = torch.meshgrid(yf, xf, indexing='ij')  # (ny·ssxy, nx·ssxy)
+def integrate(objects: list, grid: Grid, step_nm: float) -> torch.Tensor:
+    """The voxel means of the summed densities, on the truth grid (planes, ny, nx)."""
+    ss_xy, ss_z = grid.subvoxel_factors(step_nm)
+    xf, yf = grid.fine_lateral_axes(ss_xy)
+
+    ## each object's lateral window on the fine grid, built once for the whole volume
+    windows = []
+    for obj in objects:
+        x0, x1, y0, y1, z0, z1 = obj.bounds()
+        ix = slice(int(torch.searchsorted(xf, x0)), int(torch.searchsorted(xf, x1, right=True)))
+        iy = slice(int(torch.searchsorted(yf, y0)), int(torch.searchsorted(yf, y1, right=True)))
+        if ix.start < ix.stop and iy.start < iy.stop:
+            Y, X = torch.meshgrid(yf[iy], xf[ix], indexing="ij")
+            windows.append((obj, iy, ix, Y, X, z0, z1))
 
     f = torch.zeros(grid.shape, device=settings.device, dtype=settings.dtype)
-    for k in range(grid.nz):
-        z_subs = grid.fine_axial_slab(k, ssz)
-        acc = torch.zeros((ssz, *Xf.shape), device=settings.device, dtype=settings.dtype)
-        for p, zc in enumerate(z_subs):
-            Z = torch.full_like(Xf, float(zc))
-            plane = torch.zeros_like(Xf)
-            for obj in objects:
-                plane = plane + obj.density(Xf, Yf, Z)
-            acc[p] = plane
-        f[k] = acc.reshape(ssz, grid.ny, ssxy, grid.nx, ssxy).mean(dim=(0, 2, 4))
+    for k in range(grid.planes):
+        depths = grid.fine_axial_slab(k, ss_z)
+        low, high = grid.z0_nm + k * grid.dz_nm, grid.z0_nm + (k + 1) * grid.dz_nm
+        plane = torch.zeros((ss_z, yf.numel(), xf.numel()), device=settings.device,
+                            dtype=settings.dtype)
+        for obj, iy, ix, Y, X, z0, z1 in windows:
+            if z1 < low or z0 > high:
+                continue
+            for p, depth in enumerate(depths):
+                plane[p, iy, ix] += obj.density(X, Y, torch.full_like(X, float(depth)))
+        f[k] = plane.reshape(ss_z, grid.ny, ss_xy, grid.nx, ss_xy).mean(dim=(0, 2, 4))
     return f
 
 
-def normalize_01(f: torch.Tensor) -> torch.Tensor:
-    """Normalizes a non-negative tensor to [0, 1] (zeros if it is all zero)."""
-    fmax = torch.max(f)
-    if fmax <= 0:
-        return torch.zeros_like(f)
-    return f / fmax
+def generate(scene: dict) -> torch.Tensor:
+    """The ground truth of a scene, (planes, ny, nx) in [0, 1] — deterministic."""
+    scene = complete(scene)
+    grid = Grid.from_params(scene[GRID_TOML_KEY])
+    f = integrate(build_objects(scene, grid), grid,
+                  float(scene[GRID_TOML_KEY].get("fine_step_nm", 25.0)))
+    peak = f.max()
+    return f / peak if peak > 0 else f
 
 
-def generate_ground_truth(grid_config: dict, gt_config: dict) -> torch.Tensor:
-    """
-    Full generation from the two configs -> (nz, ny, nx) tensor in [0, 1], deterministic
-    given the seed in gt_config['sampling']['seed'].
-    """
-    grid_params = grid_config[GRID_TOML_KEY]
-    grid = Grid.from_params(grid_params)
-    seed = gt_config.get(SAMPLING_TOML_KEY, {}).get("seed", 0)
-    fine_step = float(grid_params.get("fine_step_nm", 25.0))
-    objects = build_objects(gt_config, grid, seed)
-    f = integrate_objects(objects, grid, fine_step_nm=fine_step)
-    return normalize_01(f)
+# ── saving a truth with its record ────────────────────────────────────────────
+
+def record_path(tif_path) -> Path:
+    return Path(tif_path).with_suffix(".truth.json")
 
 
-def generate_from_cache() -> torch.Tensor:
-    """Generates from the two cached TOML files (grid.toml + ground_truth.toml)."""
-    return generate_ground_truth(load_grid_config(), load_gt_config())
+def geometry(scene: dict) -> dict:
+    """What the MA-TIRF problem needs to know about a truth file."""
+    grid = Grid.from_params(complete(scene)[GRID_TOML_KEY])
+    return {"planes": grid.planes, "nz": grid.nz, "z_oversampling": grid.z_oversampling,
+            "z0_nm": grid.z0_nm, "zN_nm": grid.zN_nm, "dxy_nm": grid.dxy_nm,
+            "nx": grid.nx, "ny": grid.ny}
 
 
-def generate_and_save(grid_config: dict, gt_config: dict, filepath) -> torch.Tensor:
-    """Generates and saves the ground truth as a TIF (ZYX). Returns it."""
-    f_true = generate_ground_truth(grid_config, gt_config)
-    save_tif(f_true, filepath)
-    return f_true
+def save_truth(f_true: torch.Tensor, path, scene: dict) -> Path:
+    """The TIF at `path` and its record next to it. Returns the TIF path."""
+    path = Path(path)
+    if path.suffix.lower() not in (".tif", ".tiff"):
+        path = path.with_suffix(".TIF")
+    save_tif(f_true, str(path))
+    record = {"format": RECORD_FORMAT, "geometry": geometry(scene), "scene": complete(scene)}
+    record_path(path).write_text(json.dumps(record, indent=2, default=str))
+    return path
+
+
+def read_record(tif_path):
+    """The record saved with a truth TIF, or None for a TIF without one."""
+    path = record_path(tif_path)
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def regenerate(tif_path) -> torch.Tensor:
+    record = read_record(tif_path)
+    if record is None or "scene" not in record:
+        raise ValueError(f"{tif_path} has no scene record to regenerate it from")
+    return generate(record["scene"])
+
+
+def downsample_z(f: torch.Tensor, factor: int) -> torch.Tensor:
+    """Average consecutive groups of `factor` planes — exact for voxel means."""
+    if factor == 1:
+        return f
+    planes, ny, nx = f.shape
+    if planes % factor:
+        raise ValueError(f"{planes} planes cannot be grouped by {factor}")
+    return f.reshape(planes // factor, factor, ny, nx).mean(dim=1)

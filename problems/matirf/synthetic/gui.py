@@ -1,25 +1,21 @@
 """
-Synthetic Ground Truth Generator window.
+The ground-truth generator window — `matirf synth`.
 
-Built exactly like the control window: a column of QGroupBox sections, each a
-BaseSectionQGroup rendering a params_ui_dict of SimpleParameterWidgets bound to a TOML.
+    left    one section per part of the scene (cache/scene.toml): the grid, the seed, then
+            one per kind of object, whose parameters appear only when its count is > 0
+    right   the preview (the MA-TIRF display window's figures: depth map + profiles, or
+            image + histogram), and the actions:
 
-    Left column, driven by two TOML files:
-        > Grid          (grid.toml)          — how the truth is sampled / visualized
-        > Sampling      (ground_truth.toml)  — the master seed
-        > Ellipsoid / Filament / Membrane (ground_truth.toml)
-                        — one section per object type: 'count' + characteristic params
+                Generate / preview          draw the scene again from the current settings
+                Save truth…                 the TIF and its <name>.truth.json record
+                Use as MA-TIRF truth        the same, then points the MA-TIRF config at it
+                                            (synthetic mode, nz / z0 / zN from the grid)
+                Load scene… / Save scene…   a scene TOML — presets/ holds ready-made ones
 
-    Right column:
-        > preview via the MA-TIRF display window's FiguresSection (two switchable views:
-          DepthMap+Profiles / Image+Histogram 3D)
-        > actions: generate, save TIF, use as MA-TIRF synthetic truth, load/save configs
-
-Launch with 'matirf synth' or 'python -m problems.matirf.synthetic'.
+Every edit is written to the scene file at once, as in the control window.
 """
 
 import sys
-from functools import partial
 
 from PyQt5.QtWidgets import (
     QApplication, QStyleFactory, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
@@ -27,251 +23,170 @@ from PyQt5.QtWidgets import (
 )
 
 import settings as settings
-from fileio import load_or_create_toml, save_toml, save_tif
+from fileio import load_or_create_toml
 from gui.base.base_section_qgroup import BaseSectionQGroup
 from gui.file_dialog import open_file, save_file
-from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_RESULTS_DIR
-from problems.matirf.cache import update_cache as update_matirf_cache
 from gui.factory import figures_section_class
-from .objects import OBJECT_TYPES
-from .objects.base import gate_by_count
+from problems.matirf import MATIRF_MEASUREMENTS_DIR
+from problems.matirf.cache import update_cache as update_matirf_cache
 from .grid import GRID_UI, GRID_TOML_KEY
-from .config import (
-    GRID_CONFIG_PATH, GT_CONFIG_PATH, DEFAULT_GRID_CONFIG, DEFAULT_GT_CONFIG,
-    SAMPLING_UI, SAMPLING_TOML_KEY, load_grid_config, load_gt_config,
-    update_grid_cache, update_gt_cache,
+from .objects import OBJECTS, gate_by_count
+from .scene import (
+    SCENE_PATH, PRESETS_DIR, DEFAULT_SCENE, SAMPLING_UI, SAMPLING_TOML_KEY,
+    load_scene, save_scene, update_scene_cache,
 )
-from .generator import generate_ground_truth
+from .generator import generate, save_truth
 
 
 def _figures_section():
-    """The MA-TIRF figures section, built from the problem's ui declaration.
-
-    Imported lazily: this window is part of the matirf package, and the factory
-    reads the very declaration that package is still assembling at import time.
-    """
+    """The MA-TIRF figures section — imported late: the matirf package is still loading."""
     from problems.matirf import MATIRF
     return figures_section_class(MATIRF)
 
 
 class SyntheticTruthGeneratorWindow(QWidget):
-    """Interactive, TOML-driven designer for a reproducible MA-TIRF synthetic ground truth."""
+    """Edit a scene, preview its ground truth, save it for MA-TIRF."""
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MA-TIRF — Synthetic Ground Truth Generator")
-        self.f_true = None
-        self.figures = None
-        self._last_shape = None
-        # ensure both cache files exist with defaults before wiring widgets
-        load_grid_config()
-        load_gt_config()
-        # load functions (path -> dict) bound to each file's defaults
-        self._load_grid = partial(load_or_create_toml, default_config=DEFAULT_GRID_CONFIG)
-        self._load_gt = partial(load_or_create_toml, default_config=DEFAULT_GT_CONFIG)
-        self._sections = []   # list of (section, config_path) to refresh on load
+        self.f_true, self.figures, self._last_shape = None, None, None
+        load_scene()                                  # creates / completes the cache file
+        self._sections = []
         self._build_ui()
         self._generate()
 
-    # ── UI ────────────────────────────────────────────────────────────────
+    # ── layout ───────────────────────────────────────────────────────────────
 
     def _build_ui(self):
         root = QHBoxLayout(self)
 
-        # left: scrollable column of parameter sections
-        panel = QVBoxLayout()
-        panel.addWidget(self._section("Grid (visualization)", GRID_UI, GRID_TOML_KEY,
-                                      update_grid_cache, self._load_grid, GRID_CONFIG_PATH))
-        panel.addWidget(self._section("Sampling", SAMPLING_UI, SAMPLING_TOML_KEY,
-                                      update_gt_cache, self._load_gt, GT_CONFIG_PATH))
-        for key, cls in OBJECT_TYPES.items():
-            # gate_by_count -> the whole parameter set is shown only when count > 0
-            section = self._section(cls.name, gate_by_count(cls.ui_params), cls.toml_key,
-                                    update_gt_cache, self._load_gt, GT_CONFIG_PATH)
-            self._wire_count_prune(section, cls.toml_key)
-            panel.addWidget(section)
-        panel.addStretch()
-        panel_widget = QWidget()
-        panel_widget.setLayout(panel)
+        column = QVBoxLayout()
+        column.addWidget(self._section("Grid", GRID_UI, GRID_TOML_KEY))
+        column.addWidget(self._section("Sampling", SAMPLING_UI, SAMPLING_TOML_KEY))
+        for key, cls in OBJECTS.items():
+            column.addWidget(self._section(cls.name, gate_by_count(cls.ui_params), key))
+        column.addStretch()
+        panel = QWidget()
+        panel.setLayout(column)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setWidget(panel_widget)
-        scroll.setFixedWidth(400)
+        scroll.setWidget(panel)
+        scroll.setFixedWidth(430)
         root.addWidget(scroll)
 
-        # right: preview + actions
         right = QVBoxLayout()
         self.viewer_box = QVBoxLayout()
-        viewer_container = QWidget()
-        viewer_container.setLayout(self.viewer_box)
-        right.addWidget(viewer_container, stretch=1)
+        viewer = QWidget()
+        viewer.setLayout(self.viewer_box)
+        right.addWidget(viewer, stretch=1)
         right.addLayout(self._actions())
         self.status = QLabel("")
         self.status.setWordWrap(True)
         right.addWidget(self.status)
         root.addLayout(right, stretch=1)
+        self.resize(1250, 880)
 
-        self.resize(1200, 850)
-
-    def _section(self, title, ui_dict, toml_key, update_fn, load_fn, config_path):
+    def _section(self, title, ui, key):
         section = BaseSectionQGroup(
-            parent=self, update_cache_fn=update_fn, load_toml_fn=load_fn,
-            title=title, params_ui_dict=ui_dict, toml_section_key=toml_key,
-            config_path=config_path,
-        )
-        section.update_ui_from_toml(config_path)
-        self._sections.append((section, config_path))
+            parent=self, update_cache_fn=update_scene_cache,
+            load_toml_fn=lambda path: load_or_create_toml(path, DEFAULT_SCENE),
+            title=title, params_ui_dict=ui, toml_section_key=key, config_path=SCENE_PATH)
+        section.update_ui_from_toml(SCENE_PATH)
+        self._sections.append(section)
         return section
 
-    def _wire_count_prune(self, section, toml_key):
-        """When an object's count drops to 0, collapse its TOML section to just {count}."""
-        count_widget = section.parameter_widgets.get("count")
-        if count_widget is None or count_widget.input_widget is None:
-            return
-        count_widget.input_widget.textChanged.connect(
-            lambda _=None, k=toml_key: self._prune_if_zero(k))
-
-    def _prune_if_zero(self, toml_key):
-        config = load_or_create_toml(GT_CONFIG_PATH, DEFAULT_GT_CONFIG)
-        section = config.get(toml_key, {})
-        try:
-            count = int(section.get("count", 0) or 0)
-        except (TypeError, ValueError):
-            count = 0
-        if count <= 0 and set(section.keys()) != {"count"}:
-            config[toml_key] = {"count": count}
-            save_toml(config, GT_CONFIG_PATH)
-
     def _actions(self):
-        col = QVBoxLayout()
-        row1 = QHBoxLayout()
-        self.btn_generate = QPushButton("Generate / preview")
-        self.btn_generate.clicked.connect(self._generate)
-        self.btn_save = QPushButton("Save as TIF…")
-        self.btn_save.clicked.connect(self._save_tif)
-        self.btn_use = QPushButton("Use as MA-TIRF synthetic truth")
-        self.btn_use.clicked.connect(self._use_as_truth)
-        for b in (self.btn_generate, self.btn_save, self.btn_use):
-            row1.addWidget(b)
-        row2 = QHBoxLayout()
-        for label, path, default in (
-            ("Load ground-truth .toml", GT_CONFIG_PATH, DEFAULT_GT_CONFIG),
-            ("Save ground-truth .toml", GT_CONFIG_PATH, DEFAULT_GT_CONFIG),
-            ("Load grid .toml", GRID_CONFIG_PATH, DEFAULT_GRID_CONFIG),
-            ("Save grid .toml", GRID_CONFIG_PATH, DEFAULT_GRID_CONFIG),
-        ):
-            btn = QPushButton(label)
-            if label.startswith("Load"):
-                btn.clicked.connect(partial(self._load_config, path, default))
-            else:
-                btn.clicked.connect(partial(self._save_config, path, default))
-            row2.addWidget(btn)
-        col.addLayout(row1)
-        col.addLayout(row2)
-        return col
+        buttons = QHBoxLayout()
+        self.btn_generate = self._button(buttons, "Generate / preview", self._generate)
+        self.btn_save = self._button(buttons, "Save truth…", self._save_truth)
+        self.btn_use = self._button(buttons, "Use as MA-TIRF truth", self._use_as_truth)
+        self.btn_load = self._button(buttons, "Load scene…", self._load_scene)
+        self.btn_save_scene = self._button(buttons, "Save scene…", self._save_scene)
+        return buttons
 
-    # ── logic ───────────────────────────────────────────────────────────
+    @staticmethod
+    def _button(layout, label, action):
+        button = QPushButton(label)
+        button.clicked.connect(action)
+        layout.addWidget(button)
+        return button
+
+    # ── actions ──────────────────────────────────────────────────────────────
 
     def _generate(self):
         self.status.setText("Generating…")
         QApplication.processEvents()
-        grid_cfg = load_grid_config()
-        gt_cfg = load_gt_config()
-        if grid_cfg[GRID_TOML_KEY]["zN_nm"] <= grid_cfg[GRID_TOML_KEY]["z0_nm"]:
-            self.status.setText("⚠ zN must be greater than z0.")
+        scene = load_scene()
+        grid = scene[GRID_TOML_KEY]
+        if grid["zN_nm"] <= grid["z0_nm"]:
+            self.status.setText("zN must be greater than z0.")
             return
-        self.f_true = generate_ground_truth(grid_cfg, gt_cfg)
-        self._show_preview(self.f_true, grid_cfg[GRID_TOML_KEY])
-        seed = gt_cfg.get(SAMPLING_TOML_KEY, {}).get("seed", 0)
+        self.f_true = generate(scene)
+        self._show(self.f_true, grid)
         self.status.setText(
-            f"Generated {tuple(self.f_true.shape)} (Z,Y,X), range [0, 1]. Seed {seed}."
-        )
+            f"Truth {tuple(self.f_true.shape)} (Z, Y, X) in [0, 1], seed "
+            f"{scene[SAMPLING_TOML_KEY]['seed']} — reconstructions will use {grid['nz']} planes "
+            f"({grid['z_oversampling']} truth planes each), between {grid['z0_nm']:g} and "
+            f"{grid['zN_nm']:g} nm.")
 
-    def _show_preview(self, f, grid_params):
-        """
-        Show the generated truth in the MA-TIRF figures section.
-
-        The section is rebuilt only when the grid SHAPE changes, because its viewers are
-        constructed from the image they display. Otherwise it is refreshed in place — by
-        update_plot(), which is the section's own public way of doing exactly that.
-
-        (This used to reach into named widgets of the figures section to refresh them by
-        hand. Those names disappeared when the section became VIEWS-driven, so every
-        regenerate at an unchanged grid shape raised AttributeError. Refreshing through
-        update_plot() is both correct and immune to the section's internals changing again.)
-        """
-        z0, zN = grid_params["z0_nm"], grid_params["zN_nm"]
-        config = {'oper-params': {'z0': z0, 'zN': zN}}
-        shape = tuple(f.shape)
-        if self.figures is None or shape != self._last_shape:
+    def _show(self, f, grid):
+        """Rebuild the figures only when the shape changes; otherwise refresh them in place."""
+        config = {"oper-params": {"z0": grid["z0_nm"], "zN": grid["zN_nm"]}}
+        if self.figures is None or tuple(f.shape) != self._last_shape:
             while self.viewer_box.count():
-                item = self.viewer_box.takeAt(0)
-                w = item.widget()
-                if w is not None:
-                    w.deleteLater()
+                widget = self.viewer_box.takeAt(0).widget()
+                if widget is not None:
+                    widget.deleteLater()
             self.figures = _figures_section()(parent=self)
             self.viewer_box.addWidget(self.figures)
-            self._last_shape = shape
+            self._last_shape = tuple(f.shape)
         self.figures.update_plot(f, config)
 
-    def _refresh_sections(self):
-        for section, config_path in self._sections:
-            section.update_ui_from_toml(config_path)
-
-    def _save_tif_to(self, default_path, title):
-        path = save_file(self, title, default_path, "TIFF (*.TIF *.tif)")
-        if not path:
-            return None
-        if not path.lower().endswith((".tif", ".tiff")):
-            path += ".TIF"
-        save_tif(self.f_true, path)
-        return path
-
-    def _save_tif(self):
+    def _save(self, default_path, title):
         if self.f_true is None:
-            return
-        path = self._save_tif_to(str(MATIRF_MEASUREMENTS_DIR), "Save synthetic truth")
+            return None
+        path = save_file(self, title, default_path, "TIFF (*.TIF *.tif)")
+        return save_truth(self.f_true, path, load_scene()) if path else None
+
+    def _save_truth(self):
+        path = self._save(str(MATIRF_MEASUREMENTS_DIR), "Save the synthetic truth")
         if path:
-            self.status.setText(f"Saved to {path}")
+            self.status.setText(f"Saved {path} and its record {path.with_suffix('.truth.json').name}")
 
     def _use_as_truth(self):
-        if self.f_true is None:
-            return
-        default = str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth.TIF")
-        path = self._save_tif_to(default, "Save synthetic truth for MA-TIRF")
+        path = self._save(str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth.TIF"),
+                          "Save the synthetic truth for MA-TIRF")
         if not path:
             return
-        grid = load_grid_config()[GRID_TOML_KEY]
-        update_matirf_cache(['input-paths', 'mode'], "synthetic-data")
-        update_matirf_cache(['input-paths', 'tif'], path)
-        update_matirf_cache(['oper-params', 'nz'], int(grid["nz"]))
-        update_matirf_cache(['oper-params', 'z0'], float(grid["z0_nm"]))
-        update_matirf_cache(['oper-params', 'zN'], float(grid["zN_nm"]))
+        grid = load_scene()[GRID_TOML_KEY]
+        update_matirf_cache(["input-paths", "mode"], "synthetic-data")
+        update_matirf_cache(["input-paths", "tif"], str(path))
+        update_matirf_cache(["oper-params", "nz"], int(grid["nz"]))
+        update_matirf_cache(["oper-params", "z0"], float(grid["z0_nm"]))
+        update_matirf_cache(["oper-params", "zN"], float(grid["zN_nm"]))
         QMessageBox.information(
             self, "Synthetic truth set",
-            "The MA-TIRF config now uses this ground truth in synthetic mode.\n"
-            "You still need a measurement JSON and an algorithm; noise is added by the "
-            "reconstruction pipeline via the [add-noise] section.",
-        )
-        self.status.setText(f"Set as synthetic truth: {path}")
+            f"The MA-TIRF config now uses this truth in synthetic mode, reconstructed on "
+            f"{grid['nz']} planes between {grid['z0_nm']:g} and {grid['zN_nm']:g} nm.\n"
+            f"Still to choose: a measurement JSON, the noise, and an algorithm.")
+        self.status.setText(f"Set as the MA-TIRF synthetic truth: {path}")
 
-    def _load_config(self, cache_path, default_config):
-        path = open_file(self, "Select .toml config", MATIRF_RESULTS_DIR, "*.toml")
+    def _load_scene(self):
+        path = open_file(self, "Load a scene", str(PRESETS_DIR), "*.toml")
         if not path:
             return
-        config = load_or_create_toml(path, default_config)
-        save_toml(config, cache_path)
-        self._refresh_sections()
+        save_scene(load_scene(path), SCENE_PATH)
+        for section in self._sections:
+            section.update_ui_from_toml(SCENE_PATH)
         self._generate()
 
-    def _save_config(self, cache_path, default_config):
-        path = save_file(self, "Save .toml config", MATIRF_RESULTS_DIR, "*.toml")
-        if not path:
-            return
-        if not path.lower().endswith(".toml"):
-            path += ".toml"
-        save_toml(load_or_create_toml(cache_path, default_config), path)
-        self.status.setText(f"Saved config to {path}")
+    def _save_scene(self):
+        path = save_file(self, "Save the scene", str(PRESETS_DIR), "*.toml")
+        if path:
+            path = path if path.lower().endswith(".toml") else path + ".toml"
+            save_scene(load_scene(), path)
+            self.status.setText(f"Scene saved to {path}")
 
 
 def main():

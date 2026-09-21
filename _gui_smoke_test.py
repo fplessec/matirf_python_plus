@@ -44,6 +44,8 @@ import sys
 import tempfile
 import time
 import traceback
+
+import torch
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -195,7 +197,7 @@ def matirf_ready_config():
     return {
         "algorithm": "ADAM",
         "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": MJSON},
-        "oper-params": {"nz": 50, "z0": 0.0, "zN": 400.0, "normalize": False},
+        "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": False},
         "add-noise": {},
         "algo-params": {"max_iter": 12, "lr": 0.01, "K": 4, "EPS": 1e-14},
     }
@@ -795,27 +797,54 @@ check("F1  générer, par clic (le bug corrigé)", f1)
 
 
 def f2():
+    """Sauvegarder : le TIF ET sa fiche .truth.json, qui permet de le reproduire."""
+    from problems.matirf.synthetic import read_record, regenerate
     window = globals()["_SYNTH"]
     out = Path(tempfile.mkdtemp()) / "truth.TIF"
     with dialogs(save_path=str(out)):
         click(window.btn_save)
     assert out.exists() and out.stat().st_size > 1000
-    return f"clic -> TIF {out.stat().st_size // 1024} ko"
-check("F2  sauvegarder en TIF, par clic", f2)
+    record = read_record(out)
+    assert record["geometry"]["planes"] == window.f_true.shape[0]
+    assert torch.equal(regenerate(out), window.f_true), "la fiche doit reproduire la vérité"
+    return f"clic -> TIF {out.stat().st_size // 1024} ko + fiche qui la reproduit au bit près"
+check("F2  sauvegarder la vérité et sa fiche, par clic", f2)
 
 
 def f3():
+    """La config MA-TIRF reçoit les plans de RECONSTRUCTION (la vérité est plus fine)."""
+    from problems.matirf.synthetic import load_scene
     window = globals()["_SYNTH"]
     out = Path(tempfile.mkdtemp()) / "used.TIF"
     with dialogs(save_path=str(out)):
         click(window.btn_use)
     config = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
+    grid = load_scene()["grid"]
     assert config["input-paths"]["mode"] == "synthetic-data"
     assert config["input-paths"]["tif"] == str(out)
-    assert config["oper-params"]["nz"] == window.f_true.shape[0]
-    window.close()
-    return f"clic -> config matirf mise à jour (mode, tif, nz={config['oper-params']['nz']})"
-check("F3  « Use as MA-TIRF synthetic truth », par clic", f3)
+    assert config["oper-params"]["nz"] == grid["nz"]
+    assert window.f_true.shape[0] == grid["nz"] * grid["z_oversampling"]
+    return (f"clic -> config matirf : nz={config['oper-params']['nz']} plans reconstruits, "
+            f"vérité sur {window.f_true.shape[0]}")
+check("F3  « Use as MA-TIRF truth », par clic", f3)
+
+
+def f4():
+    """Charger une scène prédéfinie (celles du benchmark) met à jour les sections et l'aperçu."""
+    from problems.matirf.synthetic import PRESETS_DIR, SCENE_PATH
+    window = globals()["_SYNTH"]
+    saved_scene = SCENE_PATH.read_text()
+    try:
+        with dialogs(open_path=str(PRESETS_DIR / "cell.toml")):
+            click(window.btn_load)
+        count = window._sections[-1].parameter_widgets["count"].param_value
+        assert count == 1, f"la section membrane affiche count={count}"
+        assert window.f_true.shape == (150, 128, 128)
+    finally:
+        SCENE_PATH.write_text(saved_scene)
+        window.close()
+    return "preset « cell » chargé : section membrane et aperçu (150, 128, 128)"
+check("F4  charger une scène prédéfinie, par clic", f4)
 
 
 print("\n=== G. CHEMINS D'ERREUR ===")

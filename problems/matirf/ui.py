@@ -52,6 +52,8 @@ def _preview_errors(config):
     ## a checkbox never touched is absent from the TOML; False is a valid answer, not a gap
     if oper.get("normalize", "None") in (None, "None", "null"):
         messages.append("Normalize Operator is not set, please tick or untick the box.")
+    from problems.matirf.problem import truth_geometry_errors
+    messages.extend(truth_geometry_errors(config))
     return messages
 
 

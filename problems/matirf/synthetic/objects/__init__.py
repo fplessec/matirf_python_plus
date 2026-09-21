@@ -1,30 +1,23 @@
 """
-Object registry — the synthetic analogue of matirf.algorithms.ALGORITHMS.
+The kinds of synthetic objects, and their registry.
 
-OBJECT_TYPES maps a TOML section key -> SyntheticObjectType class. The ground-truth
-TOML has one '[toml_key]' section per type (each with a 'count' and the type's
-characteristic parameters), and the generator iterates this registry in order to build
-the scene. Registration order is fixed, which keeps generation reproducible.
+    Ellipsoid   vesicles, endosomes, focal adhesions        (ellipsoid.py)
+    Filament    actin stress fibres, microtubules            (filament.py)
+    Membrane    the basal membrane of an adherent cell       (membrane.py)
+
+OBJECTS maps a scene's TOML section key to its class. Its order is fixed on purpose: the
+generator draws every object from ONE seeded generator in this order, so the order is part
+of what makes a scene reproducible. Add a new kind at the END, never in the middle.
+
+ADDING ONE: write a SyntheticObject subclass (see base.py) and append it below.
 """
 
-from .base import ContinuousObject, SyntheticObjectType
-from .ellipsoid import Ellipsoid, GaussianEllipsoid
-from .filament import Filament3D, Filament
-from .membrane import Membrane, MembraneSheet
+from .base import SyntheticObject, value_param, count_param, gate_by_count
+from .ellipsoid import Ellipsoid
+from .filament import Filament
+from .membrane import Membrane
 
+OBJECTS = {cls.toml_key: cls for cls in (Ellipsoid, Filament, Membrane)}
 
-# order matters: it fixes the RNG consumption order -> reproducible scenes
-OBJECT_TYPES = {cls.toml_key: cls for cls in [
-    Ellipsoid,
-    Filament3D,
-    Membrane,
-]}
-
-__all__ = [
-    "OBJECT_TYPES",
-    "ContinuousObject",
-    "SyntheticObjectType",
-    "Ellipsoid", "GaussianEllipsoid",
-    "Filament3D", "Filament",
-    "Membrane", "MembraneSheet",
-]
+__all__ = ["OBJECTS", "SyntheticObject", "Ellipsoid", "Filament", "Membrane",
+           "value_param", "count_param", "gate_by_count"]

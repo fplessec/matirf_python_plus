@@ -22,10 +22,6 @@ def signed_uniform(gen: torch.Generator, lo: float, hi: float) -> float:
     return mag if torch.rand((), generator=gen).item() < 0.5 else -mag
 
 
-def randint(gen: torch.Generator, n: int) -> int:
-    """A single integer in [0, n) drawn from the seeded generator."""
-    return int(torch.randint(0, n, (1,), generator=gen).item())
-
 
 # ── rotations (torch, float64, CPU) ──────────────────────────────────────────
 
@@ -52,17 +48,3 @@ def random_flat_rotation(gen: torch.Generator, max_tilt_deg: float = 0.0) -> tor
         R = _Rx(signed_uniform(gen, 0.0, t)) @ _Ry(signed_uniform(gen, 0.0, t)) @ R
     return R
 
-
-def random_rotation_matrix(gen: torch.Generator) -> torch.Tensor:
-    """
-    A uniformly distributed 3x3 rotation (element of SO(3)) — a FREE 3D orientation.
-
-    Kept for completeness; not used for MA-TIRF ovaloids because a free rotation would
-    let an elongated axis poke out of the thin slab. Uses the QR trick.
-    """
-    a = torch.randn(3, 3, generator=gen, dtype=torch.float64)
-    q, r = torch.linalg.qr(a)
-    q = q * torch.sign(torch.diagonal(r))
-    if torch.linalg.det(q) < 0:
-        q[:, 0] = -q[:, 0]
-    return q

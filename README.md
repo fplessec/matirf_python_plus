@@ -108,49 +108,37 @@ deconv cli
 
 ### Launch the synthetic ground-truth generator (matirf only)
 
-```bash
-matirf synth              # or: python -m matirf.synthetic
+```
+matirf synth              # or: python -m problems.matirf.synthetic
 ```
 
-**What it is for.** To judge whether a reconstruction algorithm is good, you need data whose exact answer you already know. `matirf synth` designs such an answer: a reproducible 3D object `f_true`. The reconstruction pipeline then simulates the measurement from it (`g = H · f_true`, plus noise), runs an algorithm, and compares the result against `f_true` with the quality metrics. This is how the algorithms (ADAM, PPXA, ADMM, PnP, ADMM-PnP, MCMC) are compared on equal footing.
+**What it is for.** To judge a reconstruction you need data whose exact answer you already know. `matirf synth` designs that answer: a plausible, reproducible 3D object `f_true` — a small piece of an adherent cell as MA-TIRF sees it, a slab a few hundred nm deep (300 nm by default, where reconstructions are reliable) under a TIRF field of view. The pipeline then simulates the measurement from it (`g = H · f_true`, plus noise), reconstructs, and compares.
 
-**Two files, two concerns.** The generator is driven entirely by TOML, stored in `matirf/synthetic/cache/`:
+**Three kinds of objects**, each one class in `problems/matirf/synthetic/objects/`:
 
-| File | Describes |
+| Object | Represents |
 |---|---|
-| `ground_truth.toml` | *what* the objects are — one section per object type, each with a `count` and its characteristic parameters, expressed in nanometres (grid-independent). Plus a master `seed`. |
-| `grid.toml` | *how* that continuous truth is sampled onto the flat anisotropic MA-TIRF slab: `nz`, `z0_nm`, `zN_nm`, lateral extent. |
+| `Ellipsoid` | vesicles and endosomes (small, anywhere in depth), or focal adhesions (large, flat, against the glass) |
+| `Filament` | actin stress fibres, microtubules: smooth curves, nearly parallel to the glass |
+| `Membrane` | the basal membrane of an adherent cell: a footprint with an edge, close to the glass at the edge and higher under the cell body |
 
-Separating them means you can re-sample the same objects on a finer grid, or change the objects without touching the grid.
+**One scene file.** A scene is a single TOML (`[grid]`, `[sampling]` seed, then one section per object with its `count` and sizes, all in nm). The window edits `problems/matirf/synthetic/cache/scene.toml`; ready-made scenes — the benchmark's truths — are in `problems/matirf/synthetic/presets/`: `vesicles`, `adhesions_fibres`, `cell`.
 
-**Object types available.** Each is a `SyntheticObjectType` registered in `OBJECT_TYPES` — the exact analogue of an entry in the algorithm registry. Setting a type's `count` to `0` disables it.
+**A truth file describes itself.** Saving writes the TIF and a record `<name>.truth.json` with its geometry and its complete scene: the truth can be reproduced from it bit for bit, and MA-TIRF refuses to reconstruct it on another depth range than the one it was generated in.
 
-| Type | Shape |
-|---|---|
-| `Ellipsoid` | Gaussian blobs, flat-ish (MA-TIRF observes a thin slab), `sharpness > 1` gives a flat-top "soft binary" |
-| `Filament3D` | curved filaments |
-| `Membrane` | a corrugated membrane sheet |
+**Finer than the reconstruction.** The truth has `nz × z_oversampling` planes (150 by default): the measurement is simulated from the fine truth and the reconstruction, on `nz` planes, is compared with the truth averaged back. One truth can thus be reconstructed on 50, 30, 25, 15 or 10 planes with an exact reference.
 
-**Typical workflow.**
+**Typical workflow.** `matirf synth` → edit or *Load scene…* → *Generate / preview* → *Use as MA-TIRF truth* (saves the truth and sets the MA-TIRF config: synthetic mode, the file, `nz`, `z0`, `zN`) → `matirf gui`, choose the noise and an algorithm, run.
 
-1. `matirf synth` — the window shows one section per TOML section on the left, a preview on the right.
-2. Adjust the grid, the seed and the object counts/parameters. Every edit is written straight to the TOML.
-3. **Generate / preview** — builds `f_true`, normalised to `[0, 1]`, and displays it (depth map + profiles, or image + 3D histogram).
-4. Then either:
-   - **Save as TIF…** — write the truth to disk and use it however you like, or
-   - **Use as MA-TIRF synthetic truth** — saves the TIF *and* updates the MA-TIRF config for you: sets mode to `synthetic-data`, points `input-paths.tif` at the file, and copies `nz`, `z0`, `zN` into `oper-params` so the operator matches the grid.
-5. `matirf gui` — pick a measurement JSON and an algorithm, then run. The reconstruction is compared to your truth automatically.
+**Noise is not part of the truth**: it is added when the measurement is simulated (`[add-noise]`), so one truth serves every noise level.
 
-**Reproducibility.** Objects are sampled from a master `seed`, and the registry order is fixed, so the RNG is consumed in a fixed order: the same two TOML files always produce the exact same `f_true`. Keep them next to your results and the experiment is reproducible.
-
-**Noise is deliberately not part of the truth.** `f_true` is noiseless. The measurement noise is applied by the reconstruction pipeline through the `[add-noise]` section of the MA-TIRF config, so you can re-run the same truth at several noise levels.
-
-**Programmatic use** (for scripted benchmarks, no GUI):
+**From a script** (what the benchmark does):
 
 ```python
-from problems.matirf.synthetic import load_grid_config, load_gt_config, generate_ground_truth
+from problems.matirf.synthetic import load_preset, generate, save_truth
 
-f_true = generate_ground_truth(load_grid_config(), load_gt_config())   # (nz, ny, nx) in [0, 1]
+scene = load_preset("cell")
+save_truth(generate(scene), "truths/cell.TIF", scene)       # + truths/cell.truth.json
 ```
 
 ### Reset the cached configuration
@@ -202,7 +190,7 @@ matirf_python_plus/
         algorithms/                 #   problem-specific algorithm subclasses
         core/                       #   pipeline, forward operator
         gui/                        #   custom GUI elements
-        synthetic/                  #   reproducible synthetic ground-truth generator (matirf synth)
+        synthetic/                  #   plausible, reproducible ground truths (matirf synth); presets/ = benchmark truths
         cache/                      #   cached config.toml
         data/                       #   measurements and results
     deconv/                         # 2D deconvolution inverse problem

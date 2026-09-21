@@ -1,62 +1,50 @@
 """
-problems.matirf.synthetic — reproducible, TOML-driven synthetic ground truths for MA-TIRF.
+problems.matirf.synthetic — plausible, reproducible synthetic ground truths for MA-TIRF.
 
-Two concerns, two TOML files (see 'config.py'):
-    > ground_truth.toml : the continuous objects themselves — which types, how many, and
-      their characteristic parameters (grid-independent, defined in nm).
-    > grid.toml         : how that continuous truth is sampled / visualized on the flat
-      anisotropic MA-TIRF slab.
+What is generated: a small piece of an adherent cell as MA-TIRF sees it — a flat slab a few
+hundred nm deep (300 nm by default: where reconstructions are reliable) under a classical
+TIRF field of view. Three kinds of objects, each one class (objects/):
 
-Each object type (Ellipsoid, Filament, Membrane) is a SyntheticObjectType
-with its own 'ui_params' dictionary — exactly like an algorithm — and is registered in
-OBJECT_TYPES. The GUI ('matirf synth' / python -m problems.matirf.synthetic) renders one QGroupBox
-of SimpleParameterWidgets per section, edits the TOML, and previews the result.
+    Ellipsoid   vesicles, endosomes, focal adhesions
+    Filament    actin stress fibres, microtubules
+    Membrane    the basal membrane of an adherent cell
 
-Noise is NOT part of the ground truth: g = H·f_true and its noise are produced by the
-reconstruction pipeline via the '[add-noise]' section of the MA-TIRF config.
+A SCENE (scene.py) is one TOML file saying everything: the grid, the seed, and how many of
+each object with which sizes. The generator (generator.py) turns it into a (Z, Y, X)
+volume in [0, 1] and saves it as a TIF with a record, <name>.truth.json, holding its
+geometry and its scene — so a truth can always be checked and reproduced.
 
-Programmatic use::
+Ready-made scenes (presets/) are the benchmark's truths: vesicles, adhesions_fibres, cell.
 
-    from problems.matirf.synthetic import load_grid_config, load_gt_config, generate_ground_truth
-    f_true = generate_ground_truth(load_grid_config(), load_gt_config())
+The truth is sampled `z_oversampling` times finer in depth than the reconstruction will be
+(grid.py): the measurement is simulated from the fine truth and the reconstruction is
+compared with the truth averaged back — no inverse crime.
+
+    matirf synth                       the generator window (gui.py)
+
+    from problems.matirf.synthetic import load_preset, generate, save_truth
+    scene = load_preset("cell")
+    save_truth(generate(scene), "truths/cell.TIF", scene)
+
+Noise is NOT part of the truth: it is added when the measurement is simulated, through the
+'[add-noise]' section of the MA-TIRF config, so one truth serves every noise level.
 """
 
 from .grid import Grid, GRID_UI, GRID_TOML_KEY
-from .objects import (
-    OBJECT_TYPES,
-    ContinuousObject,
-    SyntheticObjectType,
-    Ellipsoid, GaussianEllipsoid,
-    Filament3D, Filament,
-    Membrane, MembraneSheet,
-)
-from .config import (
-    GRID_CONFIG_PATH, GT_CONFIG_PATH,
-    DEFAULT_GRID_CONFIG, DEFAULT_GT_CONFIG,
-    SAMPLING_UI, SAMPLING_TOML_KEY,
-    load_grid_config, load_gt_config,
-    update_grid_cache, update_gt_cache,
+from .objects import OBJECTS, SyntheticObject, Ellipsoid, Filament, Membrane
+from .scene import (
+    SCENE_PATH, PRESETS_DIR, DEFAULT_SCENE, SAMPLING_UI, SAMPLING_TOML_KEY,
+    load_scene, save_scene, presets, load_preset, update_scene_cache,
 )
 from .generator import (
-    build_objects,
-    integrate_objects,
-    normalize_01,
-    generate_ground_truth,
-    generate_from_cache,
-    generate_and_save,
+    generate, save_truth, read_record, record_path, regenerate, downsample_z, geometry,
 )
 
 __all__ = [
     "Grid", "GRID_UI", "GRID_TOML_KEY",
-    "OBJECT_TYPES", "ContinuousObject", "SyntheticObjectType",
-    "Ellipsoid", "GaussianEllipsoid",
-    "Filament3D", "Filament",
-    "Membrane", "MembraneSheet",
-    "GRID_CONFIG_PATH", "GT_CONFIG_PATH",
-    "DEFAULT_GRID_CONFIG", "DEFAULT_GT_CONFIG",
-    "SAMPLING_UI", "SAMPLING_TOML_KEY",
-    "load_grid_config", "load_gt_config",
-    "update_grid_cache", "update_gt_cache",
-    "build_objects", "integrate_objects", "normalize_01",
-    "generate_ground_truth", "generate_from_cache", "generate_and_save",
+    "OBJECTS", "SyntheticObject", "Ellipsoid", "Filament", "Membrane",
+    "SCENE_PATH", "PRESETS_DIR", "DEFAULT_SCENE", "SAMPLING_UI", "SAMPLING_TOML_KEY",
+    "load_scene", "save_scene", "presets", "load_preset", "update_scene_cache",
+    "generate", "save_truth", "read_record", "record_path", "regenerate", "downsample_z",
+    "geometry",
 ]
