@@ -7,7 +7,7 @@ Two concerns, two TOML files (see 'config.py'):
     > grid.toml         : how that continuous truth is sampled / visualized on the flat
       anisotropic MA-TIRF slab.
 
-Each object type (Ellipsoid, Filament, Membrane, DoubleLayer) is a SyntheticObjectType
+Each object type (Ellipsoid, Filament, Membrane) is a SyntheticObjectType
 with its own 'ui_params' dictionary — exactly like an algorithm — and is registered in
 OBJECT_TYPES. The GUI ('matirf synth' / python -m problems.matirf.synthetic) renders one QGroupBox
 of SimpleParameterWidgets per section, edits the TOML, and previews the result.
@@ -29,7 +29,6 @@ from .objects import (
     Ellipsoid, GaussianEllipsoid,
     Filament3D, Filament,
     Membrane, MembraneSheet,
-    DoubleLayerType, DoubleLayer,
 )
 from .config import (
     GRID_CONFIG_PATH, GT_CONFIG_PATH,
@@ -53,7 +52,6 @@ __all__ = [
     "Ellipsoid", "GaussianEllipsoid",
     "Filament3D", "Filament",
     "Membrane", "MembraneSheet",
-    "DoubleLayerType", "DoubleLayer",
     "GRID_CONFIG_PATH", "GT_CONFIG_PATH",
     "DEFAULT_GRID_CONFIG", "DEFAULT_GT_CONFIG",
     "SAMPLING_UI", "SAMPLING_TOML_KEY",

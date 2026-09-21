@@ -11,7 +11,6 @@ from .base import ContinuousObject, SyntheticObjectType
 from .ellipsoid import Ellipsoid, GaussianEllipsoid
 from .filament import Filament3D, Filament
 from .membrane import Membrane, MembraneSheet
-from .double_layer import DoubleLayerType, DoubleLayer
 
 
 # order matters: it fixes the RNG consumption order -> reproducible scenes
@@ -19,7 +18,6 @@ OBJECT_TYPES = {cls.toml_key: cls for cls in [
     Ellipsoid,
     Filament3D,
     Membrane,
-    DoubleLayerType,
 ]}
 
 __all__ = [
@@ -29,5 +27,4 @@ __all__ = [
     "Ellipsoid", "GaussianEllipsoid",
     "Filament3D", "Filament",
     "Membrane", "MembraneSheet",
-    "DoubleLayerType", "DoubleLayer",
 ]

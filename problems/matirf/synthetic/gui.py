@@ -7,7 +7,7 @@ BaseSectionQGroup rendering a params_ui_dict of SimpleParameterWidgets bound to 
     Left column, driven by two TOML files:
         > Grid          (grid.toml)          — how the truth is sampled / visualized
         > Sampling      (ground_truth.toml)  — the master seed
-        > Ellipsoid / Filament / Membrane / Double layer (ground_truth.toml)
+        > Ellipsoid / Filament / Membrane (ground_truth.toml)
                         — one section per object type: 'count' + characteristic params
 
     Right column:

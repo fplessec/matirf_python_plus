@@ -130,7 +130,6 @@ Separating them means you can re-sample the same objects on a finer grid, or cha
 | `Ellipsoid` | Gaussian blobs, flat-ish (MA-TIRF observes a thin slab), `sharpness > 1` gives a flat-top "soft binary" |
 | `Filament3D` | curved filaments |
 | `Membrane` | a corrugated membrane sheet |
-| `DoubleLayerType` | two parallel layers, to probe axial resolution |
 
 **Typical workflow.**
 
@@ -149,7 +148,7 @@ Separating them means you can re-sample the same objects on a finer grid, or cha
 **Programmatic use** (for scripted benchmarks, no GUI):
 
 ```python
-from matirf.synthetic import load_grid_config, load_gt_config, generate_ground_truth
+from problems.matirf.synthetic import load_grid_config, load_gt_config, generate_ground_truth
 
 f_true = generate_ground_truth(load_grid_config(), load_gt_config())   # (nz, ny, nx) in [0, 1]
 ```
