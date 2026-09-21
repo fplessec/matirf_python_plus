@@ -23,6 +23,13 @@ deconvolution applied a Wiener filter in Fourier — two files, 168 lines, one a
 `ForwardOperator.ridge_inverse` is precisely that operation, defined for every operator, so
 the two collapse into this one file.
 
+CAUTION — beta is relative to the SCALED likelihood. D now carries the noise level
+(solvers/fidelities/base.py): with Gaussian noise of variance b it is v1's D divided by b.
+The same beta is therefore b times more selective than in v1, and a beta tuned before the
+noise model existed must be multiplied by 1/b to reproduce the old acceptance rate. In
+return beta reads as a genuine temperature: D is a per-pixel negative log-likelihood, so the
+exact posterior of the Bayesian model corresponds to beta = 1 / N_g.
+
 CAUTION — denoiser scale. Unlike PnP, this solver passes the raw tensor to the denoiser,
 with a sigma (default 0.05) on f's own scale that also serves as the proposal noise level.
 That is inconsistent with the project-wide [0, 255] convention (see solvers/denoising.py),
@@ -35,6 +42,7 @@ import time
 import torch
 
 from solvers.base import Solver
+from solvers.fidelities import NOISE_MODEL_NAMES
 from solvers.denoising import resolve, warn_if_slice_by_slice, NO_DENOISER
 from solvers.objective_params import INIT_UI_PARAM
 from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
@@ -100,7 +108,7 @@ class Mcmc(Solver):
     name = "MCMC"
     estimator_type = "MMSE"
     uses_denoiser = True
-    uses_data_fidelity = True       # the acceptance ratio is computed from D
+    supported_noise_models = NOISE_MODEL_NAMES   # the Metropolis ratio is computed from D itself
     uses_regularization = False
     ui_params = MCMC_UI_PARAMS
 

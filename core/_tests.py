@@ -65,6 +65,9 @@ class _Gaussian:
     def loss(self, Hf, g):
         return 0.5 * ((Hf - g) ** 2).sum()
 
+    def quadratic_scale(self, n_pixels):
+        return 1.0
+
 
 class _L2:
     """R(f) = 0.5 ||f||^2, whose prox of w*R is f / (1 + w) — the v1 Regularization interface."""
@@ -350,7 +353,92 @@ def test_noise():
         "Photon noise: the photon count must be positive (got 0)"]
     assert noise.validate({"poisson_noise": True}) == [
         "Photon noise: the photon count is required when it is enabled"]
+
+    # the (a, b) every other part of the framework uses: a = 1/N, b = sigma^2
+    both_model = noise.noise_model({"poisson_noise": True, "photons": 50.0,
+                                    "gaussian_noise": True, "sigma": 0.05})
+    assert both_model.a == 1 / 50.0 and abs(both_model.b - 0.0025) < 1e-15
+
+    # g >= 0 always: read noise on a dark pixel is clipped (option A), photon noise never
+    # needs it
+    dark = noise.add_noise_to_measurement(flat(0.0), {"gaussian_noise": True, "sigma": 0.05})
+    assert float(dark.min()) >= 0.0, "the noisy measurement must stay non-negative"
+    assert 0.3 * 0.05 < float(dark.mean()) < 0.5 * 0.05, "the documented ~0.4 sigma bias"
+
+    # the formula line follows the ticked boxes
+    assert r"\mathcal{P}" in noise.formula({"poisson_noise": True, "photons": 100})
+    assert r"\mathcal{P}" not in noise.formula({"gaussian_noise": True, "sigma": 0.01})
+    assert "b = 0" in noise.formula({"poisson_noise": True, "photons": 100})
+    assert "a = 0" in noise.formula({"gaussian_noise": True, "sigma": 0.01})
+    assert "no noise" in noise.formula({})
     print("  noise           Gaussian var = sigma^2, Poisson var = signal/N, they add, seeded")
+
+
+def test_noise_estimation():
+    """
+    `estimate` recovers (a, b) from the noisy image alone.
+
+    On a smooth image — which is what a blurred measurement g = H f is — within 10 %; the
+    part the model does not have comes back as exactly 0.
+    """
+    from core import noise
+    y, x = torch.meshgrid(torch.linspace(0, 1, 384, dtype=DTYPE),
+                          torch.linspace(0, 1, 384, dtype=DTYPE), indexing="ij")
+    smooth = 0.1 + 0.9 * torch.exp(-((x - 0.5) ** 2 + (y - 0.5) ** 2) / 0.08)
+
+    cases = [
+        ({"gaussian_noise": True, "sigma": 0.02}, False, True),
+        ({"poisson_noise": True, "photons": 200}, True, False),
+        ({"poisson_noise": True, "photons": 500, "gaussian_noise": True, "sigma": 0.01}, True, True),
+    ]
+    for config, poisson, gaussian in cases:
+        truth = noise.noise_model(config)
+        a, b = noise.estimate(noise.add_noise_to_measurement(smooth, config), poisson, gaussian)
+        for name, true, got in (("a", truth.a, a), ("b", truth.b, b)):
+            if true == 0:
+                assert got == 0, f"{name} is not in the model and must come back as 0"
+            else:
+                assert abs(got / true - 1) < 0.10, f"{config}: {name} = {got:.3g}, true {true:.3g}"
+
+    # a noiseless image gives (0, 0), not a division by zero
+    assert noise.estimate(smooth) == (0.0, 0.0) or max(noise.estimate(smooth)) < 1e-9
+    assert noise.estimate(torch.full((32, 32), 0.5, dtype=DTYPE)) == (0.0, 0.0)
+    print("  estimation      (a, b) recovered within 10 % on a smooth image; absent part = 0")
+
+
+def test_normalization():
+    """Every method gives g >= 0; all but min-max are a pure scale, which keeps g = H f linear."""
+    from core import normalization as norm
+
+    g = torch.rand(4, 30, 30, dtype=DTYPE) * 7.0
+    g[0, 0, 0] = -0.3                          # what background subtraction may leave
+    for method in norm.NORMALIZATIONS:
+        out = norm.normalize(g, method)
+        assert float(out.min()) >= 0, f"{method}: negative output"
+        assert method in norm.formula(method) or norm.formula(method).startswith("g")
+
+    assert float(norm.normalize(g, "peak").max()) == 1.0
+    assert float(norm.normalize(g, "min-max").min()) == 0.0
+
+    # a pure scale: normalizing H f and normalizing 3 * H f give the same image
+    for method in ("peak", "percentile 99.9", "L2 energy", "RMS", "mean"):
+        assert torch.allclose(norm.normalize(g.clamp(min=0), method),
+                              norm.normalize(3.0 * g.clamp(min=0), method)), method
+    # min-max is not: it subtracts an offset (why it is not the default)
+    shifted = g.clamp(min=0) + 1.0
+    assert float(norm.normalize(shifted, "min-max").min()) == 0.0
+    assert float(norm.normalize(shifted, "peak").min()) > 0.1
+
+    # percentile: a hot pixel saturates instead of squashing the rest of the image
+    hot = torch.rand(100, 100, dtype=DTYPE)
+    hot[0, 0] = 1000.0
+    assert float(norm.normalize(hot, "percentile 99.9").median()) > 0.3
+    assert float(norm.normalize(hot, "peak").median()) < 0.01
+
+    # the default, and a v1 config's integer
+    assert norm.resolve(None) == "peak" and norm.resolve(1) == "min-max"
+    assert norm.validate("peak") == [] and norm.validate("bogus")
+    print("  normalization   >= 0 always, a pure scale except min-max, hot pixels saturate")
 
 
 def main():
@@ -361,6 +449,8 @@ def main():
     test_problem()
     test_end_to_end()
     test_noise()
+    test_noise_estimation()
+    test_normalization()
     print("\nAll core contracts hold.")
 
 

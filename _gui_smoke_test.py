@@ -477,6 +477,101 @@ def c6():
 check("C6  bouton « Estimate » de lambda_rr, par clic", c6)
 
 
+def c7():
+    """La normalisation se choisit avec les fichiers, s'écrit dans le TOML et montre sa formule."""
+    combo = cw.input_files_section.normalization_widget.parameter_widgets["normalization"].combo
+    label = cw.input_files_section.normalization_widget.formula_label
+    combo.setCurrentText("percentile 99.9"); app.processEvents()
+    written = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["input-paths"]
+    assert written["normalization"] == "percentile 99.9", written
+    assert "q_{99.9}" in label.latex, label.latex
+
+    # le prétraitement (et donc « See preprocessed file ») applique ce choix
+    config = matirf_ready_config()
+    peak = MATIRF.preview({**config, "input-paths": {**config["input-paths"], "normalization": "peak"}})[1]
+    energy = MATIRF.preview({**config, "input-paths": {**config["input-paths"],
+                                                       "normalization": "L2 energy"}})[1]
+    assert abs(float(peak.max()) - 1.0) < 1e-6 and abs(float(energy.norm()) - 1.0) < 1e-4
+    combo.setCurrentText("peak"); app.processEvents()
+    assert "max" in label.latex
+    return "choix écrit, formule mise à jour, preview : max = 1 (peak) / ||g|| = 1 (énergie)"
+check("C7  normalisation dans les fichiers d'entrée, par clic", c7)
+
+
+def c8():
+    """La formule du bruit ajouté change avec les cases : gaussien pur, Poisson pur, mixte."""
+    widgets = cw.add_noise.parameter_widgets
+    label = cw.add_noise.section_widget.formula_label
+    poisson, gaussian = widgets["poisson_noise"].checkbox, widgets["gaussian_noise"].checkbox
+    shown = {}
+    for name, (p, g) in {"aucun": (False, False), "gaussien": (False, True),
+                         "poisson": (True, False), "mixte": (True, True)}.items():
+        poisson.setChecked(p); gaussian.setChecked(g); app.processEvents()
+        shown[name] = label.latex
+    assert "no noise" in shown["aucun"]
+    assert r"\mathcal{P}" not in shown["gaussien"] and "a = 0" in shown["gaussien"]
+    assert r"\mathcal{P}" in shown["poisson"] and "b = 0" in shown["poisson"]
+    assert r"\mathcal{P}" in shown["mixte"] and r"\sqrt{b}" in shown["mixte"]
+    type_in(widgets["photons"], 50)
+    assert "0.02" in label.latex, "a = 1/N doit suivre le nombre de photons tapé"
+    for box in (poisson, gaussian):
+        box.setChecked(False); app.processEvents()
+    return "4 formules distinctes ; a = 1/N suit la saisie"
+check("C8  formule du bruit ajouté, par clic", c8)
+
+
+def c9():
+    """
+    La section du modèle de bruit : a et b n'apparaissent qu'en mode manuel ET si le modèle
+    les utilise (depends_on à deux parents, en ET) ; la formule de D suit.
+    """
+    widgets = cw.noise_model.parameter_widgets
+    label = cw.noise_model.section_widget.formula_label
+    fidelity, source = widgets["fidelity"].combo, widgets["parameters"].combo
+    visible = lambda: (not widgets["a"].isHidden(), not widgets["b"].isHidden())
+
+    source.setCurrentText("estimated"); app.processEvents()
+    for model in ("L2 (Gaussian noise)", "KL divergence (Poisson noise)", "Poisson-Gaussian"):
+        fidelity.setCurrentText(model); app.processEvents()
+        assert visible() == (False, False), f"{model}, estimated: {visible()}"
+    assert "estimated" in label.latex
+
+    source.setCurrentText("manual"); app.processEvents()
+    expected = {"L2 (Gaussian noise)": (False, True), "KL divergence (Poisson noise)": (True, False),
+                "Poisson-Gaussian": (True, True)}
+    for model, want in expected.items():
+        fidelity.setCurrentText(model); app.processEvents()
+        assert visible() == want, f"{model}, manual: {visible()} au lieu de {want}"
+    type_in(widgets["a"], 0.005)
+    assert "a = 0.005" in label.latex, label.latex
+
+    written = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)["noise-model"]
+    assert written["fidelity"] == "Poisson-Gaussian" and written["parameters"] == "manual"
+    assert written["a"] == 0.005
+    fidelity.setCurrentText("L2 (Gaussian noise)"); source.setCurrentText("estimated")
+    app.processEvents()
+    return "a/b visibles selon modèle ET source ; formule de D avec les valeurs"
+check("C9  modèle de bruit : visibilité en ET, formule de D", c9)
+
+
+def c10():
+    """
+    Un config.toml écrit AVANT l'existence de [noise-model] : le premier clic dans la
+    section ne doit pas planter (il plantait : KeyError dans l'écriture du cache).
+    """
+    config = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
+    config.pop("noise-model", None)
+    save_toml(config, MATIRF_CONFIG_PATH)
+    cw.noise_model.parameter_widgets["parameters"].combo.setCurrentText("oracle")
+    app.processEvents()
+    written = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)
+    assert written["noise-model"]["parameters"] == "oracle", written.get("noise-model")
+    cw.noise_model.parameter_widgets["parameters"].combo.setCurrentText("estimated")
+    app.processEvents()
+    return "section absente recréée au premier clic"
+check("C10 ancien config.toml sans [noise-model] : pas de plantage", c10)
+
+
 print("\n=== D. RUN ET FENÊTRE D'AFFICHAGE (clics réels) ===")
 
 DISPLAY = {}

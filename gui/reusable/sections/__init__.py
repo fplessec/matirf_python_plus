@@ -1,4 +1,5 @@
-from .add_noise_section import AddNoiseSection, ADD_NOISE_PARAMETERS_UI
+from .add_noise_section import AddNoiseSection, ADD_NOISE_PARAMETERS_UI, add_noise_formula
+from .noise_model_section import NoiseModelSection, NOISE_MODEL_UI, noise_model_formula
 from .algorithm_selection_section import AlgorithmSelectionSection
 from .solver_registry_view import with_extra_buttons
 from .message_section import MessageSection

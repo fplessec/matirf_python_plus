@@ -13,20 +13,21 @@ from core import InverseProblem
 from problems.deconv import (  # paths defined before this module is imported
     DECONV_CONFIG_PATH, DEFAULT_DECONV_CONFIG, DECONV_RESULTS_DIR, DECONV_MEASUREMENTS_DIR,
 )
-from core import noise
+from core import noise, normalization
+from core.normalization import normalize_and_add_noise
 from fileio import load_png, save_png
 from .operator import DeconvOperator
 from .ui import DECONV_UI
 
 
 def _add_configured_noise(g: torch.Tensor, config: dict) -> torch.Tensor:
-    """Apply the noise the user asked for, if any. The section may be empty right after a
-    cache reset, which means no noise rather than a crash (see core/noise.py)."""
-    return noise.add_noise_to_measurement(g, config.get("add-noise", {}))
+    """Normalize, then apply the noise the user asked for, if any (core/normalization.py).
+    An empty '[add-noise]' — right after a cache reset — means no noise, not a crash."""
+    return normalize_and_add_noise(g, config)
 
 
 def load_measurement(config: dict) -> torch.Tensor:
-    """REAL mode: the blurred image, as acquired, plus any simulated extra noise."""
+    """REAL mode: the blurred image, as acquired, normalized, plus any simulated extra noise."""
     return _add_configured_noise(load_png(config["input-paths"]["png"]), config)
 
 
@@ -36,7 +37,7 @@ def load_truth(config: dict) -> torch.Tensor:
 
 
 def simulate(operator, f_true: torch.Tensor, config: dict) -> torch.Tensor:
-    """SYNTHETIC mode: blur the truth, then add the configured noise."""
+    """SYNTHETIC mode: blur the truth, then normalize and add the configured noise."""
     return _add_configured_noise(operator.apply(f_true), config)
 
 
@@ -56,6 +57,7 @@ def validate(config: dict) -> list:
     if paths.get("json", "None") == "None":
         errors.append("PSF parameters file (JSON): not provided")
     errors.extend(noise.validate(add_noise))
+    errors.extend(normalization.validate(config.get("input-paths", {}).get("normalization")))
     return errors
 
 

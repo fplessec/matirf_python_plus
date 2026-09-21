@@ -162,11 +162,16 @@ def control_window_class(problem) -> type:
         ## belongs to the framework: simulating a measurement and corrupting it with a
         ## chosen noise model is what `[add-noise]` means for every inverse problem.
         ## A problem opts out simply by having no '[add-noise]' section in its default config.
+        ## The noise model follows it, for every problem: each reconstruction needs a data
+        ## fidelity, and it is chosen with the measurement, not with the algorithm.
+        from gui.reusable import (ADD_NOISE_PARAMETERS_UI, add_noise_formula,
+                                  NOISE_MODEL_UI, noise_model_formula)
         sections_left = [inputs] + list(ui.parameters)
         if "add-noise" in (problem.default_config or {}):
-            from gui.reusable import ADD_NOISE_PARAMETERS_UI
-            sections_left.append(
-                ("Add noise to measurement", ADD_NOISE_PARAMETERS_UI, "add-noise"))
+            sections_left.append(("Add noise to measurement", ADD_NOISE_PARAMETERS_UI,
+                                  "add-noise", add_noise_formula))
+        sections_left.append(("Noise model (data fidelity)", NOISE_MODEL_UI,
+                              "noise-model", noise_model_formula))
         sections_right = [(AlgorithmSelectionSection,
                            {"algorithms_dict": solvers_view,
                             "problem_features": problem.features})]

@@ -1,21 +1,28 @@
 import torch
 
-from .base import DataFidelity
+from .base import DataFidelity, floored
 
 
 class PoissonFidelity(DataFidelity):
     """
-    Kullback-Leibler data fidelity for Poisson noise.
+    Photon (Poisson) noise: g = a * Poisson(Hf / a), a = 1 / N.
 
-        D(Hf, g) = sum( Hf - g * log(Hf) )
+        D(Hf, g) = mean( Hf - g + g log(g / Hf) ) / a
 
-    Assumes g >= 0 and Hf > 0.
+    The Kullback-Leibler divergence between g and Hf, i.e. the Poisson negative
+    log-likelihood of the photon counts g / a, up to a constant that makes D(g, g) = 0.
+    Assumes g >= 0 (guaranteed by the preprocessing); Hf is floored at a tiny positive value.
     """
 
     name = "poisson"
     display_name = "KL divergence (Poisson noise)"
-    noise_model = "poisson"
+    noise_parameters = ("a",)
+    formula = r"D(Hf,g) = \frac{1}{a}\,\overline{Hf - g + g\,\log(g / Hf)}"
+
+    def __init__(self, a: float = 1.0):
+        self.a = floored(a)
 
     def loss(self, Hf, g):
         Hf_safe = Hf.clamp(min=1e-12)
-        return (Hf_safe - g * torch.log(Hf_safe)).mean()
+        kl = Hf_safe - g + torch.xlogy(g, g) - torch.xlogy(g, Hf_safe)
+        return kl.mean() / self.a

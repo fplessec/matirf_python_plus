@@ -83,6 +83,7 @@ class QLatexLabel(QWidget):
         self.setLayout(layout)
 
     def update_latex(self, latex_formula):
+        self.latex = latex_formula          # what is shown, readable by tests
         buf = render_latex(latex_formula, fontsize=self.fontsize, color=self.color, dpi=self.dpi)
         # we use a QPixmap to render the latex formula image
         pixmap = QPixmap()

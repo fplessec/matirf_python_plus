@@ -69,6 +69,7 @@ class Ppxa(Solver):
 
     name = "PPXA"
     estimator_type = "MAP"
+    supported_noise_models = frozenset({"gaussian"})   # the data step is a least-squares solve
     uses_regularization = True
     ui_params = PPXA_UI_PARAMS
 
@@ -82,9 +83,15 @@ class Ppxa(Solver):
         EPS = float(params.get("EPS", 1e-8))
 
         operator = objective.operator
-        ## the data prox is the quadratic (Gaussian) one: argmin_p 1/2||p-u||^2 + c/2||Hp-g||^2
-        ## with c = gamma * (1 - lambda_reg), i.e. p = (I + c H^T H)^-1 (u + c H^T g).
-        c = gamma * objective.data_weight
+        ## PPXA runs on L rescaled so that its data term reads 1/2 ||Hf - g||^2 — the scale
+        ## gamma was tuned for in v1, before D carried the noise level. Rescaling L does not
+        ## move its minimizer; it only keeps gamma's meaning. With w = quadratic_weight:
+        ##     L / w = 1/2 ||Hf - g||^2 + (lambda / w) R
+        ## so the data prox is argmin_p 1/2||p-u||^2 + gamma/2 ||Hp-g||^2, and the prior's
+        ## prox is that of (gamma / w) * lambda * R. (w = 0 means lambda = 1: no data at all.)
+        w = objective.quadratic_weight
+        c = gamma if w > 0 else 0.0
+        reg_tau = gamma / w if w > 0 else gamma
         Htg = operator.adjoint(objective.g)
 
         f = f0.clone()
@@ -104,7 +111,7 @@ class Ppxa(Solver):
                 return f.clamp(min=0.0)
 
             p[0] = self._data_prox(operator, u[0], Htg, c)
-            p[1] = objective.prox_reg(u[1])
+            p[1] = objective.prox_reg(u[1], reg_tau)
             p[2] = u[2].clamp(min=0.0)
 
             f, u = self._combine(p, u, f, weights, relax)

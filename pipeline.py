@@ -14,8 +14,11 @@ have made `core` depend on `solvers`, inverting the dependency the whole design 
 
 One run, in order:
 
-    validate    the problem lists every unusable setting, all at once
-    prepare     the problem loads the data and builds its operator
+    validate    the problem lists every unusable setting, all at once; the pipeline adds
+                what only it can see (does this solver handle this noise model?)
+    prepare     the problem loads the data, normalizes it, and builds its operator
+    noise       the noise level (a, b) is estimated from g, taken from the simulation, or
+                read from the config — see `resolve_noise_model`
     assemble    the objective is built from the config: noise model, prior, weight
     solve       the chosen solver minimizes it, on a background thread
     evaluate    in synthetic mode, compare against the known truth
@@ -33,31 +36,122 @@ from typing import Optional
 
 import torch
 
-from core import DataMode, Objective
+from core import DataMode, Objective, noise
 from core.result import Result
 from core.enums import PipelineState
 from fileio import save_toml, save_txt, load_txt, save_json, load_json
 from solvers import SOLVERS
 from solvers.differential_operators import DifferentialOperators
-from solvers.fidelities import DATA_FIDELITY_REGISTRY, GaussianFidelity
+from solvers.fidelities import DATA_FIDELITY_REGISTRY, GaussianFidelity, NOISE_FLOOR
 from solvers.regularizers import REGULARIZATION_REGISTRY, NoRegularization
+
+
+# ── the noise model: which likelihood, and at what level ─────────────────────
+
+NOISE_MODEL_KEY = "noise-model"
+## where the noise parameters (a, b) come from:
+NOISE_SOURCES = ("estimated", "oracle", "manual")
+
+
+def fidelity_class(config: dict):
+    """
+    The data fidelity the config selects: '[noise-model] fidelity'.
+
+    A config written before the noise model had its own section kept the choice in
+    '[algo-params] data_fidelity'; it is still read, so an old run reproduces.
+    """
+    section = config.get(NOISE_MODEL_KEY) or {}
+    key = section.get("fidelity") or config.get("algo-params", {}).get("data_fidelity")
+    return DATA_FIDELITY_REGISTRY.get(key, GaussianFidelity)
+
+
+def validate_noise_model(config: dict, solver_class=None) -> list:
+    """Every unusable noise-model setting, including one the chosen solver cannot handle."""
+    section = config.get(NOISE_MODEL_KEY) or {}
+    errors = []
+    key = section.get("fidelity")
+    if key not in (None, "None") and key not in DATA_FIDELITY_REGISTRY:
+        errors.append(f"Noise model: unknown data fidelity {key!r}")
+        return errors
+    cls = fidelity_class(config)
+
+    source = section.get("parameters", "estimated")
+    if source not in NOISE_SOURCES:
+        errors.append(f"Noise model: unknown parameter source {source!r} "
+                      f"(choose one of: {', '.join(NOISE_SOURCES)})")
+    elif source == "oracle" and config.get("input-paths", {}).get("mode") != DataMode.SYNTHETIC.value:
+        errors.append("Noise model: 'oracle' parameters exist only for simulated data "
+                      "(synthetic mode) — use 'estimated' or 'manual' on a real measurement")
+    elif source == "manual":
+        for name in cls.noise_parameters:
+            value = section.get(name)
+            try:
+                if float(value) < 0:
+                    errors.append(f"Noise model: {name} must be non-negative (got {value})")
+            except (TypeError, ValueError):
+                errors.append(f"Noise model: {name} is required with manual parameters")
+
+    if solver_class is not None and cls.name not in solver_class.supported_noise_models:
+        supported = ", ".join(sorted(solver_class.supported_noise_models))
+        errors.append(f"Noise model: {solver_class.name} handles only {supported} noise, "
+                      f"not {cls.display_name!r} — choose a solver that supports it "
+                      f"(ADAM and MCMC take every noise model), or another noise model")
+    return errors
+
+
+def resolve_noise_model(prepared, config: dict):
+    """
+    The data fidelity for this run, with its noise level (a, b), and where (a, b) came from.
+
+        estimated   measured on the preprocessed g (core.noise.estimate): the only option
+                    on a real measurement, and a test of the estimator on a simulated one
+        oracle      the values '[add-noise]' used to corrupt the simulation — exact, but
+                    only defined in synthetic mode
+        manual      '[noise-model] a' and 'b', as typed
+
+    Returns (fidelity, message) — the message goes to the run log, so a saved result
+    records the noise level its reconstruction assumed.
+    """
+    cls = fidelity_class(config)
+    section = config.get(NOISE_MODEL_KEY) or {}
+    source = section.get("parameters", "estimated")
+    if source == "manual":
+        a, b = (float(section.get(name, 0.0) or 0.0) for name in ("a", "b"))
+    elif source == "oracle":
+        model = noise.noise_model(config.get("add-noise", {}))
+        a, b = model.a, model.b
+    else:
+        a, b = noise.estimate(prepared.g, poisson="a" in cls.noise_parameters,
+                              gaussian="b" in cls.noise_parameters)
+    fidelity = cls.from_noise(a, b)
+    message = f"Noise model: {fidelity.describe()}, {source}"
+    floored = [name for name in cls.noise_parameters
+               if {"a": a, "b": b}[name] < NOISE_FLOOR]
+    if floored and not (cls.name == "poisson-gaussian" and len(floored) == 1):
+        message += (f" — {' and '.join(floored)} below {NOISE_FLOOR:g}, floored "
+                    f"(a nearly noiseless measurement)")
+    return fidelity, message
 
 
 # ── assembling the objective from a parameter dict ────────────────────────────
 
-def build_objective(prepared, params: dict, uses_regularization: bool = True) -> Objective:
+def build_objective(prepared, params: dict, uses_regularization: bool = True,
+                    fidelity=None) -> Objective:
     """
     Turn the user's parameter dict into the Objective to minimize.
 
     This is the step v1 asked each algorithm to perform for itself. Doing it once, here,
     is what lets a solver receive a finished objective and stay problem-agnostic.
 
+    `fidelity` is the noise model resolved by `resolve_noise_model`; when omitted it is
+    resolved here from the prepared config.
+
     `uses_regularization` comes from the solver: a solver whose data step is a hardcoded
     quadratic (ADMM, PnP) is given no prior, because attaching one would silently suggest
     an influence it does not have.
     """
-    fidelity_key = params.get("data_fidelity", GaussianFidelity.display_name)
-    fidelity = DATA_FIDELITY_REGISTRY.get(fidelity_key, GaussianFidelity)()
+    if fidelity is None:
+        fidelity, _ = resolve_noise_model(prepared, prepared.config)
 
     regularization, lambda_reg = None, 0.0
     if uses_regularization:
@@ -229,8 +323,10 @@ class Pipeline:
             self.solver = solver_class()
             self.solver.publishing = self.live_preview
             params = self.config.get("algo-params", {})
+            fidelity, noise_message = resolve_noise_model(self.prepared, self.config)
+            self._print(noise_message)
             objective = build_objective(self.prepared, params,
-                                        solver_class.uses_regularization)
+                                        solver_class.uses_regularization, fidelity)
             self._print(f"Solver: {solver_class.name} ({solver_class.estimator_type}).")
 
             self.solver.on_message = self._print
@@ -257,6 +353,7 @@ class Pipeline:
         elif name not in SOLVERS:
             errors.append(f"Algorithm: unknown solver {name!r} "
                           f"(available: {', '.join(SOLVERS)})")
+        errors.extend(validate_noise_model(self.config, SOLVERS.get(name)))
         return errors
 
     def _on_solved(self, f: torch.Tensor) -> None:

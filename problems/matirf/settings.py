@@ -4,5 +4,5 @@
 # 100 is way enough to compute precisely the integrals.
 precision = 100
 
-# normalization type for preprocessing the data file
-normalization = 1
+# The normalization of the measurement is no longer a constant here: it is chosen per run in
+# the '[input-paths]' section (see core/normalization.py).

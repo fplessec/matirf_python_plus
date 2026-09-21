@@ -56,7 +56,7 @@ class Admm(Solver):
 
     name = "ADMM"
     estimator_type = "MAP"
-    uses_data_fidelity = False
+    supported_noise_models = frozenset({"gaussian"})   # the data step is a least-squares solve
     uses_regularization = False
     ui_params = ADMM_UI_PARAMS
 

@@ -113,7 +113,7 @@ class Pnp(Solver):
     name = "PNP"
     estimator_type = "MAP"
     uses_denoiser = True
-    uses_data_fidelity = False
+    supported_noise_models = frozenset({"gaussian"})   # the data step is a least-squares solve
     uses_regularization = False
     ui_params = PNP_UI_PARAMS
 
@@ -179,7 +179,7 @@ class PnpAdmm(Solver):
     name = "ADMM-PnP"
     estimator_type = "MAP"
     uses_denoiser = True
-    uses_data_fidelity = False
+    supported_noise_models = frozenset({"gaussian"})   # the data step is a least-squares solve
     uses_regularization = False
     ui_params = PNP_ADMM_UI_PARAMS
 

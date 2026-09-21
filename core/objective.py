@@ -11,8 +11,24 @@ lambda_reg is a blend in [0, 1]: 0 is pure data fidelity, 1 is pure prior (and i
 measurement entirely). The two weights sum to 1, so raising the regularization necessarily
 loosens the fidelity — they trade against each other rather than varying independently.
 
-This is the convention carried over from v1, kept deliberately so that every lambda_reg
-already tuned and saved in a config.toml keeps its exact meaning.
+This is the convention carried over from v1.
+
+--------------------------------------------------------------------------------------
+What lambda_reg means — and what it does not
+--------------------------------------------------------------------------------------
+
+D is the negative log-likelihood of the noise, per pixel, parameterized by the noise level
+(solvers/fidelities/base.py); R is a mean over the voxels (solvers/regularizers/base.py).
+So L is, up to a constant factor, the negative log-POSTERIOR of the Bayesian model:
+
+    -log p(f | g)  ∝  (1 - lambda) D_theta(Hf, g)  +  lambda R(f)
+
+The noise level theta = (a, b) lives in D, where it belongs — estimated from g, known in a
+simulation, or set by hand (the '[noise-model]' section). lambda_reg is left with a single
+job: how strongly the prior pulls. It does not have to compensate for a noisier
+measurement, and the same value means the same thing with a Gaussian or a Poisson fidelity,
+on a large image or a small one. That is what makes lambda_reg comparable across noise
+models, problems and algorithms — the point of a benchmark.
 
 --------------------------------------------------------------------------------------
 Why the problem builds this, and not the solver
@@ -38,7 +54,8 @@ The contract solvers rely on
     value(f)          L(f), differentiable                  — every solver
     grad(f)           dL/df                                 — gradient solvers (Adam, ...)
     residual(f)       H f - g                               — data-consistency steps
-    prox_reg(f, tau)  prox of tau * lambda_reg * R          — proximal solvers (PPXA, ADMM)
+    prox_reg(f, tau)  prox of tau * lambda_reg * R          — proximal solvers (PPXA)
+    quadratic_weight  w with (1-lambda) D = w/2 ||Hf-g||^2   — least-squares data steps
     operator          the ForwardOperator                   — MCMC, warm starts, step sizes
 
 A solver declares which of these it needs; a term that cannot provide one (a regularizer
@@ -131,6 +148,24 @@ class Objective:
         `data_weight * D`, not `D`.
         """
         return 1.0 - self.lambda_reg if self.is_regularized else 1.0
+
+    @property
+    def quadratic_weight(self) -> float:
+        """
+        The w such that (1 - lambda_reg) * D(Hf, g) = w/2 ||Hf - g||^2 — Gaussian noise only.
+
+        A splitting solver's data step is the closed-form minimizer of a quadratic, so it
+        needs the weight of that quadratic, which carries the noise level: for Gaussian noise
+        of variance b, D = mean((Hf - g)^2) / (2b), hence w = (1 - lambda_reg) / (b * N_g).
+        The fidelity supplies the 1 / (b * N_g) part through `quadratic_scale(N_g)`; one
+        that has none (Poisson) is not quadratic, and asking is an error.
+        """
+        scale = getattr(self.data_fidelity, "quadratic_scale", None)
+        if scale is None:
+            raise NotImplementedError(
+                f"{type(self.data_fidelity).__name__} is not a quadratic data fidelity: a "
+                f"solver whose data step is a least-squares solve cannot use it.")
+        return self.data_weight * scale(self.g.numel())
 
     def residual(self, f: torch.Tensor) -> torch.Tensor:
         """H f - g. The data-consistency error, used directly by MCMC proposals."""

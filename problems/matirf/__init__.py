@@ -31,8 +31,10 @@ MATIRF_RESULTS_DIR = MATIRF_DATA_DIR / 'results'
 ## fill in rather than a KeyError.
 DEFAULT_MATIRF_CONFIG = {
     "algorithm": 'None',
-    "input-paths": {"mode": "real-data", "tif": "None", "json": "None"},
+    "input-paths": {"mode": "real-data", "tif": "None", "json": "None",
+                    "normalization": "peak"},
     "add-noise": {},
+    "noise-model": {},
     "oper-params": {},
     "algo-params": {},
 }

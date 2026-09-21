@@ -25,8 +25,10 @@ DECONV_RESULTS_DIR = DECONV_DATA_DIR / 'results'
 
 DEFAULT_DECONV_CONFIG = {
     "algorithm": 'None',
-    "input-paths": {"mode": "synthetic-data", "png": "None", "json": "None"},
+    "input-paths": {"mode": "synthetic-data", "png": "None", "json": "None",
+                    "normalization": "peak"},
     "add-noise": {},
+    "noise-model": {},
     "algo-params": {},
 }
 

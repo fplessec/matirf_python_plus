@@ -179,7 +179,11 @@ class SimpleParameterWidget(QWidget):
                     self.param_value = None
         self.update_callback = update_value
         self.input_widget.textChanged.connect(update_value)
-        # update_value_display()
+        ## show the default at once — without writing it to the cache: until the config holds
+        ## a value, the display was blank, so a default-valued field looked unset
+        if self.param_value is not None:
+            self.value_display.update_latex(
+                f"{param_info['latex_name']} = {self.param_value} \\;\\text{{{param_info['unit']}}}")
         self.layout.addWidget(self.value_display)
 
     def setup_bool_widget(self):

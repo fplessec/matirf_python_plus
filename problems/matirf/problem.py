@@ -16,34 +16,15 @@ from core import InverseProblem
 from problems.matirf import (  # paths defined before this module is imported
     MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG, MATIRF_RESULTS_DIR, MATIRF_MEASUREMENTS_DIR,
 )
-from core import noise
+from core import noise, normalization
+from core.normalization import normalize_and_add_noise
 from fileio import load_tif, save_tif, load_json
-import problems.matirf.settings as matirf_settings
 from .operator import MatirfOperator
 from .ui import MATIRF_UI
 from . import physics
 
 
 # ── loading and preprocessing the measurement ─────────────────────────────────
-
-def normalize_measurement(g: torch.Tensor, mode: int = matirf_settings.normalization):
-    """
-    Put the measured stacks on a common scale.
-
-    MA-TIRF is scale-ambiguous (see the operator's features), so the absolute level carries
-    no information and normalizing loses nothing. Modes: 0 none, 1 min-max to [0, 1],
-    2 unit L2 norm, 3 unit RMS, 4 unit mean.
-    """
-    if mode == 1:
-        return (g - g.min()) / (g.max() - g.min())
-    if mode == 2:
-        return g / g.square().sum().sqrt()
-    if mode == 3:
-        return g / g.square().mean().sqrt()
-    if mode == 4:
-        return g / g.mean()
-    return g
-
 
 def split_background(g: torch.Tensor, measurement_params: dict):
     """
@@ -84,11 +65,15 @@ def split_background(g: torch.Tensor, measurement_params: dict):
 
 
 def preprocess(g: torch.Tensor, measurement_params: dict, config: dict):
-    """Background removal, normalization, then the optional simulated noise."""
+    """
+    Background removal, then the normalization and the optional simulated noise.
+
+    MA-TIRF is scale-ambiguous (see the operator's features): the absolute level carries no
+    information, so normalizing loses nothing — it only fixes the unit the noise level and
+    the data fidelity are expressed in (core/normalization.py).
+    """
     g, measurement_params = split_background(g, measurement_params)
-    g = normalize_measurement(g)
-    g = noise.add_noise_to_measurement(g, config.get("add-noise", {}))   # no-op if disabled
-    return g, measurement_params
+    return normalize_and_add_noise(g, config), measurement_params
 
 
 def _refined_config(config: dict, measurement_params: dict) -> dict:
@@ -126,10 +111,8 @@ def load_truth(config: dict):
 
 
 def simulate(operator, f_true: torch.Tensor, config: dict) -> torch.Tensor:
-    """SYNTHETIC mode: g = H f_true, then the same preprocessing a real measurement gets."""
-    g = operator.apply(f_true)
-    g = normalize_measurement(g)
-    return noise.add_noise_to_measurement(g, config.get("add-noise", {}))
+    """SYNTHETIC mode: g = H f_true, then the same normalization and noise a real one gets."""
+    return normalize_and_add_noise(operator.apply(f_true), config)
 
 
 def build_operator(config: dict) -> MatirfOperator:
@@ -178,6 +161,7 @@ def validate(config: dict) -> list:
     if oper.get("normalize", "None") in (None, "None", "null"):
         errors.append("Operator parameter 'normalize' (normalize the operator): not set")
     errors.extend(noise.validate(add_noise))
+    errors.extend(normalization.validate(config.get("input-paths", {}).get("normalization")))
     return errors
 
 

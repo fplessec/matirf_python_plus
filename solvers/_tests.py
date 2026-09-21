@@ -72,6 +72,8 @@ class _Gaussian:
 
     def loss(self, Hf, g):
         return 0.5 * ((Hf - g) ** 2).sum()
+    def quadratic_scale(self, n_pixels):   # 1/2 ||r||^2: a quadratic of weight 1
+        return 1.0
 
 
 class _L2:
@@ -134,7 +136,7 @@ def test_ui_params():
 
     # merged for a solver that uses regularization:
     isotropic = Adam.get_ui_params(features(Feature.TWO_D))
-    assert {"max_iter", "data_fidelity", "reg", "lambda_reg"} <= set(isotropic)
+    assert {"max_iter", "reg", "lambda_reg"} <= set(isotropic)
 
     # `delta` requires ANISOTROPIC: present on MA-TIRF-like problems, absent on 2D ones,
     # with no conditional anywhere in the solver
@@ -142,19 +144,21 @@ def test_ui_params():
     anisotropic = Adam.get_ui_params(features(Feature.THREE_D, Feature.ANISOTROPIC))
     assert "delta" in anisotropic
 
-    # the noise model and the prior are gated independently, which matters:
-    #   Adam/PPXA  evaluate D and R      -> both offered
-    #   MCMC       evaluates D only      -> noise model, no prior
-    #   ADMM/PnP   hardcode a quadratic  -> neither, since choosing one would do nothing
+    # the prior is offered only to the solvers that consult it
     for solver in (Adam, Ppxa):
-        keys = solver.get_ui_params(features(Feature.TWO_D))
-        assert "data_fidelity" in keys and "lambda_reg" in keys, solver.name
-    mcmc_keys = Mcmc.get_ui_params(features(Feature.TWO_D))
-    assert "data_fidelity" in mcmc_keys and "lambda_reg" not in mcmc_keys
-    for solver in (Admm, Pnp, PnpAdmm):
-        keys = solver.get_ui_params(features(Feature.TWO_D))
-        assert "data_fidelity" not in keys and "lambda_reg" not in keys, solver.name
-    print("  ui params       noise model and prior gated independently, delta by ANISOTROPIC")
+        assert "lambda_reg" in solver.get_ui_params(features(Feature.TWO_D)), solver.name
+    for solver in (Mcmc, Admm, Pnp, PnpAdmm):
+        assert "lambda_reg" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
+
+    # the noise model is NOT an algorithm parameter any more: it belongs to the measurement
+    # ('[noise-model]'), and each solver only declares which models it can minimize
+    for solver in SOLVERS.values():
+        assert "data_fidelity" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
+    assert Adam.supported_noise_models == {"gaussian", "poisson", "poisson-gaussian"}
+    assert Mcmc.supported_noise_models == Adam.supported_noise_models
+    for solver in (Ppxa, Admm, Pnp, PnpAdmm):
+        assert solver.supported_noise_models == {"gaussian"}, solver.name
+    print("  ui params       prior gated by solver, delta by ANISOTROPIC, noise models declared")
 
 
 def test_initial_guess():
@@ -336,6 +340,94 @@ def test_threading_and_interruption():
     print("  threading       background run, clean interruption, errors reported")
 
 
+# ── the Bayesian formulation: D is a scaled likelihood, lambda a pure prior weight ──
+
+def test_fidelities_are_scaled_likelihoods():
+    """
+    Every fidelity is the per-pixel negative log-likelihood of its noise, so:
+        D(g, g) = 0                  the constant is chosen that way
+        D(H f_true, g) ~ 1/2         at the truth, for EVERY model with its right (a, b)
+    The second is what makes lambda_reg mean the same thing with any noise model.
+    """
+    from core import noise
+    from solvers.fidelities import GaussianFidelity, PoissonFidelity, PoissonGaussianFidelity
+
+    clean = 0.05 + 0.95 * torch.rand(200_000, dtype=DTYPE)
+    cases = [
+        (GaussianFidelity, {"gaussian_noise": True, "sigma": 0.03}),
+        (PoissonFidelity, {"poisson_noise": True, "photons": 300}),
+        (PoissonGaussianFidelity, {"poisson_noise": True, "photons": 300,
+                                   "gaussian_noise": True, "sigma": 0.03}),
+    ]
+    for cls, config in cases:
+        model = noise.noise_model(config)
+        g = noise.add_noise_to_measurement(clean, config)
+        D = cls.from_noise(model.a, model.b)
+        assert float(D.loss(g, g)) < 1e-12, f"{cls.__name__}: D(g, g) must be 0"
+        at_truth = float(D.loss(clean, g))
+        assert abs(at_truth - 0.5) < 0.05, f"{cls.__name__}: D at the truth = {at_truth:.3f}"
+
+    # b = 1 is v1's 1/2 mean squared error, bit for bit
+    a, b = torch.rand(50, dtype=DTYPE), torch.rand(50, dtype=DTYPE)
+    assert torch.equal(GaussianFidelity().loss(a, b), 0.5 * torch.nn.functional.mse_loss(a, b))
+    # the floor: a noiseless measurement does not make D infinite
+    assert GaussianFidelity(b=0.0).b > 0 and PoissonFidelity(a=0.0).a > 0
+    print("  fidelities      D(g,g) = 0 and D(truth) = 1/2 for Gaussian, Poisson, Poisson-Gaussian")
+
+
+def test_adam_and_ppxa_minimize_the_same_objective():
+    """
+    A gradient solver and a proximal solver must agree on what L is.
+
+    Adam differentiates L = (1 - lambda) D + lambda R directly; PPXA rebuilds it from a
+    least-squares data step and the prior's prox. Before the scale convention (D and R both
+    per-pixel means, prox of the MEAN), the two disagreed by the ratio of the image sizes
+    and converged to different images. Now their minima coincide.
+    """
+    from solvers.differential_operators import DifferentialOperators
+    from solvers.fidelities import GaussianFidelity
+    from solvers.regularizers import TikhonovRegularization
+
+    n = 32
+    fy = torch.fft.fftfreq(n, dtype=DTYPE)
+    kernel_hat = torch.exp(-2 * math.pi ** 2 * 1.5 ** 2 * (fy[:, None] ** 2 + fy[None, :] ** 2))
+
+    class _Blur2D(ForwardOperator):
+        name = "blur2d"
+        features = features(Feature.TWO_D)
+        def apply(self, f):
+            return torch.fft.ifft2(torch.fft.fft2(f) * kernel_hat).real
+        def adjoint(self, y):
+            return self.apply(y)
+
+    torch.manual_seed(3)
+    f_true = torch.zeros(n, n, dtype=DTYPE)
+    f_true[8:20, 6:14] = 1.0
+    f_true[18:28, 16:26] = 0.6
+    operator = _Blur2D()
+    sigma = 0.03
+    g = (operator.apply(f_true) + sigma * torch.randn(n, n, dtype=DTYPE)).clamp(min=0)
+
+    objective = Objective(operator, g, GaussianFidelity(b=sigma ** 2), TikhonovRegularization(n_iter=60),
+                          lambda_reg=0.02, diff_ops=DifferentialOperators())
+    with contextlib.redirect_stdout(open(os.devnull, "w")):
+        adam = Adam()
+        f_adam = adam.solve(objective, adam.initial_guess(objective, {}),
+                            {"max_iter": 8000, "lr": 0.01, "K": 8000, "EPS": 0.0})
+        ppxa = Ppxa()
+        f_ppxa = ppxa.solve(objective, ppxa.initial_guess(objective, {}),
+                            {"max_iter": 3000, "lambda_relax": 1.5, "gamma": 10.0,
+                             "K": 3000, "EPS": 0.0})
+    L_adam, L_ppxa = float(objective.value(f_adam)), float(objective.value(f_ppxa))
+    gap = abs(L_adam - L_ppxa) / L_adam
+    distance = float((f_adam - f_ppxa).norm() / f_adam.norm())
+    ## a flat valley (lambda is small): L agrees much more tightly than the images do
+    assert gap < 1e-3 and distance < 0.1, (
+        f"Adam and PPXA disagree: L = {L_adam:.5f} vs {L_ppxa:.5f}, images {distance:.2%} apart")
+    print(f"  same objective  Adam and PPXA reach the same minimum (L gap {gap:.1e}, "
+          f"images {distance:.1e} apart)")
+
+
 def main():
     print("solvers — contract tests\n")
     test_registry()
@@ -346,6 +438,8 @@ def main():
     test_same_solver_two_physics()
     test_regularization_and_reporting()
     test_threading_and_interruption()
+    test_fidelities_are_scaled_likelihoods()
+    test_adam_and_ppxa_minimize_the_same_objective()
     print("\nAll solver contracts hold.")
 
 

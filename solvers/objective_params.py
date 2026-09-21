@@ -1,7 +1,7 @@
 """
 The parameters that describe the OBJECTIVE, shared by every solver that uses one.
 
-`data_fidelity`, `reg`, `lambda_reg`, `delta`, `rho` do not belong to any particular
+`reg`, `lambda_reg`, `delta`, `rho` do not belong to any particular
 algorithm — they describe what is being minimized, not how. v1 nevertheless repeated them
 inside every algorithm's ui_params (adam, ppxa, admm, pnp, mcmc), so adding a new
 regularization meant editing five files and forgetting one was easy.
@@ -10,29 +10,19 @@ Here they are declared once. Any solver with `uses_regularization = True` receiv
 automatically (see `Solver.get_ui_params`), and its own ui_params contain only what is
 genuinely specific to that algorithm — iterations, learning rate, step size.
 
-The fidelities and regularizations themselves live under `solvers/` — they describe the
-objective, not any problem, so this is where they belong. The old paths under
-`common/algorithms/reusable/` are re-export shims kept only until the v1 stack is deleted.
+The regularizations themselves live under `solvers/regularizers/` — they describe the
+objective, not any problem, so this is where they belong.
 """
 
-from solvers.fidelities import DATA_FIDELITY_LIST
 from solvers.regularizers import (
     REGULARIZATION_LIST, ANISOTROPIC_REGULARIZATIONS,
 )
 from core.features import Feature
 
 
-## Which noise model D(Hf, g) measures the discrepancy. Offered to any solver that
-## evaluates D through the objective (Adam, PPXA, MCMC) — but NOT to the splitting solvers
-## whose data step is a hardcoded quadratic (ADMM, PnP, PnP-ADMM), where choosing a Poisson
-## fidelity would have no effect and would only mislead the user.
-DATA_FIDELITY_UI_PARAM = {
-    "data_fidelity": {
-        "title": "Data fidelity (noise model)",
-        "type": "option",
-        "param_info": {"options_list": DATA_FIDELITY_LIST},
-    },
-}
+## The noise model is NOT here: it describes the measurement, not what any algorithm does
+## with it, and has its own '[noise-model]' section (gui/reusable/sections/noise_model_section.py).
+## A solver only declares which models it supports (`Solver.supported_noise_models`).
 
 
 ## The explicit prior R(f) and its weight. Offered only to solvers that actually consult
@@ -82,7 +72,7 @@ REGULARIZATION_UI_PARAMS = {
 
 
 ## Everything describing the objective — what `Solver.get_ui_params` merges in.
-OBJECTIVE_UI_PARAMS = {**DATA_FIDELITY_UI_PARAM, **REGULARIZATION_UI_PARAMS}
+OBJECTIVE_UI_PARAMS = dict(REGULARIZATION_UI_PARAMS)
 
 
 ## Where the iteration starts. Generic since ForwardOperator.ridge_inverse exists for every

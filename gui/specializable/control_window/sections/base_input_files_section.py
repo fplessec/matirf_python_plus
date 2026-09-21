@@ -24,13 +24,15 @@ Declarative configuration (override as class attributes):
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QPalette
 from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox
 
 from gui.widgets import QSwitchButton, QSeparator
 from gui.reusable import FileSelector, SelectorButton
-from core import DataMode
+from core import DataMode, normalization
 from fileio import load_or_create_toml, load_json
+from gui.base.base_section_widget import BaseSectionWidget
 from settings import FontSize
 
 
@@ -96,6 +98,16 @@ class FileSlot:
     editor: Editor = None
 
 
+NORMALIZATION_UI = {
+    "normalization": {
+        "title": "Normalization",
+        "type": "option",
+        ## the first option is the default, so the order follows core/normalization.py
+        "param_info": {"options_list": normalization.NORMALIZATIONS},
+    },
+}
+
+
 class BaseInputFilesSection(QGroupBox):
     """
     Input-files section of a control window — declared entirely by class attributes.
@@ -105,6 +117,12 @@ class BaseInputFilesSection(QGroupBox):
     --------
         [ real  <switch>  synthetic ]                    (mode toggle)
         [ image FileSelector | json FileSelector ]
+        [ Normalization  <choice> ]                      ('[input-paths] normalization')
+        [ g <- g / max(g) ]                              (its formula)
+
+    The normalization sits with the files because it belongs to the measurement: it fixes
+    the unit every noise level and the data fidelity are expressed in (core/normalization.py),
+    and "See preprocessed file" shows its effect.
 
     ----------
     > Parameters (override as class attributes) :
@@ -171,6 +189,9 @@ class BaseInputFilesSection(QGroupBox):
     DEFAULT_MODE_REAL = True
     IMAGE_SLOT = None     # FileSlot
     JSON_SLOT = None      # FileSlot
+
+    ## the mode or the normalization changed — other sections' formulas may depend on them
+    changed = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__("Input Files")
@@ -283,7 +304,18 @@ class BaseInputFilesSection(QGroupBox):
         layout.setContentsMargins(1, 1, 1, 1)
         layout.addLayout(self._create_top_layout())
         layout.addLayout(self._create_bottom_layout())
+        layout.addWidget(QSeparator('H'))
+        layout.addWidget(self._create_normalization_widget())
         self.setLayout(layout)
+
+    def _create_normalization_widget(self):
+        self.normalization_widget = BaseSectionWidget(
+            params_ui_dict=NORMALIZATION_UI, toml_section_key="input-paths",
+            update_cache_fn=self.UPDATE_CACHE_FN,
+            load_toml_fn=self._load_config_for_update, config_path=self.CONFIG_PATH,
+            formula=lambda values, config: normalization.formula(values["normalization"]))
+        self.normalization_widget.changed.connect(self.changed)
+        return self.normalization_widget
 
     def _create_top_layout(self):
         top = QHBoxLayout()
@@ -329,6 +361,7 @@ class BaseInputFilesSection(QGroupBox):
         self.image_selector.update_mode()
         self.json_selector.update_mode()
         self.notify_selection_changed()
+        self.changed.emit()
 
     def are_both_file_selected(self):
         return self.image_selector.is_file_selected and self.json_selector.is_file_selected
@@ -355,3 +388,4 @@ class BaseInputFilesSection(QGroupBox):
         image_path, json_path = self._get_file_paths_from_config(config)
         self.image_selector.update_selected_file(image_path)
         self.json_selector.update_selected_file(json_path)
+        self.normalization_widget.update_ui_from_toml(toml_path)

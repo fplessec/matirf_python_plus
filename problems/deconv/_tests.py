@@ -152,6 +152,8 @@ def test_all_solvers_run():
         display_name = "gaussian"
         def loss(self, Hf, gg):
             return 0.5 * ((Hf - gg) ** 2).sum()
+        def quadratic_scale(self, n_pixels):   # 1/2 ||r||^2: a quadratic of weight 1
+            return 1.0
 
     budgets = {
         "ADAM": {"max_iter": 60, "lr": 0.02, "K": 60, "EPS": 1e-14},

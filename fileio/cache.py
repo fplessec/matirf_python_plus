@@ -9,8 +9,10 @@ def make_update_cache(config_path, default_config):
     def update_cache(key_path, new_value):
         config = load_or_create_toml(config_path, default_config)
         ref = config
+        ## a section missing from an older config.toml (one written before the section
+        ## existed) is created, instead of failing on the user's first click
         for key in key_path[:-1]:
-            ref = ref[key]
+            ref = ref.setdefault(key, {})
         ref[key_path[-1]] = new_value if new_value is not None else "null"
         save_toml(config, config_path)
     return update_cache

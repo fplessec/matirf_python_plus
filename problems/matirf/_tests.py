@@ -113,7 +113,10 @@ def test_preprocessing_matches_v1():
     """Background removal and normalization must still produce what v1 produced."""
     reference = _reference()
     raw = load_tif(TIF)
-    g, params = matirf_problem.preprocess(raw.clone(), load_json(JSON), {})
+    ## v1 normalized by min-max; the v2 default is "peak" (core/normalization.py), so the
+    ## comparison asks for v1's method explicitly
+    g, params = matirf_problem.preprocess(raw.clone(), load_json(JSON),
+                                          {"input-paths": {"normalization": "min-max"}})
     _assert_fingerprint(_fingerprint(g), reference["preprocessed_g"], "preprocessed measurement")
     assert params["angles_deg"] == reference["angles_after_preprocessing"]
 
@@ -214,6 +217,8 @@ def test_solver_runs_on_matirf():
         display_name = "gaussian"
         def loss(self, Hf, g):
             return 0.5 * ((Hf - g) ** 2).sum()
+        def quadratic_scale(self, n_pixels):   # 1/2 ||r||^2: a quadratic of weight 1
+            return 1.0
 
     objective = Objective(prepared.operator, prepared.g, _Gaussian())
     solver = Adam()
@@ -254,6 +259,8 @@ def test_ridge_warm_start_helps():
         display_name = "gaussian"
         def loss(self, Hf, g):
             return 0.5 * ((Hf - g) ** 2).sum()
+        def quadratic_scale(self, n_pixels):   # 1/2 ||r||^2: a quadratic of weight 1
+            return 1.0
 
     objective = Objective(prepared.operator, prepared.g, _Gaussian())
     solver = Adam()

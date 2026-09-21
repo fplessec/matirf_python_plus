@@ -23,7 +23,7 @@ from core.enums import PipelineState
 from core import DataMode
 from problems.deconv import DECONV_MEASUREMENTS_DIR
 from problems.matirf import MATIRF_MEASUREMENTS_DIR
-from pipeline import Pipeline, build_objective
+from pipeline import Pipeline, build_objective, resolve_noise_model, validate_noise_model
 from problems.deconv import DECONV
 from problems.matirf import MATIRF
 
@@ -125,6 +125,65 @@ def test_build_objective():
     assert abs(estimated - matirf_prepared.operator.estimate_anisotropy_ratio()) < 1e-9
     assert build_objective(prepared, {}).diff_ops.delta == 1.0, "isotropic by default"
     print("  objective       defaults, blend convention, prior withheld, delta estimated")
+
+
+# ── the noise model ───────────────────────────────────────────────────────────
+
+def test_noise_model():
+    """
+    The noise model is chosen with the measurement and checked against the solver.
+
+    Resolved three ways — oracle (the simulation's own values), estimated (from g), manual —
+    and refused, with a readable message, when the solver cannot minimize it.
+    """
+    from solvers import SOLVERS
+    noisy = {"poisson_noise": True, "photons": 400.0, "gaussian_noise": True, "sigma": 0.01}
+    config = {**_deconv_config(), "add-noise": noisy,
+              "noise-model": {"fidelity": "Poisson-Gaussian", "parameters": "oracle"}}
+    prepared = DECONV.prepare(config)
+
+    # oracle: exactly what corrupted the simulation
+    fidelity, message = resolve_noise_model(prepared, config)
+    assert (fidelity.a, fidelity.b) == (1 / 400.0, 0.01 ** 2)
+    assert "oracle" in message and "Poisson-Gaussian" in message
+
+    # estimated from g alone: the same noise, recovered within 30 %
+    estimated = {**config, "noise-model": {"fidelity": "Poisson-Gaussian",
+                                           "parameters": "estimated"}}
+    fidelity, _ = resolve_noise_model(prepared, estimated)
+    assert abs(fidelity.a * 400 - 1) < 0.3 and abs(fidelity.b / 1e-4 - 1) < 0.3, \
+        (fidelity.a, fidelity.b)
+
+    # manual, and a Gaussian model uses b only
+    manual = {**config, "noise-model": {"fidelity": "L2 (Gaussian noise)",
+                                        "parameters": "manual", "b": 0.004}}
+    fidelity, _ = resolve_noise_model(prepared, manual)
+    assert fidelity.name == "gaussian" and fidelity.b == 0.004
+
+    # an old config kept the fidelity among the algorithm parameters: still honoured
+    legacy = {**_deconv_config(data_fidelity="KL divergence (Poisson noise)")}
+    assert resolve_noise_model(prepared, legacy)[0].name == "poisson"
+
+    # refused: a solver whose data step is least squares, given a Poisson model...
+    poisson = {**config, "noise-model": {"fidelity": "KL divergence (Poisson noise)"}}
+    errors = validate_noise_model(poisson, SOLVERS["ADMM"])
+    assert errors and "ADMM handles only gaussian" in errors[0]
+    assert validate_noise_model(poisson, SOLVERS["ADAM"]) == []
+    # ...oracle values on a real measurement, and manual values left empty
+    real = {**config, "input-paths": {**config["input-paths"], "mode": DataMode.REAL.value}}
+    assert any("synthetic mode" in e for e in validate_noise_model(real))
+    empty = {**config, "noise-model": {"fidelity": "Poisson-Gaussian", "parameters": "manual"}}
+    assert len(validate_noise_model(empty)) == 2, "both a and b are required"
+
+    # the refusal stops the run before any computation, with the reason in the log
+    pipeline = Pipeline.create(DECONV, {**poisson, "algorithm": "PPXA"})
+    messages = []
+    pipeline.on_message, pipeline.on_error = messages.append, lambda e: None
+    pipeline.start()
+    Pipeline.remove(pipeline)
+    assert any("PPXA handles only gaussian" in m for m in messages)
+    assert pipeline.state is PipelineState.IDLE
+    print("  noise model     oracle exact, estimated within 30 %, manual; ADMM+Poisson refused")
 
 
 # ── full runs ─────────────────────────────────────────────────────────────────
@@ -231,6 +290,7 @@ def main():
     print("pipeline — the whole v2 stack, without a GUI\n")
     test_validation()
     test_build_objective()
+    test_noise_model()
     test_deconv_run()
     test_matirf_run()
     test_every_solver_through_the_pipeline()

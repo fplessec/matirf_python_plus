@@ -1,3 +1,4 @@
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 
 from gui.base.single_parameter_widget import SimpleParameterWidget
@@ -9,16 +10,31 @@ class BaseSectionWidget(QWidget):
     Renders SimpleParameterWidgets from a UI dictionary backed by a TOML config.
 
     Can be wrapped in a QGroupBox, used inside a QStackedWidget, or subclassed.
+
+    >> formula : callable, optional
+        (values, config) -> latex. When given, a formula line is drawn under the parameters
+        and redrawn whenever one of them changes: `values` are this section's current
+        values, `config` the whole cached config (so a formula may depend on another
+        section — the noise model's oracle values come from '[add-noise]'). Used to show the
+        MODEL a section describes, not just its settings.
+
+    >> changed : signal
+        Emitted whenever one of the section's parameters changes, so a window can refresh
+        the formulas of the sections that depend on this one.
     """
 
+    changed = pyqtSignal()
+
     def __init__(self, params_ui_dict, toml_section_key, update_cache_fn, load_toml_fn,
-                 config_path=None):
+                 config_path=None, formula=None):
         super().__init__()
         self.params_ui_dict = params_ui_dict
         self.toml_section_key = toml_section_key
         self._update_cache = update_cache_fn
         self._load_toml = load_toml_fn
         self._config_path = config_path
+        self._formula = formula
+        self.formula_label = None
         self.parameter_widgets = {}
         self._setup_ui()
 
@@ -50,67 +66,95 @@ class BaseSectionWidget(QWidget):
             self._separators[param_name] = sep
             layout.addWidget(widget)
             first = False
+        if self._formula is not None:
+            from gui.widgets import QLatexLabel
+            if not first:
+                layout.addWidget(QSeparator('H'))
+            self.formula_label = QLatexLabel("")
+            layout.addWidget(self.formula_label, alignment=Qt.AlignCenter)
         layout.addStretch()
         self._setup_dependencies()
+        for widget in self.parameter_widgets.values():
+            self._connect_change(widget, self._on_parameter_changed)
+        self.refresh_formula()
 
     # ── parameter dependencies (show/hide based on parent value) ────────
 
-    ## wires depends_on: show/hide dependent widgets when the parent value changes.
-    ## The condition can be:
-    ##   - a scalar / list  -> the dependent is shown when the parent value is one of them
+    ## wires depends_on: show/hide dependent widgets when a parent value changes.
+    ## Each condition can be:
+    ##   - a scalar / list  -> satisfied when the parent value is one of them
     ##                         (used with 'option' parents, e.g. reg -> {"reg": [...]})
-    ##   - a callable(value) -> shown when it returns True (works with any parent type,
+    ##   - a callable(value) -> satisfied when it returns True (works with any parent type,
     ##                         e.g. a numeric 'count' -> {"count": lambda v: v > 0})
+    ## With several parents, ALL conditions must hold: {"fidelity": [...], "parameters":
+    ## "manual"} shows a field only for those fidelities AND manual parameters.
     def _setup_dependencies(self):
-        for param_name, param_config in self.params_ui_dict.items():
-            depends_on = param_config.get("depends_on")
-            if not depends_on:
-                continue
-            for parent_name, condition in depends_on.items():
-                if parent_name not in self.parameter_widgets:
-                    continue
-                parent_widget = self.parameter_widgets[parent_name]
-                # connect the parent's signal to show/hide this dependent widget
-                self._connect_dependency(parent_widget, param_name, condition)
-                # apply initial visibility
-                self._update_dependency_visibility(parent_widget, param_name, condition)
+        parents = {parent for config in self.params_ui_dict.values()
+                   for parent in (config.get("depends_on") or {})
+                   if parent in self.parameter_widgets}
+        for parent_name in parents:
+            self._connect_change(self.parameter_widgets[parent_name],
+                                 self._refresh_all_dependencies)
+        self._refresh_all_dependencies()
 
-    def _connect_dependency(self, parent_widget, dependent_name, condition):
-        callback = lambda _=None: self._update_dependency_visibility(
-            parent_widget, dependent_name, condition)
-        if parent_widget.combo is not None:
-            parent_widget.combo.currentTextChanged.connect(callback)
-        elif parent_widget.input_widget is not None:
-            parent_widget.input_widget.textChanged.connect(callback)
-        elif parent_widget.checkbox is not None:
-            parent_widget.checkbox.stateChanged.connect(callback)
+    @staticmethod
+    def _connect_change(widget, callback):
+        slot = lambda *_: callback()
+        if widget.combo is not None:
+            widget.combo.currentTextChanged.connect(slot)
+        elif widget.input_widget is not None:
+            widget.input_widget.textChanged.connect(slot)
+        elif widget.checkbox is not None:
+            widget.checkbox.stateChanged.connect(slot)
 
-    def _update_dependency_visibility(self, parent_widget, dependent_name, condition):
-        value = parent_widget.param_value
+    @staticmethod
+    def _condition_holds(value, condition) -> bool:
         if callable(condition):
             try:
-                visible = bool(condition(value))
+                return bool(condition(value))
             except Exception:
-                visible = False
-        else:
-            required = condition if isinstance(condition, (list, tuple)) else [condition]
-            visible = value in required
-        self.parameter_widgets[dependent_name].setVisible(visible)
-        sep = self._separators.get(dependent_name)
-        if sep is not None:
-            sep.setVisible(visible)
+                return False
+        required = condition if isinstance(condition, (list, tuple)) else [condition]
+        return value in required
 
-    ## re-evaluates all depends_on visibility (after loading from toml or resetting)
+    def _is_visible(self, param_name) -> bool:
+        depends_on = self.params_ui_dict[param_name].get("depends_on") or {}
+        return all(self._condition_holds(self.parameter_widgets[parent].param_value, condition)
+                   for parent, condition in depends_on.items()
+                   if parent in self.parameter_widgets)
+
+    ## re-evaluates all depends_on visibility (after a change, a toml load or a reset)
     def _refresh_all_dependencies(self):
         for param_name, param_config in self.params_ui_dict.items():
-            depends_on = param_config.get("depends_on")
-            if not depends_on:
+            if not param_config.get("depends_on"):
                 continue
-            for parent_name, condition in depends_on.items():
-                if parent_name not in self.parameter_widgets:
-                    continue
-                parent_widget = self.parameter_widgets[parent_name]
-                self._update_dependency_visibility(parent_widget, param_name, condition)
+            visible = self._is_visible(param_name)
+            self.parameter_widgets[param_name].setVisible(visible)
+            sep = self._separators.get(param_name)
+            if sep is not None:
+                sep.setVisible(visible)
+
+    # ── the formula line ──────────────────────────────────────────────────
+
+    def _on_parameter_changed(self):
+        self.refresh_formula()
+        self.changed.emit()
+
+    def refresh_formula(self):
+        """Redraw the formula line from the current values (no-op without a formula)."""
+        if self.formula_label is None:
+            return
+        config = {}
+        if self._config_path is not None:
+            try:
+                config = self._load_toml(self._config_path)
+            except Exception:
+                config = {}
+        try:
+            latex = self._formula(self.get_parameters(), config)
+        except Exception as error:                 # a formula must never break the window
+            latex = rf"\text{{(formula unavailable: {type(error).__name__})}}"
+        self.formula_label.update_latex(latex)
 
     # ── public helpers ────────────────────────────────────────────────────
 
@@ -130,8 +174,10 @@ class BaseSectionWidget(QWidget):
             if self._config_path:
                 self.parameter_widgets[param_name].update_ui_from_toml(self._config_path)
         self._refresh_all_dependencies()
+        self.refresh_formula()
 
     def update_ui_from_toml(self, toml_path):
         for param_name in self.params_ui_dict:
             self.parameter_widgets[param_name].update_ui_from_toml(toml_path)
         self._refresh_all_dependencies()
+        self.refresh_formula()

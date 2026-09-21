@@ -6,6 +6,8 @@ to override (except on_close_cleanup for problem-specific sub-windows).
 
 Section descriptor formats:
     (title, ui_dict, toml_key)  — creates a BaseSectionQGroup from a UI dict
+    (title, ui_dict, toml_key, formula)
+                                — the same, with a formula line (values, config) -> latex
     SomeClass                   — auto-instantiated with injected kwargs
     (SomeClass, extra_kwargs)   — same, with extra kwargs merged in
 """
@@ -58,6 +60,7 @@ class BaseControlWindow(QMainWindow):
         self.setGeometry(100, 100, settings.width_cw, settings.height_cw)
         self._all_sections = []     # flat list of every built section (for load_cached_config)
         self._setup_ui()
+        self._link_formulas()
         self.load_cached_config()
 
     # ── config I/O ─────────────────────────────────────────────────────────
@@ -83,9 +86,9 @@ class BaseControlWindow(QMainWindow):
 
     ## builds a single section widget from a descriptor, returns (widget, attr_name)
     def _build_section(self, desc):
-        # ── UI-dict tuple: (title, ui_dict, toml_key) ──
-        if isinstance(desc, tuple) and len(desc) == 3 and isinstance(desc[1], dict):
-            title, ui_dict, toml_key = desc
+        # ── UI-dict tuple: (title, ui_dict, toml_key[, formula]) ──
+        if isinstance(desc, tuple) and len(desc) in (3, 4) and isinstance(desc[1], dict):
+            title, ui_dict, toml_key = desc[:3]
             section = BaseSectionQGroup(
                 parent=self,
                 update_cache_fn=self.update_cache_fn,
@@ -93,6 +96,8 @@ class BaseControlWindow(QMainWindow):
                 title=title,
                 params_ui_dict=ui_dict,
                 toml_section_key=toml_key,
+                config_path=self.cached_config_path,
+                formula=desc[3] if len(desc) == 4 else None,
             )
             # Attribute name from toml_key: 'add-noise' → 'add_noise'
             attr_name = toml_key.replace('-', '_')
@@ -211,6 +216,21 @@ class BaseControlWindow(QMainWindow):
         for section in self._all_sections:
             if hasattr(section, 'update_ui_from_toml'):
                 section.update_ui_from_toml(self.cached_config_path)
+        self._refresh_formulas()
+
+    ## A formula may read another section (the noise model's oracle values live in
+    ## '[add-noise]'), so any change anywhere redraws every formula. They are few and cheap.
+    def _link_formulas(self):
+        for section in self._all_sections:
+            changed = getattr(section, 'changed', None)
+            if changed is not None:
+                changed.connect(self._refresh_formulas)
+
+    def _refresh_formulas(self):
+        for section in self._all_sections:
+            refresh = getattr(section, 'refresh_formula', None)
+            if refresh is not None:
+                refresh()
 
     def _load_any_config(self):
         path = open_file(self, "Select config", self.results_dir, "*.toml")
