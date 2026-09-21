@@ -1,0 +1,55 @@
+{
+  "format": "matirf-synthetic-truth/2",
+  "geometry": {
+    "planes": 150,
+    "nz": 50,
+    "z_oversampling": 3,
+    "z0_nm": 0.0,
+    "zN_nm": 300.0,
+    "dxy_nm": 100.0,
+    "nx": 128,
+    "ny": 128
+  },
+  "scene": {
+    "grid": {
+      "nx": 128,
+      "ny": 128,
+      "nz": 50,
+      "z_oversampling": 3,
+      "dxy_nm": 100.0,
+      "z0_nm": 0.0,
+      "zN_nm": 300.0,
+      "fine_step_nm": 25.0
+    },
+    "sampling": {
+      "seed": 3
+    },
+    "ellipsoid": {
+      "count": 15,
+      "lateral_size_min_nm": 150.0,
+      "lateral_size_max_nm": 350.0,
+      "axial_size_min_nm": 80.0,
+      "axial_size_max_nm": 150.0,
+      "depth_min_nm": 190.0,
+      "depth_max_nm": 270.0,
+      "max_tilt_deg": 10.0,
+      "sharpness": 1.5,
+      "amplitude": 0.8
+    },
+    "filament": {
+      "count": 0
+    },
+    "membrane": {
+      "count": 1,
+      "footprint_radius_nm": 4500.0,
+      "irregularity": 0.25,
+      "edge_width_nm": 400.0,
+      "height_edge_nm": 40.0,
+      "height_center_nm": 160.0,
+      "corrugation_amp_nm": 20.0,
+      "corrugation_period_nm": 2000.0,
+      "thickness_nm": 20.0,
+      "amplitude": 1.0
+    }
+  }
+}

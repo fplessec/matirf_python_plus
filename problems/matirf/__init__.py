@@ -24,6 +24,8 @@ MATIRF_CACHE_DIR = MATIRF_DIR / 'cache'
 MATIRF_CONFIG_PATH = MATIRF_CACHE_DIR / 'config.toml'
 MATIRF_DATA_DIR = MATIRF_DIR / 'data'
 MATIRF_MEASUREMENTS_DIR = MATIRF_DATA_DIR / 'measurements'
+## the benchmark's synthetic truths (made by the synthetic package) and their measurement .json
+MATIRF_SYNTHETIC_DIR = MATIRF_MEASUREMENTS_DIR / 'synthetic'
 MATIRF_RESULTS_DIR = MATIRF_DATA_DIR / 'results'
 
 ## The shape of a fresh config.toml. Sections are left empty on purpose: every reader uses
@@ -48,6 +50,6 @@ PROBLEM = MATIRF
 __all__ = [
     "PROBLEM", "MATIRF", "MatirfOperator",
     "MATIRF_DIR", "MATIRF_CACHE_DIR", "MATIRF_CONFIG_PATH",
-    "MATIRF_DATA_DIR", "MATIRF_MEASUREMENTS_DIR", "MATIRF_RESULTS_DIR",
+    "MATIRF_DATA_DIR", "MATIRF_MEASUREMENTS_DIR", "MATIRF_SYNTHETIC_DIR", "MATIRF_RESULTS_DIR",
     "DEFAULT_MATIRF_CONFIG",
 ]

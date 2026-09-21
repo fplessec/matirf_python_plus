@@ -5,7 +5,7 @@ Run it:
     python -m problems.matirf.synthetic._tests
 
     REPRODUCIBLE   a scene gives the same truth every time; a TIF's record reproduces it;
-                   the v1 truths shipped in data/ are reproduced exactly by this code
+                   the truths shipped in data/measurements/synthetic are exactly their presets
     PLAUSIBLE      every preset is a non-negative volume in [0, 1] inside the slab; the cell
                    has an edge and rises from it; adhesions stay at the glass
     NO INVERSE     a truth finer than the reconstruction is averaged exactly, and MA-TIRF
@@ -20,7 +20,7 @@ import torch
 
 from core import DataMode
 from core.diagnostics import depth_profile
-from problems.matirf import MATIRF, MATIRF_MEASUREMENTS_DIR
+from problems.matirf import MATIRF, MATIRF_SYNTHETIC_DIR
 from problems.matirf.synthetic import (
     presets, load_preset, generate, save_truth, read_record, regenerate, downsample_z,
     OBJECTS, Grid,
@@ -40,17 +40,18 @@ def test_reproducible():
     save_truth(f, out, scene)
     assert torch.equal(regenerate(out), f), "the record alone reproduces the truth"
 
-    # the truths shipped with the project, made by the v1 generator, reproduced exactly
-    for i in (0, 1):
-        tif = MATIRF_MEASUREMENTS_DIR / f"synthetic_truth{i}.TIF"
-        from fileio import load_tif
+    # the benchmark truths shipped in data/measurements/synthetic ARE their presets: each
+    # regenerates from its record, and that record's scene is the current preset
+    from fileio import load_tif
+    for name in presets():
+        tif = MATIRF_SYNTHETIC_DIR / f"{name}.TIF"
+        assert read_record(tif)["scene"] == load_preset(name), f"{name}: preset changed, regenerate"
         assert torch.equal(regenerate(tif).to(torch.float32), load_tif(str(tif))), tif.name
-    assert "cannot be regenerated" in read_record(MATIRF_MEASUREMENTS_DIR / "synthetic_truth2.TIF")["note"]
 
     empty = complete({"grid": {"nx": 16, "ny": 16, "nz": 10}, "sampling": {"seed": 0},
                       **{key: {"count": 0} for key in OBJECTS}})
     assert float(generate(empty).abs().max()) == 0.0, "no object, no fluorescence"
-    print("  reproducible    same scene -> same truth; record reproduces it; v1 truths exact")
+    print("  reproducible    same scene -> same truth; the shipped truths are their presets, exactly")
 
 
 def test_presets_are_plausible():
@@ -98,7 +99,7 @@ def test_no_inverse_crime():
     out = Path(tempfile.mkdtemp()) / "vesicles.TIF"
     save_truth(fine, out, scene)
     config = {"input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": str(out),
-                              "json": str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")},
+                              "json": str(MATIRF_SYNTHETIC_DIR / "measurement_parameters.json")},
               "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": False},
               "add-noise": {}}
     assert MATIRF.validate(config) == []

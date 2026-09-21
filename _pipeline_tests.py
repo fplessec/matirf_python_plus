@@ -22,7 +22,7 @@ import torch
 from core.enums import PipelineState
 from core import DataMode
 from problems.deconv import DECONV_MEASUREMENTS_DIR
-from problems.matirf import MATIRF_MEASUREMENTS_DIR
+from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
 from pipeline import Pipeline, build_objective, resolve_noise_model, validate_noise_model
 from problems.deconv import DECONV
 from problems.matirf import MATIRF
@@ -43,8 +43,8 @@ def _matirf_config(algorithm="ADAM", **algo_params):
     return {
         "algorithm": algorithm,
         "input-paths": {"mode": DataMode.SYNTHETIC.value,
-                        "tif": str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth0.TIF"),
-                        "json": str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")},
+                        "tif": str(MATIRF_SYNTHETIC_DIR / "vesicles.TIF"),
+                        "json": str(MATIRF_SYNTHETIC_DIR / "measurement_parameters.json")},
         "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": False},
         "add-noise": {},
         "algo-params": {"max_iter": 20, "lr": 0.01, "K": 20, "EPS": 1e-14, **algo_params},
@@ -226,7 +226,7 @@ def test_matirf_run():
     result = pipeline.result
 
     assert pipeline.state is PipelineState.COMPLETED
-    assert result.f.shape == (50, 64, 64)
+    assert result.f.shape == (50, 128, 128), "50 reconstruction planes of the 150-plane truth"
     assert result.metrics and "FSC" in result.metrics, "FSC applies to a 3D problem"
     assert "Scale_alpha" in result.metrics, "a scale-ambiguous problem reports its scale"
     assert result.alpha is not None and result.diff.shape == result.f.shape

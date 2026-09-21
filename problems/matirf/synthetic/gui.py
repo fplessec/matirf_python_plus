@@ -9,7 +9,9 @@ The ground-truth generator window — `matirf synth`.
                 Generate / preview          draw the scene again from the current settings
                 Save truth…                 the TIF and its <name>.truth.json record
                 Use as MA-TIRF truth        the same, then points the MA-TIRF config at it
-                                            (synthetic mode, nz / z0 / zN from the grid)
+                                            (synthetic mode, nz / z0 / zN from the grid, and
+                                            synthetic/measurement_parameters.json as the
+                                            microscope that simulates g)
                 Load scene… / Save scene…   a scene TOML — presets/ holds ready-made ones
 
 Every edit is written to the scene file at once, as in the control window.
@@ -27,7 +29,7 @@ from fileio import load_or_create_toml
 from gui.base.base_section_qgroup import BaseSectionQGroup
 from gui.file_dialog import open_file, save_file
 from gui.factory import figures_section_class
-from problems.matirf import MATIRF_MEASUREMENTS_DIR
+from problems.matirf import MATIRF_SYNTHETIC_DIR
 from problems.matirf.cache import update_cache as update_matirf_cache
 from .grid import GRID_UI, GRID_TOML_KEY
 from .objects import OBJECTS, gate_by_count
@@ -150,18 +152,19 @@ class SyntheticTruthGeneratorWindow(QWidget):
         return save_truth(self.f_true, path, load_scene()) if path else None
 
     def _save_truth(self):
-        path = self._save(str(MATIRF_MEASUREMENTS_DIR), "Save the synthetic truth")
+        path = self._save(str(MATIRF_SYNTHETIC_DIR), "Save the synthetic truth")
         if path:
             self.status.setText(f"Saved {path} and its record {path.with_suffix('.truth.json').name}")
 
     def _use_as_truth(self):
-        path = self._save(str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth.TIF"),
+        path = self._save(str(MATIRF_SYNTHETIC_DIR / "synthetic_truth.TIF"),
                           "Save the synthetic truth for MA-TIRF")
         if not path:
             return
         grid = load_scene()[GRID_TOML_KEY]
         update_matirf_cache(["input-paths", "mode"], "synthetic-data")
         update_matirf_cache(["input-paths", "tif"], str(path))
+        update_matirf_cache(["input-paths", "json"], str(MATIRF_SYNTHETIC_DIR / "measurement_parameters.json"))
         update_matirf_cache(["oper-params", "nz"], int(grid["nz"]))
         update_matirf_cache(["oper-params", "z0"], float(grid["z0_nm"]))
         update_matirf_cache(["oper-params", "zN"], float(grid["zN_nm"]))
@@ -169,7 +172,8 @@ class SyntheticTruthGeneratorWindow(QWidget):
             self, "Synthetic truth set",
             f"The MA-TIRF config now uses this truth in synthetic mode, reconstructed on "
             f"{grid['nz']} planes between {grid['z0_nm']:g} and {grid['zN_nm']:g} nm.\n"
-            f"Still to choose: a measurement JSON, the noise, and an algorithm.")
+            f"It is simulated with the microscope of synthetic/measurement_parameters.json.\n"
+            f"Still to choose: the noise and an algorithm.")
         self.status.setText(f"Set as the MA-TIRF synthetic truth: {path}")
 
     def _load_scene(self):

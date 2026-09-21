@@ -25,7 +25,7 @@ import torch
 
 from fileio import load_json, load_tif
 from core import DataMode, Feature, features
-from problems.matirf import MATIRF_MEASUREMENTS_DIR
+from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
 from solvers import Adam
 from core import Objective
 
@@ -34,14 +34,18 @@ from problems.matirf import physics, problem as matirf_problem
 
 TIF = str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF")
 JSON = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")
-TRUTH = str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth0.TIF")
+## a benchmark truth (150 planes over 0-300 nm) and the microscope it is simulated with
+TRUTH = str(MATIRF_SYNTHETIC_DIR / "vesicles.TIF")
+SYNTHETIC_JSON = str(MATIRF_SYNTHETIC_DIR / "measurement_parameters.json")
 
 
-def _config(mode=DataMode.REAL, nz=10, z0=0.0, zN=400.0, add_noise=None):
+def _config(mode=DataMode.REAL, nz=10, z0=0.0, zN=None, add_noise=None):
+    real = mode is DataMode.REAL
     return {
-        "input-paths": {"mode": mode.value, "tif": TIF if mode is DataMode.REAL else TRUTH,
-                        "json": JSON},
-        "oper-params": {"nz": nz, "z0": z0, "zN": zN, "normalize": False},
+        "input-paths": {"mode": mode.value, "tif": TIF if real else TRUTH,
+                        "json": JSON if real else SYNTHETIC_JSON},
+        "oper-params": {"nz": nz, "z0": z0, "zN": zN if zN is not None else (400.0 if real else 300.0),
+                        "normalize": False},
         "add-noise": add_noise or {},
         "algo-params": {},
     }
@@ -199,19 +203,21 @@ def test_prepare_both_modes():
     assert real.operator.H.shape == (13, 10)
     assert "_measurement" in real.config, "the refined config is carried forward"
 
-    synthetic = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=99))
+    # the truth has 150 planes: nz = 50 divides it -> reconstructed on 50 planes, g simulated
+    # from the fine truth; nz = 99 does not -> the truth's own 150 planes are used
+    synthetic = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=50))
     assert synthetic.mode is DataMode.SYNTHETIC and synthetic.has_truth
-    assert synthetic.f_true.shape == (50, 64, 64)
-    # nz=99 was overridden by the truth's own depth count — the operator must match the file
-    assert synthetic.operator.H.shape == (13, 50), "nz comes from the truth, not the config"
-    assert synthetic.g.shape == (13, 64, 64)
-    assert torch.isfinite(synthetic.g).all()
-    print("  prepare         both modes; nz taken from the truth in synthetic mode")
+    assert synthetic.f_true.shape == (50, 128, 128) and synthetic.operator.H.shape == (13, 50)
+    assert synthetic.config["_simulation"] == {"planes": 150}
+    assert synthetic.g.shape == (13, 128, 128) and torch.isfinite(synthetic.g).all()
+    fallback = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=99))
+    assert fallback.operator.H.shape == (13, 150), "nz must divide the truth's planes"
+    print("  prepare         both modes; synthetic on 50 of the truth's 150 planes, or all 150")
 
 
 def test_solver_runs_on_matirf():
     """The end of the chain: a generic solver reconstructs this problem, knowing nothing of it."""
-    prepared = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=99))
+    prepared = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=50))
 
     class _Gaussian:
         display_name = "gaussian"
@@ -226,7 +232,7 @@ def test_solver_runs_on_matirf():
     f0 = solver.initial_guess(objective, params)
     f = solver.solve(objective, f0, params)
 
-    assert f.shape == prepared.f_true.shape == (50, 64, 64)
+    assert f.shape == prepared.f_true.shape == (50, 128, 128)
     assert torch.isfinite(f).all() and (f >= 0).all(), "positivity must hold"
     start, end = objective.value(f0).item(), objective.value(f).item()
     assert end < start, f"the objective must decrease ({start:.3e} -> {end:.3e})"
@@ -236,7 +242,7 @@ def test_solver_runs_on_matirf():
     ## so many very different f explain g almost equally well and sixty iterations do not yet
     ## pick the right one. Judging reconstruction quality belongs in benchmarks/, with
     ## regularization and a proper iteration budget.
-    print(f"  end-to-end      Adam ran on real MA-TIRF data, loss {start:.2e} -> {end:.2e}")
+    print(f"  end-to-end      Adam ran on a benchmark truth, loss {start:.2e} -> {end:.2e}")
 
 
 def test_ridge_warm_start_helps():
@@ -245,7 +251,7 @@ def test_ridge_warm_start_helps():
 
     In v1 this warm start existed only for MA-TIRF, as a subclass override, because only its
     mixin knew how to invert the operator. `ForwardOperator.ridge_inverse` gives it to every
-    problem; here is what it buys on real data.
+    problem; here is what it buys on a benchmark truth.
 
     Because MA-TIRF is SCALE_AMBIGUOUS, f and alpha*f explain g equally well, so the
     distance to the truth is measured AFTER fitting the optimal scale. Comparing without
@@ -253,7 +259,7 @@ def test_ridge_warm_start_helps():
     """
     from core.metrics import optimal_scale
 
-    prepared = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=99))
+    prepared = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=50))
 
     class _Gaussian:
         display_name = "gaussian"
@@ -281,27 +287,46 @@ def test_ridge_warm_start_helps():
           f"-> {ridge_error:.3f} (ridge)")
 
 
+## v1's synthetic_truth0: one flat-topped ellipsoid on a 64 x 64 x 50 grid over 0-300 nm
+V1_TRUTH0_SCENE = {
+    "grid": {"nx": 64, "ny": 64, "nz": 50, "z_oversampling": 1, "dxy_nm": 100.0,
+             "z0_nm": 0.0, "zN_nm": 300.0, "fine_step_nm": 10.0},
+    "sampling": {"seed": 6},
+    "ellipsoid": {"count": 1, "lateral_size_min_nm": 2000.0, "lateral_size_max_nm": 4000.0,
+                  "axial_size_min_nm": 40.0, "axial_size_max_nm": 200.0,
+                  "depth_min_nm": 30.0, "depth_max_nm": 240.0, "max_tilt_deg": 5.0,
+                  "sharpness": 5.0, "amplitude": 1.0},
+    "filament": {"count": 0}, "membrane": {"count": 0},
+}
+
+
 def test_v1_reconstructions_reproduce():
     """
     A config saved by v1 must give v1's reconstruction — not just run.
 
     The two saved results problems/matirf/data/results/gt0_ADAM_{noreg,l1} are replayed from
     their own config.toml, through the whole pipeline, and must hit their recorded metrics.
+    Their truth, v1's synthetic_truth0, is no longer shipped: it is regenerated here from its
+    scene, which the v2 generator reproduces exactly — so this test also proves that.
     This is the test that caught the initialization regression: v2 had made the start a
     parameter defaulting to H^T g, while v1's MA-TIRF Adam always started from the ridge
     estimate. The v1 config has no 'init' key, so it silently got the other start — and a
     depth-shifted, rejected image (cosine 0.11 instead of 0.89). MA-TIRF now declares that
     default itself (InverseProblem.solver_defaults).
     """
+    import tempfile
     import time
     import tomli
     from pipeline import Pipeline
+    from problems.matirf.synthetic import generate, save_truth
+    truth = save_truth(generate(V1_TRUTH0_SCENE), Path(tempfile.mkdtemp()) / "synthetic_truth0.TIF",
+                       V1_TRUTH0_SCENE)
     results = Path(__file__).parent / "data" / "results"
     for run in ("gt0_ADAM_noreg", "gt0_ADAM_l1"):
         config = tomli.loads((results / run / "config.toml").read_text())
         ## the paths were absolute on the v1 machine layout; point them at this checkout
-        for key in ("tif", "json"):
-            config["input-paths"][key] = str(MATIRF_MEASUREMENTS_DIR / Path(config["input-paths"][key]).name)
+        config["input-paths"]["tif"] = str(truth)
+        config["input-paths"]["json"] = JSON
         expected = json.loads((results / run / "metrics.json").read_text())
         pipeline = Pipeline.create(MATIRF, config)
         errors = []

@@ -82,7 +82,9 @@ from problems.matirf import (
 
 TIF = str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF")
 MJSON = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")
-TRUTH = str(MATIRF_MEASUREMENTS_DIR / "synthetic_truth0.TIF")
+## a benchmark truth, simulated with the microscope described next to it
+TRUTH = str(MATIRF_MEASUREMENTS_DIR / "synthetic" / "vesicles.TIF")
+SJSON = str(MATIRF_MEASUREMENTS_DIR / "synthetic" / "measurement_parameters.json")
 PNG = str(DECONV_MEASUREMENTS_DIR / "img_001.png")
 DJSON = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
 
@@ -196,7 +198,7 @@ def matirf_ready_config():
     """A configuration where everything is set — the state just before clicking Run."""
     return {
         "algorithm": "ADAM",
-        "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": MJSON},
+        "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": SJSON},
         "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": False},
         "add-noise": {},
         "algo-params": {"max_iter": 12, "lr": 0.01, "K": 4, "EPS": 1e-14},

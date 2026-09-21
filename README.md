@@ -124,6 +124,8 @@ matirf synth              # or: python -m problems.matirf.synthetic
 
 **One scene file.** A scene is a single TOML (`[grid]`, `[sampling]` seed, then one section per object with its `count` and sizes, all in nm). The window edits `problems/matirf/synthetic/cache/scene.toml`; ready-made scenes — the benchmark's truths — are in `problems/matirf/synthetic/presets/`: `vesicles`, `adhesions_fibres`, `cell`.
 
+**The benchmark truths are shipped** in `problems/matirf/data/measurements/synthetic/`: `vesicles.TIF`, `adhesions_fibres.TIF`, `cell.TIF` (each with its `.truth.json`), and `measurement_parameters.json` — the MA-TIRF microscope (13 angles, 62.6–69.8°, NA 1.33, 491 nm) that builds `H_synthetic` and simulates `g` from them. Select a truth and that .json in synthetic mode, with `z0 = 0`, `zN = 300` and `nz` = 50 (or 30, 25, 15, 10).
+
 **A truth file describes itself.** Saving writes the TIF and a record `<name>.truth.json` with its geometry and its complete scene: the truth can be reproduced from it bit for bit, and MA-TIRF refuses to reconstruct it on another depth range than the one it was generated in.
 
 **Finer than the reconstruction.** The truth has `nz × z_oversampling` planes (150 by default): the measurement is simulated from the fine truth and the reconstruction, on `nz` planes, is compared with the truth averaged back. One truth can thus be reconstructed on 50, 30, 25, 15 or 10 planes with an exact reference.
