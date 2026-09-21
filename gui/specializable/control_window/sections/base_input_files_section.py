@@ -313,7 +313,8 @@ class BaseInputFilesSection(QGroupBox):
             params_ui_dict=NORMALIZATION_UI, toml_section_key="input-paths",
             update_cache_fn=self.UPDATE_CACHE_FN,
             load_toml_fn=self._load_config_for_update, config_path=self.CONFIG_PATH,
-            formula=lambda values, config: normalization.formula(values["normalization"]))
+            formula=lambda values, config: normalization.formula(values["normalization"]),
+            formula_position="bottom")
         self.normalization_widget.changed.connect(self.changed)
         return self.normalization_widget
 
@@ -373,6 +374,7 @@ class BaseInputFilesSection(QGroupBox):
         for selector in (self.image_selector, self.json_selector):
             if hasattr(selector, 'refresh_extra_button'):
                 selector.refresh_extra_button()
+        self.changed.emit()                  # a new file is a new g
 
     def update_ui_from_toml(self, toml_path):
         config = self._load_config_for_update(toml_path)

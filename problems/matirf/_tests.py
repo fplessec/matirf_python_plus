@@ -281,6 +281,44 @@ def test_ridge_warm_start_helps():
           f"-> {ridge_error:.3f} (ridge)")
 
 
+def test_v1_reconstructions_reproduce():
+    """
+    A config saved by v1 must give v1's reconstruction — not just run.
+
+    The two saved results problems/matirf/data/results/gt0_ADAM_{noreg,l1} are replayed from
+    their own config.toml, through the whole pipeline, and must hit their recorded metrics.
+    This is the test that caught the initialization regression: v2 had made the start a
+    parameter defaulting to H^T g, while v1's MA-TIRF Adam always started from the ridge
+    estimate. The v1 config has no 'init' key, so it silently got the other start — and a
+    depth-shifted, rejected image (cosine 0.11 instead of 0.89). MA-TIRF now declares that
+    default itself (InverseProblem.solver_defaults).
+    """
+    import time
+    import tomli
+    from pipeline import Pipeline
+    results = Path(__file__).parent / "data" / "results"
+    for run in ("gt0_ADAM_noreg", "gt0_ADAM_l1"):
+        config = tomli.loads((results / run / "config.toml").read_text())
+        ## the paths were absolute on the v1 machine layout; point them at this checkout
+        for key in ("tif", "json"):
+            config["input-paths"][key] = str(MATIRF_MEASUREMENTS_DIR / Path(config["input-paths"][key]).name)
+        expected = json.loads((results / run / "metrics.json").read_text())
+        pipeline = Pipeline.create(MATIRF, config)
+        errors = []
+        pipeline.on_error = errors.append
+        pipeline.start()
+        while pipeline.is_running:
+            time.sleep(0.05)
+        Pipeline.remove(pipeline)
+        assert not errors, errors
+        got = pipeline.result.metrics
+        for metric in ("cosine similarity", "PSNR"):
+            assert abs(got[metric] - expected[metric]) <= 1e-3 * max(1.0, abs(expected[metric])), \
+                f"{run}: {metric} {got[metric]:.4f}, v1 recorded {expected[metric]:.4f}"
+        assert not pipeline.result.diagnosis.rejected, pipeline.result.diagnosis.summary()
+    print("  v1 replay       gt0 Adam (no prior, L1) reproduce v1's cosine and PSNR exactly")
+
+
 def main():
     print("problems.matirf — regression against v1, and contracts\n")
     test_physics_matches_v1()
@@ -290,6 +328,7 @@ def main():
     test_prepare_both_modes()
     test_solver_runs_on_matirf()
     test_ridge_warm_start_helps()
+    test_v1_reconstructions_reproduce()
     print("\nMA-TIRF is ported faithfully.")
 
 

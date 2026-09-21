@@ -42,7 +42,7 @@ from core.enums import PipelineState
 from fileio import save_toml, save_txt, load_txt, save_json, load_json
 from solvers import SOLVERS
 from solvers.differential_operators import DifferentialOperators
-from solvers.fidelities import DATA_FIDELITY_REGISTRY, GaussianFidelity, NOISE_FLOOR
+from solvers.fidelities import DATA_FIDELITY_REGISTRY, GaussianFidelity
 from solvers.regularizers import REGULARIZATION_REGISTRY, NoRegularization
 
 
@@ -50,7 +50,11 @@ from solvers.regularizers import REGULARIZATION_REGISTRY, NoRegularization
 
 NOISE_MODEL_KEY = "noise-model"
 ## where the noise parameters (a, b) come from:
-NOISE_SOURCES = ("estimated", "oracle", "manual")
+##     estimated   measured on the preprocessed g (core.noise.estimate)
+##     oracle      the values '[add-noise]' used — synthetic mode only
+##     manual      '[noise-model] a' and 'b', as typed
+##     unscaled    a = b = 1: v1's formulation, D = 1/2 mean (Hf - g)^2 for Gaussian noise
+NOISE_SOURCES = ("estimated", "oracle", "manual", "unscaled")
 
 
 def fidelity_class(config: dict):
@@ -99,38 +103,50 @@ def validate_noise_model(config: dict, solver_class=None) -> list:
     return errors
 
 
-def resolve_noise_model(prepared, config: dict):
+def noise_parameters(config: dict, g=None):
     """
-    The data fidelity for this run, with its noise level (a, b), and where (a, b) came from.
+    (fidelity class, a, b, note): the noise level this config gives, before any solver runs.
 
-        estimated   measured on the preprocessed g (core.noise.estimate): the only option
-                    on a real measurement, and a test of the estimator on a simulated one
-        oracle      the values '[add-noise]' used to corrupt the simulation — exact, but
-                    only defined in synthetic mode
-        manual      '[noise-model] a' and 'b', as typed
+    `g` is the preprocessed measurement; it is needed only by the 'estimated' source. The
+    note says what happened in words — shown in the interface and written to the run log.
 
-    Returns (fidelity, message) — the message goes to the run log, so a saved result
-    records the noise level its reconstruction assumed.
+    A noise found NEGLIGIBLE (core.noise.is_negligible) by estimation or in the oracle
+    values switches to 'unscaled': the measurement is treated as noiseless and D takes v1's
+    form, a = b = 1. Scaling by a near-zero variance would make D so steep that lambda_reg
+    could no longer be felt. A value typed by hand is always used as typed.
     """
     cls = fidelity_class(config)
     section = config.get(NOISE_MODEL_KEY) or {}
     source = section.get("parameters", "estimated")
+    if source == "unscaled":
+        return cls, 1.0, 1.0, "unscaled (a = b = 1, as in v1)"
     if source == "manual":
         a, b = (float(section.get(name, 0.0) or 0.0) for name in ("a", "b"))
-    elif source == "oracle":
+        return cls, a, b, "manual"
+    if source == "oracle":
         model = noise.noise_model(config.get("add-noise", {}))
         a, b = model.a, model.b
     else:
-        a, b = noise.estimate(prepared.g, poisson="a" in cls.noise_parameters,
+        if g is None:
+            raise ValueError("estimating the noise needs the preprocessed measurement g")
+        a, b = noise.estimate(g, poisson="a" in cls.noise_parameters,
                               gaussian="b" in cls.noise_parameters)
+    if noise.is_negligible(a, b, cls.noise_parameters):
+        found = ", ".join(f"{name} = {value:.2g}" for name, value in (("a", a), ("b", b))
+                          if name in cls.noise_parameters)
+        return cls, 1.0, 1.0, (f"{source} noise negligible ({found}): treated as noiseless, "
+                               f"unscaled D (a = b = 1, as in v1)")
+    return cls, a, b, source
+
+
+def resolve_noise_model(prepared, config: dict):
+    """
+    The data fidelity for this run, and a line for the run log saying which (a, b) it uses
+    and where they came from — so a saved result records the noise level it assumed.
+    """
+    cls, a, b, note = noise_parameters(config, prepared.g)
     fidelity = cls.from_noise(a, b)
-    message = f"Noise model: {fidelity.describe()}, {source}"
-    floored = [name for name in cls.noise_parameters
-               if {"a": a, "b": b}[name] < NOISE_FLOOR]
-    if floored and not (cls.name == "poisson-gaussian" and len(floored) == 1):
-        message += (f" — {' and '.join(floored)} below {NOISE_FLOOR:g}, floored "
-                    f"(a nearly noiseless measurement)")
-    return fidelity, message
+    return fidelity, f"Noise model: {fidelity.describe()}, {note}"
 
 
 # ── assembling the objective from a parameter dict ────────────────────────────
@@ -322,7 +338,8 @@ class Pipeline:
             solver_class = SOLVERS[self.config["algorithm"]]
             self.solver = solver_class()
             self.solver.publishing = self.live_preview
-            params = self.config.get("algo-params", {})
+            params = self.problem.solver_params(self.config["algorithm"],
+                                                self.config.get("algo-params", {}))
             fidelity, noise_message = resolve_noise_model(self.prepared, self.config)
             self._print(noise_message)
             objective = build_objective(self.prepared, params,
@@ -360,6 +377,7 @@ class Pipeline:
         self.result.f = f
         if self.prepared.has_truth:
             self._evaluate()
+        self._check_realism(f)
         self._set_state(PipelineState.COMPLETED)
         if self.on_finished:
             self.on_finished(self.result)
@@ -383,6 +401,20 @@ class Pipeline:
         if self.state in (PipelineState.LOADING, PipelineState.COMPUTING):
             self._set_state(PipelineState.INTERRUPTED)
             self._print("Interrupted by user.")
+
+    def _check_realism(self, f: torch.Tensor) -> None:
+        """Flag a meaningless reconstruction (core/diagnostics.py) — in the log, and on the result."""
+        from core.diagnostics import diagnose
+        params = self.problem.solver_params(self.config.get("algorithm"),
+                                            self.config.get("algo-params", {}))
+        lambda_rr = params.get("lambda_rr")
+        try:
+            lambda_rr = float(lambda_rr) if lambda_rr not in (None, "None", "null") else None
+        except (TypeError, ValueError):
+            lambda_rr = None
+        self.result.diagnosis = diagnose(f, self.prepared, f0=self.solver.start_point,
+                                         lambda_rr=lambda_rr)
+        self._print(self.result.diagnosis.summary())
 
     # ── evaluating against a known truth ─────────────────────────────────────
 

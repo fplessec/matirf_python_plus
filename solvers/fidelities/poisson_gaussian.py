@@ -20,8 +20,8 @@ class PoissonGaussianFidelity(DataFidelity):
     name = "poisson-gaussian"
     display_name = "Poisson-Gaussian"
     noise_parameters = ("a", "b")
-    formula = (r"D(Hf,g) = \overline{\frac{(Hf - g)^2}{2\,(a\,Hf + b)}"
-               r" + \frac{1}{2}\log\frac{a\,Hf + b}{a\,g + b}}")
+    formula = (r"D(Hf,g) = \frac{1}{n_g}\sum_{i=1}^{n_g}\left(\frac{(Hf - g)^2}{2\,(a\,Hf + b)}"
+               r" + \frac{1}{2}\log\frac{a\,Hf + b}{a\,g + b}\right)_i")
 
     def __init__(self, a: float = 1.0, b: float = 1.0):
         ## either part may be absent, but not both: the variance must stay positive

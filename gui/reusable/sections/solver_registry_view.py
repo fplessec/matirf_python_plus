@@ -21,7 +21,7 @@ this avoids repeating it.
 import copy
 
 
-def with_extra_buttons(solvers: dict, buttons: dict) -> dict:
+def with_extra_buttons(solvers: dict, buttons: dict, defaults: dict = None) -> dict:
     """
     A copy of the solver registry whose parameters carry problem-specific extra buttons.
 
@@ -43,6 +43,11 @@ def with_extra_buttons(solvers: dict, buttons: dict) -> dict:
         A parameter absent from a given solver is simply skipped, so one mapping can be
         written per problem and applied to the whole registry.
 
+    >> defaults : dict, optional
+        The problem's `solver_defaults`, {solver name: {param: value}}. The view shows them
+        AS the defaults — an option moved first, a value's default replaced — so what the
+        window displays for an untouched field is what the pipeline will use.
+
     ----------
     > Returns :
     ----------
@@ -57,10 +62,12 @@ def with_extra_buttons(solvers: dict, buttons: dict) -> dict:
             "lambda_rr": {"label": "Estimate", "tooltip": "...", "callback": estimate_lambda_rr},
         })
     """
-    return {name: _view_of(solver, buttons) for name, solver in solvers.items()}
+    defaults = defaults or {}
+    return {name: _view_of(solver, buttons, defaults.get(name, {}))
+            for name, solver in solvers.items()}
 
 
-def _view_of(solver, buttons: dict) -> type:
+def _view_of(solver, buttons: dict, defaults: dict) -> type:
     """A subclass of `solver` whose get_ui_params adds the buttons, leaving the original alone."""
 
     @classmethod
@@ -69,6 +76,14 @@ def _view_of(solver, buttons: dict) -> type:
         for key, button in buttons.items():
             if key in params:
                 params[key] = {**params[key], "extra_button": button}
+        for key, value in defaults.items():
+            info = params.get(key, {}).get("param_info")
+            if info is None:
+                continue
+            if "options_list" in info and value in info["options_list"]:
+                info["options_list"] = [value] + [o for o in info["options_list"] if o != value]
+            elif "default" in info:
+                info["default"] = value
         return params
 
     return type(solver.__name__, (solver,), {"get_ui_params": get_ui_params})

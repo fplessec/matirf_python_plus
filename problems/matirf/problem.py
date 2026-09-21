@@ -184,6 +184,11 @@ MATIRF = InverseProblem(
     results_dir=MATIRF_RESULTS_DIR,
     measurements_dir=MATIRF_MEASUREMENTS_DIR,
     ui=MATIRF_UI,
+    ## v1's MA-TIRF Adam and PPXA always started from the ridge estimate (lambda_rr = 1e4).
+    ## Keeping it as the default is what makes a v1 config reproduce its v1 result exactly;
+    ## the back-projection start leaves Adam in a depth-shifted image (core/diagnostics.py).
+    solver_defaults={"ADAM": {"init": "ridge", "lambda_rr": 1e4},
+                     "PPXA": {"init": "ridge", "lambda_rr": 1e4}},
     description="Multi-angle TIRF: recover a 3D object from stacks measured at several "
                 "incidence angles, each probing a different depth.",
 )

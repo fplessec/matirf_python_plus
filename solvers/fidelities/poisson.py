@@ -17,7 +17,8 @@ class PoissonFidelity(DataFidelity):
     name = "poisson"
     display_name = "KL divergence (Poisson noise)"
     noise_parameters = ("a",)
-    formula = r"D(Hf,g) = \frac{1}{a}\,\overline{Hf - g + g\,\log(g / Hf)}"
+    formula = (r"D(Hf,g) = \frac{1}{a\,n_g}\sum_{i=1}^{n_g}"
+               r"\left(Hf - g + g\,\log\frac{g}{Hf}\right)_i")
 
     def __init__(self, a: float = 1.0):
         self.a = floored(a)

@@ -204,6 +204,22 @@ def add_noise_to_measurement(g: torch.Tensor, params: dict) -> torch.Tensor:
     return noisy.clamp(min=0)
 
 
+# ── a noise too small to model ────────────────────────────────────────────────
+
+## Below these levels the measurement is treated as noiseless: sigma under 0.2 % of an
+## intensity of 1 (an 8-bit image's own quantization is 0.11 %), more than 10^5 photons.
+## Scaling D by 1/b there would make it so steep that no lambda_reg below ~0.9999 could be
+## felt — so the reconstruction falls back to the unscaled D of v1 (a = b = 1) instead.
+NEGLIGIBLE_A = 1e-5
+NEGLIGIBLE_B = 4e-6
+
+
+def is_negligible(a: float, b: float, uses=("a", "b")) -> bool:
+    """True when every parameter the model uses is below its negligible level."""
+    limits = {"a": (a, NEGLIGIBLE_A), "b": (b, NEGLIGIBLE_B)}
+    return all(limits[name][0] < limits[name][1] for name in uses)
+
+
 # ── the model, written out ────────────────────────────────────────────────────
 
 def formula(params: dict) -> str:

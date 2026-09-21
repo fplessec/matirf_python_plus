@@ -165,11 +165,23 @@ class InverseProblem:
     results_dir: Optional[object] = None        # where reconstructions are saved
     measurements_dir: Optional[object] = None   # where the file dialogs open
 
+    # ── how its solvers start by default ─────────────────────────────────────
+    # {solver name: {parameter: value}}, applied UNDER the user's '[algo-params]': a value
+    # the user set always wins. It exists because the right default can be a property of
+    # the problem, not of the algorithm — on MA-TIRF, Adam and PPXA start from the ridge
+    # estimate (lambda_rr = 1e4), as v1 did; from the raw back-projection H^T g, which is
+    # ~50x too large there, Adam ends in a meaningless, depth-shifted image.
+    solver_defaults: dict = field(default_factory=dict)
+
     # ── the interface ────────────────────────────────────────────────────────
     # A `gui.spec.ProblemUI`, typed as a plain object on purpose: `core` must not import
     # `gui`. The problem CARRIES its interface declaration without depending on the code
     # that draws it, so the drawing can be replaced without touching a single problem.
     ui: Optional[object] = None
+
+    def solver_params(self, solver_name: str, params: dict) -> dict:
+        """The parameters a solver actually receives: this problem's defaults, then the user's."""
+        return {**self.solver_defaults.get(solver_name, {}), **(params or {})}
 
     # ── what kind of problem this is ─────────────────────────────────────────
 

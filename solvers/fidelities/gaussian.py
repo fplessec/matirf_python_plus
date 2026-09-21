@@ -7,7 +7,7 @@ class GaussianFidelity(DataFidelity):
     """
     Additive Gaussian (read) noise of variance b = sigma^2.
 
-        D(Hf, g) = mean( (Hf - g)^2 ) / (2 b)
+        D(Hf, g) = mean( (Hf - g)^2 ) / (2 b)  =  ||Hf - g||_2^2 / (2 b n_g)
 
     With b = 1 this is v1's 1/2 mean squared error, bit for bit.
     """
@@ -15,7 +15,7 @@ class GaussianFidelity(DataFidelity):
     name = "gaussian"
     display_name = "L2 (Gaussian noise)"
     noise_parameters = ("b",)
-    formula = r"D(Hf,g) = \frac{1}{2b}\,\overline{(Hf - g)^2}"
+    formula = r"D(Hf,g) = \frac{1}{2\,b\,n_g}\,\Vert Hf - g\Vert_2^2"
 
     def __init__(self, b: float = 1.0):
         self.b = floored(b)

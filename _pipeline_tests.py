@@ -175,6 +175,21 @@ def test_noise_model():
     empty = {**config, "noise-model": {"fidelity": "Poisson-Gaussian", "parameters": "manual"}}
     assert len(validate_noise_model(empty)) == 2, "both a and b are required"
 
+    # a negligible noise is treated as noiseless: the unscaled D of v1 (a = b = 1), so that
+    # lambda_reg stays felt — by estimation (clean simulation) and in the oracle values
+    clean = {**_deconv_config(), "noise-model": {"fidelity": "L2 (Gaussian noise)",
+                                                 "parameters": "estimated"}}
+    clean_prepared = DECONV.prepare(clean)
+    fidelity, message = resolve_noise_model(clean_prepared, clean)
+    assert fidelity.b == 1.0 and "negligible" in message, message
+    tiny = {**clean, "add-noise": {"gaussian_noise": True, "sigma": 1e-4},
+            "noise-model": {"fidelity": "L2 (Gaussian noise)", "parameters": "oracle"}}
+    assert resolve_noise_model(DECONV.prepare(tiny), tiny)[0].b == 1.0
+    # 'unscaled' asks for it explicitly, whatever the noise
+    unscaled = {**config, "noise-model": {"fidelity": "L2 (Gaussian noise)",
+                                          "parameters": "unscaled"}}
+    assert resolve_noise_model(prepared, unscaled)[0].b == 1.0
+
     # the refusal stops the run before any computation, with the reason in the log
     pipeline = Pipeline.create(DECONV, {**poisson, "algorithm": "PPXA"})
     messages = []
@@ -183,7 +198,8 @@ def test_noise_model():
     Pipeline.remove(pipeline)
     assert any("PPXA handles only gaussian" in m for m in messages)
     assert pipeline.state is PipelineState.IDLE
-    print("  noise model     oracle exact, estimated within 30 %, manual; ADMM+Poisson refused")
+    print("  noise model     oracle exact, estimated within 30 %, manual, negligible -> "
+          "unscaled; ADMM+Poisson refused")
 
 
 # ── full runs ─────────────────────────────────────────────────────────────────

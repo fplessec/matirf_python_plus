@@ -219,12 +219,19 @@ class BaseControlWindow(QMainWindow):
         self._refresh_formulas()
 
     ## A formula may read another section (the noise model's oracle values live in
-    ## '[add-noise]'), so any change anywhere redraws every formula. They are few and cheap.
+    ## '[add-noise]', its live estimate depends on everything that changes g), so any change
+    ## anywhere redraws every formula. Debounced: typing "300" in a field is one refresh, not
+    ## three — the live estimate recomputes the preprocessed measurement.
     def _link_formulas(self):
+        from PyQt5.QtCore import QTimer
+        self._formula_timer = QTimer(self)
+        self._formula_timer.setSingleShot(True)
+        self._formula_timer.setInterval(300)
+        self._formula_timer.timeout.connect(self._refresh_formulas)
         for section in self._all_sections:
             changed = getattr(section, 'changed', None)
             if changed is not None:
-                changed.connect(self._refresh_formulas)
+                changed.connect(self._formula_timer.start)
 
     def _refresh_formulas(self):
         for section in self._all_sections:

@@ -12,8 +12,8 @@ class BaseSectionWidget(QWidget):
     Can be wrapped in a QGroupBox, used inside a QStackedWidget, or subclassed.
 
     >> formula : callable, optional
-        (values, config) -> latex. When given, a formula line is drawn under the parameters
-        and redrawn whenever one of them changes: `values` are this section's current
+        (values, config) -> latex. When given, a formula line is drawn — first, above the
+        parameters, unless formula_position="bottom" — and redrawn whenever one changes: `values` are this section's current
         values, `config` the whole cached config (so a formula may depend on another
         section — the noise model's oracle values come from '[add-noise]'). Used to show the
         MODEL a section describes, not just its settings.
@@ -26,7 +26,7 @@ class BaseSectionWidget(QWidget):
     changed = pyqtSignal()
 
     def __init__(self, params_ui_dict, toml_section_key, update_cache_fn, load_toml_fn,
-                 config_path=None, formula=None):
+                 config_path=None, formula=None, formula_position="top"):
         super().__init__()
         self.params_ui_dict = params_ui_dict
         self.toml_section_key = toml_section_key
@@ -34,6 +34,7 @@ class BaseSectionWidget(QWidget):
         self._load_toml = load_toml_fn
         self._config_path = config_path
         self._formula = formula
+        self._formula_position = formula_position
         self.formula_label = None
         self.parameter_widgets = {}
         self._setup_ui()
@@ -44,6 +45,11 @@ class BaseSectionWidget(QWidget):
         layout.setSpacing(1)
         self._separators = {}
         first = True
+        if self._formula is not None and self._formula_position == "top":
+            from gui.widgets import QLatexLabel
+            self.formula_label = QLatexLabel("")
+            layout.addWidget(self.formula_label, alignment=Qt.AlignCenter)
+            first = False
         for param_name, param_config in self.params_ui_dict.items():
             sep = None
             if not first:
@@ -66,7 +72,7 @@ class BaseSectionWidget(QWidget):
             self._separators[param_name] = sep
             layout.addWidget(widget)
             first = False
-        if self._formula is not None:
+        if self._formula is not None and self._formula_position == "bottom":
             from gui.widgets import QLatexLabel
             if not first:
                 layout.addWidget(QSeparator('H'))

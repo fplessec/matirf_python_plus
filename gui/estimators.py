@@ -27,7 +27,8 @@ from PyQt5.QtWidgets import QMessageBox
 
 def attach(solvers: dict, estimators: dict, problem) -> dict:
     """
-    A view of the solver registry whose parameters carry this problem's Estimate buttons.
+    A view of the solver registry whose parameters carry this problem's Estimate buttons,
+    and show this problem's solver defaults (InverseProblem.solver_defaults) as defaults.
 
     Returns fresh subclasses; the shared solver classes are never modified, so one problem's
     buttons can never leak into another's window — the failure mode of editing a class-level
@@ -41,7 +42,9 @@ def attach(solvers: dict, estimators: dict, problem) -> dict:
               "callback": _callback_for(key, spec, problem)}
         for key, spec in (estimators or {}).items()
     }
-    return with_extra_buttons(solvers, buttons) if buttons else dict(solvers)
+    defaults = getattr(problem, "solver_defaults", None) or {}
+    return with_extra_buttons(solvers, buttons, defaults) if (buttons or defaults) \
+        else dict(solvers)
 
 
 def _callback_for(param_key: str, spec, problem):

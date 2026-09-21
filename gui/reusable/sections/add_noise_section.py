@@ -5,29 +5,12 @@ from gui.base.base_section_qgroup import BaseSectionQGroup
 ## The Poisson-Gaussian noise model of core/noise.py, as two independent switches:
 ##     photon noise only -> 100% Poisson,   read noise only -> 100% Gaussian,
 ##     both -> Poisson-Gaussian,            neither -> no noise.
-## There is no separate "add noise" box: noise is on as soon as one of the two is ticked.
+## There is no separate "add noise" box: noise is on as soon as one of the two is ticked,
+## and both start unticked — a fresh config adds no noise.
 ## Both parameters are in NORMALIZED units (see core/normalization.py): N is the photon count
 ## for an intensity of 1, sigma a fraction of it. The formula line under the section shows
 ## the resulting model and its (a, b) = (1/N, sigma^2) — the numbers the noise model uses.
 ADD_NOISE_PARAMETERS_UI = {
-        "poisson_noise": {
-            "title": "Photon noise (Poisson)",
-            "type": "bool",
-            "param_info": {
-                'default': False
-            }
-        },
-        "photons": {
-            "title": "Photons for an intensity of 1",
-            "type": "value",
-            "depends_on": {"poisson_noise": True},
-            "param_info": {
-                'dtype': float,
-                'unit': 'photons',
-                'latex_name': 'N',
-                'default': 100.0
-            }
-        },
         "gaussian_noise": {
             "title": "Read noise (Gaussian)",
             "type": "bool",
@@ -44,6 +27,24 @@ ADD_NOISE_PARAMETERS_UI = {
                 'unit': '',
                 'latex_name': '\\sigma',
                 'default': 0.01
+            }
+        },
+        "poisson_noise": {
+            "title": "Photon noise (Poisson)",
+            "type": "bool",
+            "param_info": {
+                'default': False
+            }
+        },
+        "photons": {
+            "title": "Photons for an intensity of 1",
+            "type": "value",
+            "depends_on": {"poisson_noise": True},
+            "param_info": {
+                'dtype': float,
+                'unit': 'photons',
+                'latex_name': 'N',
+                'default': 100.0
             }
         },
         "seed": {

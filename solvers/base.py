@@ -179,6 +179,7 @@ class Solver(ABC):
         ## copying the iterate costs a full-size clone per iteration; the pipeline turns it off
         ## when nobody watches (headless runs, or the `live_preview` setting unticked):
         self.publishing = True
+        self.start_point = None
         ## reporting hooks, wired by the pipeline; harmless no-ops when running standalone,
         ## which is what lets a solver be used directly from a script or a notebook:
         self.on_message = lambda msg: None
@@ -251,7 +252,9 @@ class Solver(ABC):
 
     def _guarded_solve(self, objective, params: dict) -> None:
         try:
-            f = self.solve(objective, self.initial_guess(objective, params), params)
+            ## kept, so what the solver returns can be compared with where it started
+            self.start_point = self.initial_guess(objective, params)
+            f = self.solve(objective, self.start_point, params)
             if not self.interrupted:
                 self.on_finished(f)
         except Exception as e:

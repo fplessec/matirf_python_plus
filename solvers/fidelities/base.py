@@ -33,7 +33,8 @@ class DataFidelity:
                           solvers list in `supported_noise_models`
         display_name      the label shown in the interface and stored in config.toml
         noise_parameters  which of (a, b) this model uses
-        formula           latex of D, symbolic (shown in the interface)
+        formula           latex of D, symbolic (shown in the interface); n_g is the
+                          number of pixels of g — D is always a mean
     """
 
     name = ""

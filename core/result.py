@@ -48,6 +48,15 @@ class Result:
 
     >> alpha : float
         The fitted scale factor, kept so the difference image can be interpreted.
+
+    ----------
+    > Present after every successful run :
+    ----------
+
+    >> diagnosis : core.diagnostics.Diagnosis
+        Whether f is a plausible reconstruction, or one of the known meaningless shapes
+        (collapsed at the interface, the same image on every plane, f ~ g, f ~ a
+        least-squares estimate). Its summary is also written to the log.
     """
 
     f: Optional[torch.Tensor] = None
@@ -58,6 +67,7 @@ class Result:
     metrics: Optional[dict] = None
     diff: Optional[torch.Tensor] = None
     alpha: Optional[float] = None
+    diagnosis: Optional[object] = None
 
     extras: dict = field(default_factory=dict)
 

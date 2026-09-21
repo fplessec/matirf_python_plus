@@ -222,7 +222,17 @@ def test_every_prox_matches_its_loss():
             worst = min(J(u + 1e-3 * torch.randn_like(u)) for _ in range(20))
             assert worst >= J(u) - 1e-3 * max(gain, 1e-12), \
                 f"{cls.__name__} {len(shape)}D: a random perturbation beats the prox"
-    print(f"  contract        all {len(classes)} proxes minimize their own loss, 2D and 3D")
+
+    # R is a mean: the same image mirrored onto itself (no seam) gives the same value, up to
+    # the one-voxel border the difference operators see
+    f = torch.rand(32, 32, dtype=torch.float64)
+    doubled = torch.cat([f, f.flip(0)])
+    for cls in classes:
+        reg = cls()
+        one, two = float(reg.loss(f, DifferentialOperators())), float(reg.loss(doubled, DifferentialOperators()))
+        assert abs(one - two) <= 0.1 * max(abs(one), 1e-12), f"{cls.__name__}: {one} vs {two}"
+    print(f"  contract        all {len(classes)} proxes minimize their own loss, 2D and 3D; "
+          f"every R is a mean")
 
 
 def main():

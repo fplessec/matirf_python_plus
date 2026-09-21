@@ -372,7 +372,15 @@ def test_fidelities_are_scaled_likelihoods():
     assert torch.equal(GaussianFidelity().loss(a, b), 0.5 * torch.nn.functional.mse_loss(a, b))
     # the floor: a noiseless measurement does not make D infinite
     assert GaussianFidelity(b=0.0).b > 0 and PoissonFidelity(a=0.0).a > 0
-    print("  fidelities      D(g,g) = 0 and D(truth) = 1/2 for Gaussian, Poisson, Poisson-Gaussian")
+
+    # nothing depends on the number of pixels: every D is a mean, so an image and the same
+    # image repeated give the same value
+    residual, data = torch.rand(40, 40, dtype=DTYPE), torch.rand(40, 40, dtype=DTYPE)
+    for cls in (GaussianFidelity, PoissonFidelity, PoissonGaussianFidelity):
+        D = cls.from_noise(0.01, 0.001)
+        twice = D.loss(torch.cat([residual, residual]), torch.cat([data, data]))
+        assert torch.allclose(D.loss(residual, data), twice), cls.__name__
+    print("  fidelities      D(g,g) = 0, D(truth) = 1/2 for all three models, a mean (size-free)")
 
 
 def test_adam_and_ppxa_minimize_the_same_objective():
