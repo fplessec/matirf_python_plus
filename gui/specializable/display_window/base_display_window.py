@@ -29,6 +29,10 @@ class BaseDisplayWindow(QMainWindow):
 
         self.pipeline = pipeline
         self.config = pipeline.config
+        ## read at each run, so a change made with `settings gui` applies to the next run
+        ## (created before `pipeline.start()`, hence before the solver exists):
+        self.live_preview = settings.live_preview
+        pipeline.live_preview = self.live_preview
 
         self.qt_bridge = PipelineQtBridge()
         self.qt_bridge.message.connect(self._print, Qt.QueuedConnection)
@@ -108,7 +112,7 @@ class BaseDisplayWindow(QMainWindow):
 
     def _on_state_changed(self, old_state: PipelineState, new_state: PipelineState):
         ## start the live preview timer when the algorithm starts computing:
-        if new_state == PipelineState.COMPUTING:
+        if new_state == PipelineState.COMPUTING and self.live_preview:
             self._last_polled_f = None
             self._live_preview_timer.start()
         ## stop the timer when the algorithm finishes or fails:

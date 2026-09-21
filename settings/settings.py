@@ -12,7 +12,9 @@ from pathlib import Path
 import tomli
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+## settings/settings.py -> settings/ -> the project root (v1 lived one level deeper, in
+## common/settings/, and the extra .parent had silently moved the file OUT of the project)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SETTINGS_PATH = PROJECT_ROOT / "settings.toml"
 
 _DEFAULTS = OrderedDict([
@@ -62,6 +64,10 @@ _DEFAULTS = OrderedDict([
     ("height_dw", {
         "value": 800,
         "description": "Display window height (px)",
+    }),
+    ("live_preview", {
+        "value": True,
+        "description": "Refresh the figures during the reconstruction (off: only at the end)",
     }),
 ])
 

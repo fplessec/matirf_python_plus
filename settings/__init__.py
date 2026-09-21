@@ -8,6 +8,7 @@ Usage::
     settings.device        # "cpu" / "cuda" / "mps"
     settings.dtype         # torch.float32 / torch.float64
     settings.dark_style    # True / False
+    settings.live_preview  # refresh the figures while the solver runs, or only at the end
     settings.FontSize.SMALL / .NORMAL / .BIG
 
 The module-level ``__getattr__`` delegates to the singleton so that

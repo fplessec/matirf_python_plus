@@ -204,19 +204,27 @@ def test_interruption():
     ## K is small so a preview snapshot exists quickly: a solver publishes every K
     ## iterations, so a large K leaves the live preview blank for a long time.
     config["algo-params"] = {"max_iter": 5_000_000, "lr": 1e-4, "K": 5}
-    pipeline = Pipeline.create(DECONV, config)
-    pipeline.on_error = lambda e: None
-    pipeline.start()
+    ## a headless run publishes nothing (no copy per iteration); a display window switches
+    ## live_preview on, as the `live_preview` setting asks — both are run side by side here
+    quiet = Pipeline.create(DECONV, config)
+    watched = Pipeline.create(DECONV, config)
+    watched.live_preview = True
+    for pipeline in (quiet, watched):
+        pipeline.on_error = lambda e: None
+        pipeline.start()
     time.sleep(0.6)
 
-    assert pipeline.is_running and pipeline.state is PipelineState.COMPUTING
-    assert pipeline.latest_preview is not None, "a live-preview snapshot must be available"
+    for pipeline in (quiet, watched):
+        assert pipeline.is_running and pipeline.state is PipelineState.COMPUTING
+    assert quiet.latest_preview is None, "nobody watches: the iterate must not be copied"
+    assert watched.latest_preview is not None, "a live-preview snapshot must be available"
 
-    assert len(Pipeline.get_all()) == 1
+    assert len(Pipeline.get_all()) == 2
     Pipeline.stop_all()
-    assert pipeline.state is PipelineState.INTERRUPTED
-    assert not pipeline.is_running and Pipeline.get_all() == []
-    print("  interruption    stopped mid-run, live preview available, registry cleared")
+    for pipeline in (quiet, watched):
+        assert pipeline.state is PipelineState.INTERRUPTED and not pipeline.is_running
+    assert Pipeline.get_all() == []
+    print("  interruption    stopped mid-run, preview only when watched, registry cleared")
 
 
 def main():

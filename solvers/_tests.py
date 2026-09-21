@@ -294,6 +294,12 @@ def test_regularization_and_reporting():
         "the run log states what is being minimized"
     assert any("iter" in m for m in messages)
     assert solver.latest is not None, "publish() fed the live preview"
+
+    # nobody watching (headless run, or the live_preview setting off): no copy at all
+    quiet = Adam()
+    quiet.publishing = False
+    quiet.solve(objective, quiet.initial_guess(objective, {}), {"max_iter": 20, "lr": 0.05, "K": 10})
+    assert quiet.latest is None, "publish() must not copy the iterate when publishing is off"
     print("  reporting       positivity, objective logged, live-preview snapshot")
 
 

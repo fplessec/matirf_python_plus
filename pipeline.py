@@ -151,6 +151,9 @@ class Pipeline:
         self.solver = None
         self.state = PipelineState.IDLE
         self._running = False
+        ## whether the solver publishes snapshots of its iterate: only worth the copy when a
+        ## display window polls them, so off by default and switched on by that window
+        self.live_preview = False
 
         self.on_message = None
         self.on_finished = None
@@ -224,6 +227,7 @@ class Pipeline:
 
             solver_class = SOLVERS[self.config["algorithm"]]
             self.solver = solver_class()
+            self.solver.publishing = self.live_preview
             params = self.config.get("algo-params", {})
             objective = build_objective(self.prepared, params,
                                         solver_class.uses_regularization)

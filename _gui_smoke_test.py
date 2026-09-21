@@ -596,6 +596,43 @@ def d9():
 check("D9  aperçu live pendant le run, puis interruption", d9)
 
 
+def d10():
+    """Réglage `live_preview` décoché : rien pendant le run, les figures seulement à la fin."""
+    from settings import _settings
+    saved = _settings._values["live_preview"]
+    _settings._values["live_preview"] = False          # en mémoire : settings.toml intact
+    try:
+        config = matirf_ready_config()
+        config["algo-params"] = {"max_iter": 5_000_000, "lr": 1e-4, "K": 3}
+        save_toml(config, MATIRF_CONFIG_PATH)
+        cw.load_cached_config()
+        Display = display_window_class(MATIRF)
+        before = set(top_level(Display))
+        click(button(cw, "Run"))
+        window = [w for w in top_level(Display) if w not in before][-1]
+        pipeline = window.pipeline
+        assert wait_until(lambda: pipeline.state is PipelineState.COMPUTING, timeout=60)
+        wait_until(lambda: False, timeout=1.0)            # laisse le solveur itérer
+        assert not window._live_preview_timer.isActive(), "le minuteur d'aperçu tourne"
+        assert pipeline.latest_preview is None, "le solveur copie l'itéré pour rien"
+        pipeline.stop()
+        window.close()
+
+        save_toml(matirf_ready_config(), MATIRF_CONFIG_PATH)   # un run court, mené au bout
+        cw.load_cached_config()
+        before = set(top_level(Display))
+        click(button(cw, "Run"))
+        window = [w for w in top_level(Display) if w not in before][-1]
+        assert wait_until(lambda: window.pipeline.state is PipelineState.COMPLETED)
+        wait_until(lambda: window.figures_section._initialized, timeout=10)
+        assert window.figures_section._initialized, "figures non affichées à la fin du run"
+        window.close()
+    finally:
+        _settings._values["live_preview"] = saved
+    return "aucun aperçu ni copie pendant le run ; figures affichées à la fin"
+check("D10 réglage live_preview décoché : figures à la fin seulement", d10)
+
+
 print("\n=== E. DÉCONVOLUTION ===")
 
 

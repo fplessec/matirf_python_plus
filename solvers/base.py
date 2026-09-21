@@ -175,6 +175,9 @@ class Solver(ABC):
         self._stop_event = threading.Event()
         self._thread = None
         self._latest = None
+        ## copying the iterate costs a full-size clone per iteration; the pipeline turns it off
+        ## when nobody watches (headless runs, or the `live_preview` setting unticked):
+        self.publishing = True
         ## reporting hooks, wired by the pipeline; harmless no-ops when running standalone,
         ## which is what lets a solver be used directly from a script or a notebook:
         self.on_message = lambda msg: None
@@ -222,8 +225,11 @@ class Solver(ABC):
         Stored rather than signalled: the UI polls it on a timer. Emitting a signal per
         iteration would flood the Qt event loop and freeze the interface — a lesson kept
         from v1.
+
+        A no-op when `publishing` is False, so solvers call it unconditionally.
         """
-        self._latest = f.detach().clone()
+        if self.publishing:
+            self._latest = f.detach().clone()
 
     @property
     def latest(self):
