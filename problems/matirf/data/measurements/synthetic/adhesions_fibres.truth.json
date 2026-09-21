@@ -22,7 +22,7 @@
       "fine_step_nm": 25.0
     },
     "sampling": {
-      "seed": 2
+      "seed": 34
     },
     "ellipsoid": {
       "count": 12,

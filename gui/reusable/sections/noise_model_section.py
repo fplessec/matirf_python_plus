@@ -56,24 +56,27 @@ NOISE_MODEL_UI = {
 
 def noise_model_formula(values: dict, config: dict, problem=None) -> str:
     """
-    D with the (a, b) the run will use.
+    D with the (a, b) the run will use — or an empty line while they cannot be known yet.
 
     `config` is the whole cached config; this section's current `values` replace its
     '[noise-model]' part. With 'estimated', g is computed through `problem.preview` — the
     code path a run takes — and the estimate is cached on everything g depends on.
+
+    Nothing is shown when the values are not available (files or parameters missing, oracle
+    values on a real measurement, a and b not typed yet): the line stays empty and fills in
+    as soon as they are. The reasons themselves are reported where they belong — by the
+    preview's error dialog and by the validation when Run is clicked.
     """
-    from pipeline import noise_parameters
+    from pipeline import noise_parameters, validate_noise_model
     config = {**config, "noise-model": dict(values)}
     source = values.get("parameters", "estimated")
+    if validate_noise_model(config):                 # the same rules as the Run button
+        return ""
     try:
         g = _preprocessed(problem, config) if source == "estimated" else None
         cls, a, b, note = noise_parameters(config, g)
-    except _Unavailable as reason:
-        from pipeline import fidelity_class
-        return fidelity_class(config).formula + rf",\quad \text{{({reason})}}"
-    except (TypeError, ValueError) as error:
-        from pipeline import fidelity_class
-        return fidelity_class(config).formula + rf",\quad \text{{({_plain(error)})}}"
+    except (_Unavailable, TypeError, ValueError):
+        return ""
     shown = cls.from_noise(a, b).latex()
     if "negligible" in note:
         return shown + rf"\quad \text{{({source} noise negligible: unscaled, as in v1)}}"
@@ -99,14 +102,8 @@ def _preprocessed(problem, config):
             _G_CACHE.clear()                 # one measurement at a time is enough
             _G_CACHE[key] = problem.preview(config)[1]
         except Exception as error:
-            raise _Unavailable(f"g unavailable: {_plain(error)}")
+            raise _Unavailable(f"g unavailable: {error}")
     return _G_CACHE[key]
-
-
-def _plain(error) -> str:
-    """An exception as text mathtext can show (no $, _, ^ or braces)."""
-    text = str(error).splitlines()[0][:60] if str(error) else type(error).__name__
-    return "".join(c for c in text if c not in "$_^{}\\%#&~")
 
 
 class NoiseModelSection(BaseSectionQGroup):

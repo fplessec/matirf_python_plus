@@ -84,6 +84,12 @@ class QLatexLabel(QWidget):
 
     def update_latex(self, latex_formula):
         self.latex = latex_formula          # what is shown, readable by tests
+        if not latex_formula:
+            ## an empty line that keeps its height, so the layout does not jump when the
+            ## formula arrives (or leaves)
+            self.label.clear()
+            self.setFixedSize(1, max(self.height(), int(self.fontsize * 2.2)))
+            return
         buf = render_latex(latex_formula, fontsize=self.fontsize, color=self.color, dpi=self.dpi)
         # we use a QPixmap to render the latex formula image
         pixmap = QPixmap()

@@ -22,10 +22,10 @@
       "fine_step_nm": 25.0
     },
     "sampling": {
-      "seed": 3
+      "seed": 30
     },
     "ellipsoid": {
-      "count": 15,
+      "count": 25,
       "lateral_size_min_nm": 150.0,
       "lateral_size_max_nm": 350.0,
       "axial_size_min_nm": 80.0,

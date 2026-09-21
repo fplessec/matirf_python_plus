@@ -11,16 +11,16 @@ zN_nm = 300.0
 fine_step_nm = 25.0
 
 [sampling]
-seed = 1
+seed = 15
 
 [ellipsoid]
-count = 80
+count = 150
 lateral_size_min_nm = 150.0
-lateral_size_max_nm = 400.0
+lateral_size_max_nm = 500.0
 axial_size_min_nm = 80.0
 axial_size_max_nm = 200.0
-depth_min_nm = 30.0
-depth_max_nm = 240.0
+depth_min_nm = 20.0
+depth_max_nm = 280.0
 max_tilt_deg = 10.0
 sharpness = 1.5
 amplitude = 1.0
