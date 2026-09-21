@@ -14,7 +14,8 @@ each object with which sizes. The generator (generator.py) turns it into a (Z, Y
 volume in [0, 1] and saves it as a TIF with a record, <name>.truth.json, holding its
 geometry and its scene — so a truth can always be checked and reproduced.
 
-Ready-made scenes (presets/) are the benchmark's truths: vesicles, adhesions_fibres, cell.
+Ready-made scenes (presets/) are the benchmark's truths: vesicles, fibres, cell, and
+cell_fibres_vesicles (the three together).
 
 The truth is sampled `z_oversampling` times finer in depth than the reconstruction will be
 (grid.py): the measurement is simulated from the fine truth and the reconstruction is

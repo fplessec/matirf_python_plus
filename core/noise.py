@@ -224,13 +224,14 @@ def is_negligible(a: float, b: float, uses=("a", "b")) -> bool:
 
 def formula(params: dict) -> str:
     """
-    The noise the '[add-noise]' section adds, as a latex line with the values of a and b.
+    The noise the '[add-noise]' section adds, as a latex line with the values of a and b —
+    empty while the settings are incomplete.
 
     Shown at the bottom of that section: it changes with the ticked boxes, so the user sees
     the exact model — purely Gaussian, purely Poisson, or both — and not just its settings.
     """
     if validate(params):
-        return r"\text{incomplete noise settings}"
+        return ""                                    # an empty line until the settings are usable
     model = noise_model(params)
     if model.photons is not None and model.sigma:
         return (r"g_{noisy} = \max\left(a\,\mathcal{P}(g/a) + \sqrt{b}\,\varepsilon,\ 0\right)"

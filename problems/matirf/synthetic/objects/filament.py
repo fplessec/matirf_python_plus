@@ -10,8 +10,9 @@ cell). So a filament here is:
     in depth       a linear ramp from its start height, rising or sinking by at most
                    `axial_rise_nm` over its whole length
 
-with a Gaussian RADIAL profile: `radius_nm` is its standard deviation, the visible width
-(FWHM) is about 2.4 x radius. A fibre may leave the field of view, as real ones do.
+with a Gaussian RADIAL profile whose standard deviation, the radius, is drawn per fibre in
+[radius_min_nm, radius_max_nm] — thin single filaments next to thick bundles; the visible
+width (FWHM) is about 2.4 x radius. A fibre may leave the field of view, as real ones do.
 
 Typical values: actin bundles and stress fibres radius 30-60 nm, length 5-20 um;
 microtubules 10-15 nm. Keep in mind the slab is only ~300 nm deep: a radius of 60 nm already
@@ -42,7 +43,8 @@ class Filament(SyntheticObject):
     toml_key = "filament"
     ui_params = {
         "count": count_param("filaments", default=8),
-        "radius_nm": value_param("Radius (profile std)", "r", 30.0, "nm"),
+        "radius_min_nm": value_param("Radius min (profile std)", "r^{min}", 15.0, "nm"),
+        "radius_max_nm": value_param("Radius max (profile std)", "r^{max}", 45.0, "nm"),
         "length_min_nm": value_param("Length min", "\\ell^{min}", 3000.0, "nm"),
         "length_max_nm": value_param("Length max", "\\ell^{max}", 10000.0, "nm"),
         "bend": value_param("Bending (fraction of the length)", "\\beta", 0.1),
@@ -63,7 +65,6 @@ class Filament(SyntheticObject):
 
     @classmethod
     def sample(cls, p, gen, grid):
-        radius = float(p["radius_nm"])
         length = uniform(gen, float(p["length_min_nm"]), float(p["length_max_nm"])).item()
         x0 = uniform(gen, 0.0, grid.Lx_nm).item()
         y0 = uniform(gen, 0.0, grid.Ly_nm).item()
@@ -73,6 +74,7 @@ class Filament(SyntheticObject):
         bend = float(p["bend"]) * length
         b1 = signed_uniform(gen, 0.3, 1.0) * bend
         b2 = signed_uniform(gen, 0.0, 0.5) * bend
+        radius = uniform(gen, float(p["radius_min_nm"]), float(p["radius_max_nm"])).item()
 
         spacing = min(20.0, radius / 2)
         t = torch.linspace(0.0, 1.0, max(16, math.ceil(length / spacing) + 1), dtype=torch.float64)

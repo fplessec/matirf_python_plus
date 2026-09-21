@@ -7,7 +7,7 @@ Run it:
     REPRODUCIBLE   a scene gives the same truth every time; a TIF's record reproduces it;
                    the truths shipped in data/measurements/synthetic are exactly their presets
     PLAUSIBLE      every preset is a non-negative volume in [0, 1] inside the slab; the cell
-                   has an edge and rises from it; adhesions stay at the glass
+                   has an edge and rises from it; vesicles follow their plane; fibres vary
     NO INVERSE     a truth finer than the reconstruction is averaged exactly, and MA-TIRF
     CRIME          simulates the measurement from the FINE truth, reconstructs on the coarse
                    grid, and refuses a depth range different from the truth's
@@ -30,7 +30,7 @@ from problems.matirf.synthetic.scene import complete
 
 
 def test_reproducible():
-    scene = load_preset("adhesions_fibres")
+    scene = load_preset("fibres")
     assert torch.equal(generate(scene), generate(scene)), "same scene, same truth"
     other = {**scene, "sampling": {"seed": 99}}
     assert not torch.equal(generate(scene), generate(other)), "another seed, another truth"
@@ -78,13 +78,23 @@ def test_presets_are_plausible():
         (~footprint).float()[None, None], 41, stride=1, padding=20)[0, 0].bool()].median()
     assert float(edge) < float(centre) - 50, "the membrane must rise from its edge"
 
-    # adhesions stay against the glass: most of their fluorescence in the first 100 nm
-    adhesions = load_preset("adhesions_fibres")
-    adhesions = {**adhesions, "filament": {"count": 0}}
-    profile = depth_profile(generate(adhesions))
-    assert float(profile[:50].sum()) > 0.9, "adhesions must lie within 100 nm of the glass"
+    # the vesicles lie on their inclined plane: depth follows position, over ~200 nm
+    scene = complete(load_preset("vesicles"))
+    grid = Grid.from_params(scene["grid"])
+    centres = torch.tensor([obj.center_nm for obj in build_objects(scene, grid)])
+    design = torch.cat([centres[:, :2], torch.ones(len(centres), 1)], dim=1).double()
+    fit = torch.linalg.lstsq(design, centres[:, 2:].double()).solution
+    residual = float((design @ fit - centres[:, 2:]).std())
+    span = float(centres[:, 2].max() - centres[:, 2].min())
+    assert residual < 25 and span > 150, f"not a plane: scatter {residual:.0f} nm, span {span:.0f} nm"
+
+    # the fibres mix thin filaments and thick bundles
+    fibres = complete(load_preset("fibres"))
+    radii = [obj.radius_nm for obj in build_objects(fibres, Grid.from_params(fibres["grid"]))]
+    assert min(radii) < 20 and max(radii) > 40, radii
     print(f"  plausible       {len(presets())} presets in [0, 1] inside the slab; the cell has "
-          f"an edge and rises {float(centre - edge):.0f} nm; adhesions at the glass")
+          f"an edge and rises {float(centre - edge):.0f} nm; vesicles on a plane spanning "
+          f"{span:.0f} nm (scatter {residual:.0f} nm); fibre radii {min(radii):.0f}-{max(radii):.0f} nm")
 
 
 def test_no_inverse_crime():

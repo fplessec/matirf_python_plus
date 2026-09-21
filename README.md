@@ -118,13 +118,13 @@ matirf synth              # or: python -m problems.matirf.synthetic
 
 | Object | Represents |
 |---|---|
-| `Ellipsoid` | vesicles and endosomes (small, anywhere in depth), or focal adhesions (large, flat, against the glass) |
-| `Filament` | actin stress fibres, microtubules: smooth curves, nearly parallel to the glass |
+| `Ellipsoid` | vesicles and endosomes (small; at random depths, or on an inclined plane or a sphere), or focal adhesions (large, flat, against the glass) |
+| `Filament` | actin stress fibres, microtubules: smooth curves nearly parallel to the glass, thickness drawn per fibre |
 | `Membrane` | the basal membrane of an adherent cell: a footprint with an edge, close to the glass at the edge and higher under the cell body |
 
-**One scene file.** A scene is a single TOML (`[grid]`, `[sampling]` seed, then one section per object with its `count` and sizes, all in nm). The window edits `problems/matirf/synthetic/cache/scene.toml`; ready-made scenes — the benchmark's truths — are in `problems/matirf/synthetic/presets/`: `vesicles`, `adhesions_fibres`, `cell`.
+**One scene file.** A scene is a single TOML (`[grid]`, `[sampling]` seed, then one section per object with its `count` and sizes, all in nm). The window edits `problems/matirf/synthetic/cache/scene.toml`; ready-made scenes — the benchmark's truths — are in `problems/matirf/synthetic/presets/`: `vesicles` (on an inclined plane), `fibres` (thin and thick, crossing at different depths), `cell`, and `cell_fibres_vesicles` (the three together).
 
-**The benchmark truths are shipped** in `problems/matirf/data/measurements/synthetic/`: `vesicles.TIF`, `adhesions_fibres.TIF`, `cell.TIF` (each with its `.truth.json`), and `measurement_parameters.json` — the MA-TIRF microscope (13 angles, 62.6–69.8°, NA 1.33, 491 nm) that builds `H_synthetic` and simulates `g` from them. Select a truth and that .json in synthetic mode, with `z0 = 0`, `zN = 300` and `nz` = 50 (or 30, 25, 15, 10).
+**The benchmark truths are shipped** in `problems/matirf/data/measurements/synthetic/`: `vesicles.TIF`, `fibres.TIF`, `cell.TIF`, `cell_fibres_vesicles.TIF` (each with its `.truth.json`), and `measurement_parameters.json` — the MA-TIRF microscope (13 angles, 62.6–69.8°, NA 1.33, 491 nm) that builds `H_synthetic` and simulates `g` from them. Select a truth and that .json in synthetic mode, with `z0 = 0`, `zN = 300` and `nz` = 50 (or 30, 25, 15, 10).
 
 **A truth file describes itself.** Saving writes the TIF and a record `<name>.truth.json` with its geometry and its complete scene: the truth can be reproduced from it bit for bit, and MA-TIRF refuses to reconstruct it on another depth range than the one it was generated in.
 

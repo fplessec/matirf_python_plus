@@ -2,6 +2,7 @@
 The kinds of synthetic objects, and their registry.
 
     Ellipsoid   vesicles, endosomes, focal adhesions        (ellipsoid.py)
+                (at random depths, or on a plane / sphere)
     Filament    actin stress fibres, microtubules            (filament.py)
     Membrane    the basal membrane of an adherent cell       (membrane.py)
 

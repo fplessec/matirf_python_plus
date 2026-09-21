@@ -17,8 +17,9 @@ refused when the run starts (see pipeline.validate_noise_model).
 The formula line, first in the section, shows D with the values it will use. With
 'estimated' it computes them live — from the same preprocessed g "See preprocessed file"
 shows — and updates whenever anything that changes g does (files, normalization, operator
-parameters, added noise). A noise found negligible is announced there, with the switch to
-the unscaled D it causes (see pipeline.noise_parameters).
+parameters, added noise). Only the formula is shown: a noise found negligible simply
+appears as the unscaled D it switches to (b = 1; see pipeline.noise_parameters), and the
+run log says why.
 """
 
 import json
@@ -69,18 +70,14 @@ def noise_model_formula(values: dict, config: dict, problem=None) -> str:
     """
     from pipeline import noise_parameters, validate_noise_model
     config = {**config, "noise-model": dict(values)}
-    source = values.get("parameters", "estimated")
     if validate_noise_model(config):                 # the same rules as the Run button
         return ""
     try:
-        g = _preprocessed(problem, config) if source == "estimated" else None
-        cls, a, b, note = noise_parameters(config, g)
+        g = _preprocessed(problem, config) if values.get("parameters", "estimated") == "estimated" else None
+        cls, a, b, _ = noise_parameters(config, g)
     except (_Unavailable, TypeError, ValueError):
         return ""
-    shown = cls.from_noise(a, b).latex()
-    if "negligible" in note:
-        return shown + rf"\quad \text{{({source} noise negligible: unscaled, as in v1)}}"
-    return shown + rf"\quad \text{{({source})}}"
+    return cls.from_noise(a, b).latex()
 
 
 class _Unavailable(Exception):

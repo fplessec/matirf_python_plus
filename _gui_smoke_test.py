@@ -538,7 +538,7 @@ def c9():
     for model in ("L2 (Gaussian noise)", "KL divergence (Poisson noise)", "Poisson-Gaussian"):
         fidelity.setCurrentText(model); app.processEvents()
         assert visible() == (False, False), f"{model}, estimated: {visible()}"
-    assert "estimated" in label.latex
+    assert label.latex.startswith("D(Hf,g)"), "estimated: just the formula, with its values"
 
     source.setCurrentText("manual"); app.processEvents()
     expected = {"L2 (Gaussian noise)": (False, True), "KL divergence (Poisson noise)": (True, False),

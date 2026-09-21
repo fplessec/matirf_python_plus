@@ -1,5 +1,6 @@
-# Vesicles and endosomes scattered in depth: small, point-like objects whose depth must be
-# recovered plane by plane — the basic test of axial localization.
+# Vesicles lined up on an inclined plane crossing the volume: from ~40 nm on one side of the
+# field to ~260 nm on the other. Each vesicle must be placed at its own depth, and together
+# they draw a depth GRADIENT the reconstruction has to recover.
 [grid]
 nx = 128
 ny = 128
@@ -11,19 +12,21 @@ zN_nm = 300.0
 fine_step_nm = 25.0
 
 [sampling]
-seed = 15
+seed = 20
 
 [ellipsoid]
-count = 150
-lateral_size_min_nm = 150.0
-lateral_size_max_nm = 500.0
-axial_size_min_nm = 80.0
-axial_size_max_nm = 200.0
-depth_min_nm = 20.0
-depth_max_nm = 280.0
+count = 200
+lateral_size_min_nm = 200.0
+lateral_size_max_nm = 600.0
+axial_size_min_nm = 100.0
+axial_size_max_nm = 250.0
 max_tilt_deg = 10.0
 sharpness = 1.5
 amplitude = 1.0
+placement = "plane"
+surface_depth_nm = 150.0
+surface_rise_nm = 220.0
+surface_jitter_nm = 15.0
 
 [filament]
 count = 0
