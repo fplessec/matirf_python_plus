@@ -26,7 +26,7 @@ import time
 import torch
 
 from core import Feature, features, ForwardOperator, Objective
-from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, Pnp, PnpAdmm, Mcmc
+from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, Pnp, PnpAdmm, Mcmc, McmcV2
 
 DTYPE = torch.float64
 
@@ -113,19 +113,20 @@ def _step_signal(n: int) -> torch.Tensor:
 
 def test_registry():
     """The registry answers which solvers a given problem can run."""
-    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"}
-    assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc
+    ## MCMCv2 is a proposed alternative to MCMC, kept separate until its owner decides
+    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC", "MCMCv2"}
+    assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["MCMCv2"] is McmcV2
 
-    # no solver requires any feature any more, so every problem gets all six — that is the
+    # no solver requires any feature any more, so every problem gets all of them — that is the
     # whole promise of the layer, and it is checked rather than asserted in prose:
     for feats in (features(Feature.TWO_D),
                   features(Feature.THREE_D, Feature.ANISOTROPIC, Feature.SCALE_AMBIGUOUS)):
-        assert len(available_for(feats)) == 6, f"all six solvers must serve {feats}"
+        assert len(available_for(feats)) == 7, f"every solver must serve {feats}"
 
-    assert Mcmc.estimator_type == "MMSE", "MCMC is the only posterior-mean estimator"
-    assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if n != "MCMC")
+    assert Mcmc.estimator_type == McmcV2.estimator_type == "MMSE", "the posterior means"
+    assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if not n.startswith("MCMC"))
     assert "MAP" in Adam.description() and "ADAM" in Adam.description()
-    print("  registry        six solvers, all available to every problem, MAP/MMSE split")
+    print("  registry        seven solvers (MCMCv2 a proposal), all available to every problem")
 
 
 def test_ui_params():
@@ -147,7 +148,7 @@ def test_ui_params():
     # the prior is offered only to the solvers that consult it
     for solver in (Adam, Ppxa):
         assert "lambda_reg" in solver.get_ui_params(features(Feature.TWO_D)), solver.name
-    for solver in (Mcmc, Admm, Pnp, PnpAdmm):
+    for solver in (Mcmc, McmcV2, Admm, Pnp, PnpAdmm):
         assert "lambda_reg" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
 
     # the noise model is NOT an algorithm parameter any more: it belongs to the measurement
@@ -155,7 +156,7 @@ def test_ui_params():
     for solver in SOLVERS.values():
         assert "data_fidelity" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
     assert Adam.supported_noise_models == {"gaussian", "poisson", "poisson-gaussian"}
-    assert Mcmc.supported_noise_models == Adam.supported_noise_models
+    assert Mcmc.supported_noise_models == McmcV2.supported_noise_models == Adam.supported_noise_models
     for solver in (Ppxa, Admm, Pnp, PnpAdmm):
         assert solver.supported_noise_models == {"gaussian"}, solver.name
     print("  ui params       prior gated by solver, delta by ANISOTROPIC, noise models declared")
@@ -220,7 +221,7 @@ def test_solve_normal():
 
 def test_every_solver_on_both_physics():
     """
-    The central claim, checked exhaustively: all six solvers run on both physics.
+    The central claim, checked exhaustively: every solver runs on both physics.
 
     Each is given a modest budget and only has to get meaningfully closer to the truth than
     the back-projection it starts from. This is a contract test, not a benchmark — the real
@@ -232,7 +233,8 @@ def test_every_solver_on_both_physics():
         "ADMM": {"iter": 30, "mu": 0.1, "threshold_ratio": 0.0},
         "PNP": {"iter": 8, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
         "ADMM-PnP": {"iter": 20, "rho": 0.1, "sigma": 5.0, "denoiser": "None"},
-        "MCMC": {"max_iter": 60, "sigma": 0.03, "K": 30},
+        "MCMC": {"max_iter": 60, "beta": 1e-3, "sigma": 0.01, "K": 30, "lambda_rr": 1e-3},
+        "MCMCv2": {"max_iter": 60, "sigma": 0.03, "K": 30},
     }
 
     problems = {
@@ -256,7 +258,7 @@ def test_every_solver_on_both_physics():
             assert error < baseline, (
                 f"{name} on {physics}: error {error:.3e} is no better than the "
                 f"back-projection it started from ({baseline:.3e})")
-    print(f"  all solvers     six solvers x two physics: every run improved on H^t g")
+    print(f"  all solvers     {len(SOLVERS)} solvers x two physics: every run improved on H^t g")
 
 
 def test_same_solver_two_physics():
@@ -438,9 +440,9 @@ def test_adam_and_ppxa_minimize_the_same_objective():
 
 def test_mcmc_is_robust_to_its_temperature():
     """
-    What the MCMC study established, frozen: beta is calibrated, so the relative temperature
-    no longer decides whether the chain works; lambda_rr defaults to s1; the meaningless
-    `proposal_method` switch is gone.
+    MCMCv2's claim, checked: beta is calibrated, so the relative temperature no longer decides
+    whether the chain works, and lambda_rr defaults to s1. And MCMC itself has lost the
+    meaningless `proposal_method` switch.
     """
     from solvers.base import ridge_weight
     op = _random_matrix_operator(40, 30, seed=11)
@@ -451,15 +453,15 @@ def test_mcmc_is_robust_to_its_temperature():
 
     rates = []
     for temperature in (0.3, 1.0, 10.0):
-        mcmc, log = Mcmc(), []
+        mcmc, log = McmcV2(), []
         mcmc.on_message = log.append
         mcmc.solve(objective, op.adjoint(objective.g),
                    {"max_iter": 100, "sigma": 0.03, "temperature": temperature, "K": 100})
         line = next(l for l in log if l.startswith("Accepted"))
         rates.append(float(line.split("(")[1].split("%")[0]))
     assert min(rates) > 50, f"a calibrated chain must move at any sensible temperature: {rates}"
-    assert "proposal_method" not in Mcmc.ui_params
-    print(f"  mcmc            acceptance {min(rates):.0f}-{max(rates):.0f}% for temperatures "
+    assert "proposal_method" not in Mcmc.ui_params and "proposal_method" not in McmcV2.ui_params
+    print(f"  mcmcv2          acceptance {min(rates):.0f}-{max(rates):.0f}% for temperatures "
           f"0.3-10; lambda_rr auto = s1; no proposal switch")
 
 

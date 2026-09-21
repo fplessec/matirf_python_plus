@@ -141,7 +141,7 @@ def test_problem_declaration():
 # ── every solver, on this problem ─────────────────────────────────────────────
 
 def test_all_solvers_run():
-    """All six solvers reconstruct this problem without a line of deconvolution-specific code."""
+    """Every solver reconstructs this problem without a line of deconvolution-specific code."""
     prepared = DECONV.prepare(_config(DataMode.SYNTHETIC))
     ## a crop keeps the test quick; the operator is shape-agnostic
     f_true = prepared.f_true[:96, :96]
@@ -161,7 +161,8 @@ def test_all_solvers_run():
         "ADMM": {"iter": 15, "mu": 0.05, "threshold_ratio": 0.0},
         "PNP": {"iter": 6, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
         "ADMM-PnP": {"iter": 15, "rho": 0.05, "sigma": 5.0, "denoiser": "None"},
-        "MCMC": {"max_iter": 40, "sigma": 0.02, "K": 40, "denoiser": "TV Bregman"},
+        "MCMC": {"max_iter": 40, "beta": 1e-4, "sigma": 0.005, "K": 40, "lambda_rr": 0.05},
+        "MCMCv2": {"max_iter": 40, "sigma": 0.02, "K": 40, "denoiser": "TV Bregman"},
     }
 
     baseline = (operator.adjoint(g) - f_true).norm() / f_true.norm()
@@ -175,7 +176,7 @@ def test_all_solvers_run():
         assert torch.isfinite(f).all(), f"{name} produced non-finite values"
         assert error < baseline, (f"{name}: error {error:.3e} is no better than the "
                                  f"back-projection ({baseline:.3e})")
-    print("  all solvers     six solvers reconstructed a real image, none deconv-specific")
+    print(f"  all solvers     {len(SOLVERS)} solvers reconstructed a real image, none deconv-specific")
 
 
 def test_wiener_and_the_regularization_tradeoff():

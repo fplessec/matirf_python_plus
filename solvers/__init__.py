@@ -29,6 +29,7 @@ from .ppxa import Ppxa
 from .admm import Admm
 from .pnp import Pnp, PnpAdmm
 from .mcmc import Mcmc
+from .mcmc_v2 import McmcV2
 
 ## Registration order is the order the GUI lists them in.
 SOLVERS = {cls.name: cls for cls in [
@@ -38,6 +39,7 @@ SOLVERS = {cls.name: cls for cls in [
     Pnp,
     PnpAdmm,
     Mcmc,
+    McmcV2,
 ]}
 
 
@@ -46,5 +48,5 @@ def available_for(problem_features) -> dict:
     return {name: cls for name, cls in SOLVERS.items() if cls.supported_by(problem_features)}
 
 
-__all__ = ["Solver", "Adam", "Ppxa", "Admm", "Pnp", "PnpAdmm", "Mcmc",
+__all__ = ["Solver", "Adam", "Ppxa", "Admm", "Pnp", "PnpAdmm", "Mcmc", "McmcV2",
            "SOLVERS", "available_for"]
