@@ -21,8 +21,8 @@ class SHVRegularization(Regularization):
         self.n_iter = n_iter
 
     def loss(self, f, diff_ops):
-        hess = diff_ops.hessian(f)
-        hess_term = hess.sum(dim=(0, 1)).mean()
+        ## see HessianFrobeniusRegularization.loss for why hessian_sum rather than hessian
+        hess_term = diff_ops.hessian_sum(f).mean()
         l1_term = f.abs().mean()
         return self.rho * hess_term + (1 - self.rho) * l1_term
 
@@ -35,10 +35,10 @@ class SHVRegularization(Regularization):
         n_iter: number of iterations
         """
         u = f.clone()
+        weight = self.step * lambda_reg
         for _ in range(self.n_iter):
-            hess = diff_ops.hessian(u)
-            grad_h = hess.sum(dim=(0, 1))
-            grad_l1 = torch.sign(u)
-            grad = self.rho * grad_h + (1 - self.rho) * grad_l1
-            u = u - self.step * lambda_reg * grad
+            grad = diff_ops.hessian_sum(u)
+            grad *= self.rho                                  # in place on our own buffer
+            grad.add_(torch.sign(u), alpha=1 - self.rho)
+            u -= weight * grad
         return u
