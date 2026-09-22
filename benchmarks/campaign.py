@@ -1,14 +1,16 @@
 """
-The benchmark campaign — which runs make up the report, at full resolution.
+Phase A — the parameter atlas, derived from docs/algorithms/ (the a priori analysis).
 
-    phase A (atlas)   every method on every structure and noise level.
-    phase B (lambda)  a lambda sweep for the reg-based reference (ADAM, TV & Tikhonov),
-                      so `regularization_share` r(lambda) can be plotted.
-    phase C (v1/v2)   NOT extra runs: it reads the v1/v2 pairs already in phase A.
+For each solver we sweep ONLY the axes the theory says move the *solution* (foundation §3.4);
+the convergence knobs are fixed at the values the notes justify. Full resolution, physical
+operator (`normalize = False`), g peak-normalized. Datasets: two synthetic MA-TIRF truths
+(cell_fibres_vesicles, vesicles) at three noise levels (none, gaussian 0.02, gaussian 0.05),
+the real esoubies measurement (native noise, no truth), and one deconvolution image (img_001)
+at the three noise levels.
 
-`specs()` returns the RunSpec list (phase A + phase B, de-duplicated by run_id) to hand to
-`run_campaign`. Configs are full and explicit; the ridge s2^2 start is the solver default,
-so it is not set here. Noise is oracle (D uses the exact injected sigma^2).
+Solvers: MA-TIRF gets all ten; deconvolution gets the general ones (Adam, PPXA, MCMC, MCMCv2).
+PPXA is CONFIRMATION-ONLY: Adam and PPXA minimize the same objective, so the reg×λ atlas is
+Adam's; PPXA runs a handful of points to verify Adam=PPXA and to test its γ range.
 
     from benchmarks.campaign import specs
     from benchmarks.runner import run_campaign
@@ -17,122 +19,185 @@ so it is not set here. Noise is oracle (D uses the exact injected sigma^2).
 from core import DataMode
 from benchmarks.runner import RunSpec
 from problems.deconv import DECONV_MEASUREMENTS_DIR
-from problems.matirf import MATIRF_SYNTHETIC_DIR
+from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
 
-# ── the matrix (full resolution) ──────────────────────────────────────────────
+# ── datasets and noise ────────────────────────────────────────────────────────
 
-## per-solver iteration budget, per family. Mostly the authors' tuned defaults; PPXA is
-## capped at 500 (from 2000) because at full resolution it costs ~150 s/run on MA-TIRF and
-## still under-converges there (nmse ~0.6) — the report notes its slow convergence.
-SOLVER_ITERS = {
-    "ADAM": {"max_iter": 1000}, "PPXA": {"max_iter": 500},
-    "ADMM": {"iter": 20}, "ADMMv2": {"iter": 100},
-    "PNP": {"iter": 5}, "PNPv2": {"iter": 16},
-    "ADMM-PnP": {"iter": 20}, "ADMM-PnPv2": {"iter": 50},
-    "MCMC": {"max_iter": 200}, "MCMCv2": {"max_iter": 300},
-}
-ALL_SOLVERS = list(SOLVER_ITERS)
-DECONV_SOLVERS = ["ADAM", "PPXA", "MCMC"]        # the plan: deconv keeps the general solvers
-PNP_SOLVERS = {"PNP", "PNPv2", "ADMM-PnP", "ADMM-PnPv2"}
-MCMC_SOLVERS = {"MCMC", "MCMCv2"}
-DENOISER_SOLVERS = PNP_SOLVERS | MCMC_SOLVERS
-REG_SOLVERS = {"ADAM", "PPXA"}                   # take reg + lambda_reg on the shared objective
-
-## anisotropic-aware, never NL-Ridge / DCT. TV Bregman is the robust denoiser for the MCMC
-## chain (the MCMC study: Bilateral drifts); PnP keeps the anisotropic Bilateral.
-PNP_DENOISER = "Bilateral"
-MCMC_DENOISER = "TV Bregman"
-ATLAS_REG, ATLAS_LAMBDA = "tv", 0.1              # for the reg-based solvers in the atlas
-NOISES = [0.02, 0.05]                            # sigma as a fraction of the peak (low, moderate)
-MATIRF_TRUTHS = ["vesicles", "fibres", "cell", "cell_fibres_vesicles"]
-DECONV_TRUTHS = ["img_001", "img_002", "img_003", "img_004"]
-
-## phase B: the lambda sweep (ADAM, the reg-based reference), on one truth per problem
-LAMBDAS = [0.0, 0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75]
-LAMBDA_REGS = ["tv", "tikhonov"]
-LAMBDA_MATIRF_TRUTH, LAMBDA_DECONV_TRUTH, LAMBDA_SIGMA = "fibres", "img_001", 0.05
-
+MATIRF_SYNTHETIC = ["cell_fibres_vesicles", "vesicles"]     # have a ground truth
+MATIRF_REAL = "esoubies"                                     # real data, no truth
+DECONV_IMAGE = "img_001"
+NOISES = [0.0, 0.02, 0.05]                                   # none, then two Gaussian levels
 JSON_MATIRF = str(MATIRF_SYNTHETIC_DIR / "measurement_parameters.json")
+JSON_ESOUBIES = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")
 JSON_DECONV = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
 
-# ── config builders ───────────────────────────────────────────────────────────
+# ── the parameter grids (from the notes) ──────────────────────────────────────
 
-def _algo_params(solver, *, reg=None, lam=None):
-    params = dict(SOLVER_ITERS[solver])
-    if solver in MCMC_SOLVERS:
-        params["denoiser"] = MCMC_DENOISER
-    elif solver in PNP_SOLVERS:
-        params["denoiser"] = PNP_DENOISER
-    if solver in REG_SOLVERS:
-        params["reg"] = reg if reg is not None else ATLAS_REG
-        params["lambda_reg"] = ATLAS_LAMBDA if lam is None else lam
-    return params
+LAMBDAS = [0.02, 0.05, 0.1, 0.2, 0.35, 0.5]                  # Adam/PPXA λ (calibrated share)
+REG_PRIORS = ["tv", "shv"]                                   # + the no-prior case (λ = 0)
+SHV_RHO = 0.6
+ADAM_FIXED = {"max_iter": 3000, "K": 10, "EPS": 1e-8}        # EPS stops before the budget
+
+ADMM_KAPPA = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1]                  # v1 threshold_ratio (log band)
+ADMM_MU = [0.3, 0.5, 1.0]
+ADMMV2_KAPPA = [0.02, 0.05, 0.1, 0.2, 0.5]                   # fraction of τ_max, scale-free
+
+DENOISERS = ["Gaussian", "Bilateral"]                        # + the no-denoiser case
+PNP_SIGMA = [10.0, 25.0, 50.0]                               # 0-255 scale
+PNP_LAMBDA_KZ = [1e-3, 1e-2, 1e-1]                           # final data weight (≈ s4²..s3²)
+ADMMPNP_RHO = [1e-3, 1e-2, 1e-1]
+MCMC_SIGMA = [0.02, 0.03, 0.05]                              # fraction of the peak
+
+# ── config builders (physical operator, g peak-normalized) ────────────────────
+
+def _noise_sections(noise):
+    """(add-noise, noise-model) for a synthetic run: none → estimated (≈ unscaled), else oracle."""
+    if noise == 0.0:
+        return {}, {}                                        # no added noise; noise estimated
+    return {"gaussian_noise": True, "sigma": noise, "seed": 1}, {"parameters": "oracle"}
 
 
-def matirf_config(truth, solver, sigma, *, reg=None, lam=None):
-    return {
-        "algorithm": solver,
-        "input-paths": {"mode": DataMode.SYNTHETIC.value,
-                        "tif": str(MATIRF_SYNTHETIC_DIR / f"{truth}.TIF"), "json": JSON_MATIRF},
-        "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": "peak"},
-        "add-noise": {"gaussian_noise": True, "sigma": sigma, "seed": 1},
-        "noise-model": {"parameters": "oracle"},
-        "algo-params": _algo_params(solver, reg=reg, lam=lam),
-    }
+def matirf_synth_config(truth, solver, noise, algo_params):
+    add_noise, noise_model = _noise_sections(noise)
+    return {"algorithm": solver,
+            "input-paths": {"mode": DataMode.SYNTHETIC.value,
+                            "tif": str(MATIRF_SYNTHETIC_DIR / f"{truth}.TIF"),
+                            "json": JSON_MATIRF, "normalization": "peak"},
+            "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": False},
+            "add-noise": add_noise, "noise-model": noise_model, "algo-params": algo_params}
 
 
-def deconv_config(truth, solver, sigma, *, reg=None, lam=None):
-    return {
-        "algorithm": solver,
-        "input-paths": {"mode": DataMode.SYNTHETIC.value,
-                        "png": str(DECONV_MEASUREMENTS_DIR / f"{truth}.png"),
-                        "json": JSON_DECONV, "normalization": "peak"},
-        "add-noise": {"gaussian_noise": True, "sigma": sigma, "seed": 1},
-        "noise-model": {"parameters": "oracle"},
-        "algo-params": _algo_params(solver, reg=reg, lam=lam),
-    }
+def matirf_real_config(solver, algo_params):
+    """esoubies: real data (native noise, no truth); noise estimated from g."""
+    return {"algorithm": solver,
+            "input-paths": {"mode": DataMode.REAL.value,
+                            "tif": str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF"),
+                            "json": JSON_ESOUBIES, "normalization": "peak"},
+            "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": False},
+            "add-noise": {}, "noise-model": {}, "algo-params": algo_params}
 
-# ── the phases ────────────────────────────────────────────────────────────────
 
-def atlas_specs():
-    """Phase A: every method on every structure and noise level."""
+def deconv_config(solver, noise, algo_params):
+    add_noise, noise_model = _noise_sections(noise)
+    return {"algorithm": solver,
+            "input-paths": {"mode": DataMode.SYNTHETIC.value,
+                            "png": str(DECONV_MEASUREMENTS_DIR / f"{DECONV_IMAGE}.png"),
+                            "json": JSON_DECONV, "normalization": "peak"},
+            "add-noise": add_noise, "noise-model": noise_model, "algo-params": algo_params}
+
+# ── per-solver algo-params (the swept axis + the fixed knobs) ──────────────────
+
+def _reg_grid():
+    """(tag, algo-params) for Adam/PPXA: the no-prior point, then TV and SHV over λ."""
+    yield ({"reg": "none", "lambda": 0.0}, {"lambda_reg": 0.0, **ADAM_FIXED})
+    for lam in LAMBDAS:
+        yield ({"reg": "tv", "lambda": lam}, {"reg": "tv", "lambda_reg": lam, **ADAM_FIXED})
+        yield ({"reg": "shv", "lambda": lam},
+               {"reg": "shv", "rho": SHV_RHO, "lambda_reg": lam, **ADAM_FIXED})
+
+
+def _denoiser_grid(strength_name, strengths):
+    """(tag, params) for a PnP-family solver: the no-denoiser point, then 2 denoisers × σ × strength."""
+    yield ({"denoiser": "None"}, {"denoiser": "None"})
+    for denoiser in DENOISERS:
+        for sigma in PNP_SIGMA:
+            for strength in strengths:
+                yield ({"denoiser": denoiser, "sigma": sigma, strength_name: strength},
+                       {"denoiser": denoiser, "sigma": sigma, strength_name: strength})
+
+
+def _mcmc_grid():
+    yield ({"denoiser": "None"}, {"denoiser": "None"})
+    for denoiser in DENOISERS:
+        for sigma in MCMC_SIGMA:
+            yield ({"denoiser": denoiser, "sigma": sigma}, {"denoiser": denoiser, "sigma": sigma})
+
+
+## every solver's swept axis and its fixed knobs, as (tag_extra, algo-params) generators
+def _solver_specs(solver):
+    if solver == "ADAM":
+        yield from _reg_grid()
+    elif solver == "ADMM":
+        for kappa in ADMM_KAPPA:
+            for mu in ADMM_MU:
+                yield ({"kappa": kappa, "mu": mu},
+                       {"iter": 200, "threshold_ratio": kappa, "mu": mu})
+    elif solver == "ADMMv2":
+        for kappa in ADMMV2_KAPPA:
+            yield ({"kappa": kappa}, {"iter": 100, "kappa": kappa, "mu": 1.0})
+    elif solver in ("PNP", "PNPv2"):
+        for tag, p in _denoiser_grid("lambda_kz", PNP_LAMBDA_KZ):
+            yield (tag, {"iter": 16, **p})
+    elif solver in ("ADMM-PnP", "ADMM-PnPv2"):
+        for tag, p in _denoiser_grid("rho", ADMMPNP_RHO):
+            yield (tag, {"iter": 50, **p})
+    elif solver in ("MCMC", "MCMCv2"):
+        for tag, p in _mcmc_grid():
+            yield (tag, {"max_iter": 300, **p})
+
+
+MATIRF_SOLVERS = ["ADAM", "ADMM", "ADMMv2", "PNP", "PNPv2",
+                  "ADMM-PnP", "ADMM-PnPv2", "MCMC", "MCMCv2"]     # PPXA handled separately
+DECONV_SOLVERS = ["ADAM", "MCMC", "MCMCv2"]                       # + PPXA confirmation
+
+# ── PPXA confirmation-only (Adam = PPXA on the same objective; + a γ range check) ─
+
+def _ppxa_confirmation():
+    """~10 runs: verify Adam=PPXA on TV/SHV at λ=0.1, and sweep γ once."""
+    base = {"max_iter": 3000, "K": 10, "EPS": 1e-8, "lambda_relax": 1.5, "gamma": 0.01}
     out = []
-    for sigma in NOISES:
-        for truth in MATIRF_TRUTHS:
-            for solver in ALL_SOLVERS:
-                out.append(RunSpec("matirf", matirf_config(truth, solver, sigma),
-                                   tags={"phase": "A", "problem": "matirf", "solver": solver,
-                                         "truth": truth, "sigma": sigma}))
-        for truth in DECONV_TRUTHS:
-            for solver in DECONV_SOLVERS:
-                out.append(RunSpec("deconv", deconv_config(truth, solver, sigma),
-                                   tags={"phase": "A", "problem": "deconv", "solver": solver,
-                                         "truth": truth, "sigma": sigma}))
+    for truth in MATIRF_SYNTHETIC:                       # confirm on both truths, TV + SHV, λ=0.1, σ=0.02
+        for reg, extra in (("tv", {}), ("shv", {"rho": SHV_RHO})):
+            ap = {"reg": reg, "lambda_reg": 0.1, **extra, **base}
+            out.append(RunSpec("matirf", matirf_synth_config(truth, "PPXA", 0.02, ap),
+                               tags={"phase": "A", "problem": "matirf", "solver": "PPXA",
+                                     "dataset": truth, "noise": 0.02, "reg": reg, "lambda": 0.1,
+                                     "role": "confirm"}))
+    for gamma in [1e-3, 3e-3, 1e-2, 3e-2, 1e-1]:         # γ range check on TV, vesicles
+        ap = {"reg": "tv", "lambda_reg": 0.1, **base, "gamma": gamma}
+        out.append(RunSpec("matirf", matirf_synth_config("vesicles", "PPXA", 0.02, ap),
+                           tags={"phase": "A", "problem": "matirf", "solver": "PPXA",
+                                 "dataset": "vesicles", "noise": 0.02, "gamma": gamma,
+                                 "role": "gamma"}))
+    ap = {"reg": "tv", "lambda_reg": 0.1, **base}        # deconv confirm
+    out.append(RunSpec("deconv", deconv_config("PPXA", 0.02, ap),
+                       tags={"phase": "A", "problem": "deconv", "solver": "PPXA",
+                             "dataset": DECONV_IMAGE, "noise": 0.02, "reg": "tv", "lambda": 0.1,
+                             "role": "confirm"}))
+    return out
+
+# ── the campaign ──────────────────────────────────────────────────────────────
+
+def _matirf_specs():
+    out = []
+    for solver in MATIRF_SOLVERS:
+        for tag_extra, ap in _solver_specs(solver):
+            for truth in MATIRF_SYNTHETIC:
+                for noise in NOISES:
+                    out.append(RunSpec("matirf", matirf_synth_config(truth, solver, noise, ap),
+                                       tags={"phase": "A", "problem": "matirf", "solver": solver,
+                                             "dataset": truth, "noise": noise, **tag_extra}))
+            out.append(RunSpec("matirf", matirf_real_config(solver, ap),
+                               tags={"phase": "A", "problem": "matirf", "solver": solver,
+                                     "dataset": MATIRF_REAL, "noise": "native", **tag_extra}))
     return out
 
 
-def lambda_specs():
-    """Phase B: a lambda sweep for ADAM (TV & Tikhonov), one truth per problem."""
+def _deconv_specs():
     out = []
-    for reg in LAMBDA_REGS:
-        for lam in LAMBDAS:
-            out.append(RunSpec("matirf",
-                               matirf_config(LAMBDA_MATIRF_TRUTH, "ADAM", LAMBDA_SIGMA, reg=reg, lam=lam),
-                               tags={"phase": "B", "problem": "matirf", "solver": "ADAM",
-                                     "truth": LAMBDA_MATIRF_TRUTH, "sigma": LAMBDA_SIGMA,
-                                     "reg": reg, "lambda": lam}))
-            out.append(RunSpec("deconv",
-                               deconv_config(LAMBDA_DECONV_TRUTH, "ADAM", LAMBDA_SIGMA, reg=reg, lam=lam),
-                               tags={"phase": "B", "problem": "deconv", "solver": "ADAM",
-                                     "truth": LAMBDA_DECONV_TRUTH, "sigma": LAMBDA_SIGMA,
-                                     "reg": reg, "lambda": lam}))
+    for solver in DECONV_SOLVERS:
+        for tag_extra, ap in _solver_specs(solver):
+            for noise in NOISES:
+                out.append(RunSpec("deconv", deconv_config(solver, noise, ap),
+                                   tags={"phase": "A", "problem": "deconv", "solver": solver,
+                                         "dataset": DECONV_IMAGE, "noise": noise, **tag_extra}))
     return out
 
 
 def specs():
-    """Phase A + phase B, de-duplicated by run_id (an atlas run and a lambda run can coincide)."""
+    """All Phase-A runs, de-duplicated by run_id."""
     seen, out = set(), []
-    for spec in atlas_specs() + lambda_specs():
+    for spec in _matirf_specs() + _deconv_specs() + _ppxa_confirmation():
         if spec.run_id not in seen:
             seen.add(spec.run_id)
             out.append(spec)
@@ -140,15 +205,14 @@ def specs():
 
 
 def summary():
-    """A human count of the campaign, by phase and problem — printed before launch."""
     all_specs = specs()
     by = {}
     for spec in all_specs:
-        key = (spec.tags["phase"], spec.tags["problem"])
+        key = (spec.tags["problem"], spec.tags["solver"])
         by[key] = by.get(key, 0) + 1
-    lines = [f"Campaign: {len(all_specs)} runs (full resolution)"]
-    for (phase, problem), n in sorted(by.items()):
-        lines.append(f"  phase {phase} · {problem:7} {n:4d}")
+    lines = [f"Phase A: {len(all_specs)} runs (full resolution)"]
+    for (problem, solver), n in sorted(by.items()):
+        lines.append(f"  {problem:7} {solver:12} {n:4d}")
     return "\n".join(lines)
 
 
