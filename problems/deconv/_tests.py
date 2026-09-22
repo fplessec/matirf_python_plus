@@ -159,6 +159,7 @@ def test_all_solvers_run():
         "ADAM": {"max_iter": 60, "lr": 0.02, "K": 60, "EPS": 1e-14},
         "PPXA": {"max_iter": 40, "lambda_relax": 1.0, "gamma": 1.0, "K": 40, "EPS": 1e-14},
         "ADMM": {"iter": 15, "mu": 0.05, "threshold_ratio": 0.0},
+        "ADMMv2": {"iter": 30, "mu": 1.0, "kappa": 0.001},
         "PNP": {"iter": 6, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
         "ADMM-PnP": {"iter": 15, "rho": 0.05, "sigma": 5.0, "denoiser": "None"},
         "MCMC": {"max_iter": 40, "beta": 1e-4, "sigma": 0.005, "K": 40, "lambda_rr": 0.05},

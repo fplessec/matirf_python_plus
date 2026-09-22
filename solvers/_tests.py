@@ -26,7 +26,7 @@ import time
 import torch
 
 from core import Feature, features, ForwardOperator, Objective
-from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, Pnp, PnpAdmm, Mcmc, McmcV2
+from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, AdmmV2, Pnp, PnpAdmm, Mcmc, McmcV2
 
 DTYPE = torch.float64
 
@@ -113,20 +113,20 @@ def _step_signal(n: int) -> torch.Tensor:
 
 def test_registry():
     """The registry answers which solvers a given problem can run."""
-    ## MCMCv2 is a proposed alternative to MCMC, kept separate until its owner decides
-    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC", "MCMCv2"}
+    ## ADMMv2 and MCMCv2 are proposed alternatives, kept separate until their owner decides
+    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "ADMM-PnP", "MCMC", "MCMCv2"}
     assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["MCMCv2"] is McmcV2
 
     # no solver requires any feature any more, so every problem gets all of them — that is the
     # whole promise of the layer, and it is checked rather than asserted in prose:
     for feats in (features(Feature.TWO_D),
                   features(Feature.THREE_D, Feature.ANISOTROPIC, Feature.SCALE_AMBIGUOUS)):
-        assert len(available_for(feats)) == 7, f"every solver must serve {feats}"
+        assert len(available_for(feats)) == 8, f"every solver must serve {feats}"
 
     assert Mcmc.estimator_type == McmcV2.estimator_type == "MMSE", "the posterior means"
     assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if not n.startswith("MCMC"))
     assert "MAP" in Adam.description() and "ADAM" in Adam.description()
-    print("  registry        seven solvers (MCMCv2 a proposal), all available to every problem")
+    print("  registry        eight solvers (ADMMv2, MCMCv2 proposals), all available to every problem")
 
 
 def test_ui_params():
@@ -148,7 +148,7 @@ def test_ui_params():
     # the prior is offered only to the solvers that consult it
     for solver in (Adam, Ppxa):
         assert "lambda_reg" in solver.get_ui_params(features(Feature.TWO_D)), solver.name
-    for solver in (Mcmc, McmcV2, Admm, Pnp, PnpAdmm):
+    for solver in (Mcmc, McmcV2, Admm, AdmmV2, Pnp, PnpAdmm):
         assert "lambda_reg" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
 
     # the noise model is NOT an algorithm parameter any more: it belongs to the measurement
@@ -157,7 +157,7 @@ def test_ui_params():
         assert "data_fidelity" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
     assert Adam.supported_noise_models == {"gaussian", "poisson", "poisson-gaussian"}
     assert Mcmc.supported_noise_models == McmcV2.supported_noise_models == Adam.supported_noise_models
-    for solver in (Ppxa, Admm, Pnp, PnpAdmm):
+    for solver in (Ppxa, Admm, AdmmV2, Pnp, PnpAdmm):
         assert solver.supported_noise_models == {"gaussian"}, solver.name
     print("  ui params       prior gated by solver, delta by ANISOTROPIC, noise models declared")
 
@@ -231,6 +231,7 @@ def test_every_solver_on_both_physics():
         "ADAM": {"max_iter": 400, "lr": 0.05, "K": 200, "EPS": 1e-14},
         "PPXA": {"max_iter": 300, "lambda_relax": 1.0, "gamma": 0.5, "K": 150, "EPS": 1e-14},
         "ADMM": {"iter": 30, "mu": 0.1, "threshold_ratio": 0.0},
+        "ADMMv2": {"iter": 100, "mu": 1.0, "kappa": 0.001},
         "PNP": {"iter": 8, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
         "ADMM-PnP": {"iter": 20, "rho": 0.1, "sigma": 5.0, "denoiser": "None"},
         "MCMC": {"max_iter": 60, "beta": 1e-3, "sigma": 0.01, "K": 30, "lambda_rr": 1e-3},
@@ -465,6 +466,34 @@ def test_mcmc_is_robust_to_its_temperature():
           f"0.3-10; lambda_rr auto = s1; no proposal switch")
 
 
+def test_admm_v2_parameters_mean_what_they_say():
+    """
+    ADMMv2's two claims, checked against ADMM on a sparse toy problem: kappa = 1 empties the
+    image exactly (tau = max(H^T g)), and mu changes only the speed, not the solution —
+    while ADMM's mu changes the sparsity, and diverges well above the 1.618 bound.
+    """
+    torch.manual_seed(0)
+    op = _random_matrix_operator(40, 60, seed=4)
+    f_true = torch.zeros(60, dtype=DTYPE)
+    f_true[[3, 17, 40]] = torch.tensor([1.0, 0.5, 0.8], dtype=DTYPE)
+    objective = Objective(op, op.apply(f_true) + 0.01 * torch.randn(40, dtype=DTYPE), _Gaussian())
+
+    assert float(AdmmV2().solve(objective, None, {"kappa": 1.0, "iter": 500}).norm()) == 0.0
+    slow = AdmmV2().solve(objective, None, {"kappa": 0.05, "mu": 0.3, "iter": 5000})
+    fast = AdmmV2().solve(objective, None, {"kappa": 0.05, "mu": 30.0, "iter": 5000})
+    assert float((slow - fast).norm() / slow.norm()) < 1e-4, "mu must not change the solution"
+
+    start = op.adjoint(objective.g)
+    sparse = [int((Admm().solve(objective, start, {"iter": 2000, "mu": mu,
+                                                    "threshold_ratio": 0.3}) > 1e-8).sum())
+              for mu in (0.3, 1.5)]
+    assert sparse[0] != sparse[1], "ADMM: mu changes the solution (the reason for ADMMv2)"
+    diverged = Admm().solve(objective, start, {"iter": 2000, "mu": 2.5, "threshold_ratio": 0.3})
+    assert not torch.isfinite(diverged).all(), "ADMM: mu = 2.5 is beyond its dual-step bound"
+    print(f"  admm v2         kappa = 1 empties; mu speed-only (ADMM: {sparse[0]} vs {sparse[1]} "
+          f"nonzeros for mu 0.3 / 1.5, NaN at 2.5)")
+
+
 def main():
     print("solvers — contract tests\n")
     test_registry()
@@ -478,6 +507,7 @@ def main():
     test_fidelities_are_scaled_likelihoods()
     test_adam_and_ppxa_minimize_the_same_objective()
     test_mcmc_is_robust_to_its_temperature()
+    test_admm_v2_parameters_mean_what_they_say()
     print("\nAll solver contracts hold.")
 
 

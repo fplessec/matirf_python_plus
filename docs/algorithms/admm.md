@@ -2,7 +2,8 @@
 
 > Status: **theoretical note** (Day 7, step 2). Ranges are *predicted* from the mathematics
 > and from the MA-TIRF spectrum (see `adam_ppxa.md` §1.1: $s_1 = 38.9$, $s_2 = 6.02$,
-> $s_3 = 0.562$, $s_4 = 0.033$). No algorithm was modified; §4 lists *proposals*.
+> $s_3 = 0.562$, $s_4 = 0.033$). ADMM itself is unchanged; its two proposed fixes exist as
+> the separate solver ADMMv2 (§4).
 
 ---
 
@@ -131,19 +132,32 @@ ones.
 
 ---
 
-## 4. Proposals (not applied — for the project owner to decide)
+## 4. ADMMv2 — the two proposals, as a separate solver
 
-1. **Decouple $\mu$ from the prior weight.** Apply the threshold $\tau/\mu$ with
-   $\tau = \kappa \max(g)/s_1$ fixed. Then $\kappa$ alone sets the prior and $\mu$ only the speed,
-   as in textbook ADMM. *Evidence*: §1.1 (derivation); to be confirmed by H-A2.
-2. **Standard dual step** $\eta \leftarrow \eta + (u - f)$, removing the 1.618 cap on $\mu$ and
-   letting $\mu$ be chosen from the spectrum alone ($[s_3^2, s_1^2]$). *Evidence*: §1.2; to be
-   confirmed by H-A2 (oscillation above 1.618 today).
+At the project owner's request the two proposals exist as a separate solver,
+`solvers/admm_v2.py` ("ADMMv2"); ADMM is unchanged. The benchmark compares them and only
+one will be kept if one is clearly worse.
 
-Both would change results of existing configurations; neither is needed for the benchmark,
-which characterizes ADMM as it is.
+| | ADMM | ADMMv2 |
+|---|---|---|
+| threshold in the f-step | fixed $t = \kappa \max(g)/s_1$ | $\tau/\mu$ |
+| prior weight at convergence | $\tau = \mu\, t$ — depends on $\mu$ | $\tau = \kappa \max(H^Tg)$ — independent of $\mu$ |
+| dual step | $\eta \mathrel{+}= \mu(u-f)$, needs $\mu < 1.618$ | $\eta \mathrel{+}= (u-f)$, any $\mu > 0$ |
+| role of $\mu$ | ridge × prior weight × dual step | **speed only** |
+| meaning of $\kappa$ | threshold ≈ fraction of the image peak | fraction of $\tau_{max} = \max(H^Tg)$: **1 = empty image, → 0 = NNLS** |
 
----
+$\tau_{max} = \max(H^Tg)$ is exact: with positivity, $f = 0$ is optimal iff $H^Tg \le \tau$
+(the optimality condition at 0). So ADMMv2's $\kappa$ reads the same whatever the data scale,
+the operator's gain or the normalization of $g$.
+
+*Evidence (sparse toy problem, `solvers/_tests.py`)*: ADMMv2 — $\kappa = 1$ returns exactly
+zero; $\mu = 0.3$ and $\mu = 30$ reach the same solution to $5\cdot10^{-7}$. ADMM — at a fixed
+threshold, $\mu$ from 0.3 to 1.7 takes the solution from 21 to 6 non-zero voxels, and
+$\mu = 2.5$ diverges to NaN (the 1.618 bound is sufficient, not necessary: 1.7 still
+converged there).
+
+**Predicted ranges for ADMMv2:** $\kappa \in [10^{-3}, 10^{-1}]$ on MA-TIRF (to be established);
+$\mu$ fastest in $[s_3^2, s_1^2]$; `iter` a pure budget (default 100).
 
 ## 5. Hypotheses the benchmark must test
 
@@ -153,3 +167,4 @@ which characterizes ADMM as it is.
 | H-A2 | at fixed $\kappa$, $\mu$ changes the sparsity (not only the speed); $\mu > 1.618$ oscillates | $\mu$ sweep 0.03 – 3, loss / iterate history |
 | H-A3 | with $\kappa$ in range the result plateaus for `iter` ≳ 50; with $\kappa \approx 0$ it drifts with `iter` | `iter` sweep 10 – 2 000 at two $\kappa$ |
 | H-A4 | $\mu \approx s_3^2$ – 1 converges fastest on MA-TIRF | iterations to plateau vs $\mu$ |
+| H-A5 | ADMMv2: same reconstruction for any $\mu$ once converged; its best $\kappa$ is transferable across truths and noise levels better than ADMM's `threshold_ratio` | $\mu$ and $\kappa$ sweeps, ADMM vs ADMMv2 |
