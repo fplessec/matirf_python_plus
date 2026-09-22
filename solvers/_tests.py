@@ -26,7 +26,8 @@ import time
 import torch
 
 from core import Feature, features, ForwardOperator, Objective
-from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, AdmmV2, Pnp, PnpAdmm, Mcmc, McmcV2
+from solvers import (SOLVERS, available_for, Adam, Ppxa, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm,
+                     Mcmc, McmcV2)
 
 DTYPE = torch.float64
 
@@ -113,20 +114,21 @@ def _step_signal(n: int) -> torch.Tensor:
 
 def test_registry():
     """The registry answers which solvers a given problem can run."""
-    ## ADMMv2 and MCMCv2 are proposed alternatives, kept separate until their owner decides
-    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "ADMM-PnP", "MCMC", "MCMCv2"}
+    ## the "v2" solvers are proposed alternatives, kept separate until their owner decides
+    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "PNPv2", "ADMM-PnP",
+                            "MCMC", "MCMCv2"}
     assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["MCMCv2"] is McmcV2
 
     # no solver requires any feature any more, so every problem gets all of them — that is the
     # whole promise of the layer, and it is checked rather than asserted in prose:
     for feats in (features(Feature.TWO_D),
                   features(Feature.THREE_D, Feature.ANISOTROPIC, Feature.SCALE_AMBIGUOUS)):
-        assert len(available_for(feats)) == 8, f"every solver must serve {feats}"
+        assert len(available_for(feats)) == 9, f"every solver must serve {feats}"
 
     assert Mcmc.estimator_type == McmcV2.estimator_type == "MMSE", "the posterior means"
     assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if not n.startswith("MCMC"))
     assert "MAP" in Adam.description() and "ADAM" in Adam.description()
-    print("  registry        eight solvers (ADMMv2, MCMCv2 proposals), all available to every problem")
+    print("  registry        nine solvers (the v2 ones are proposals), all available to every problem")
 
 
 def test_ui_params():
@@ -148,7 +150,7 @@ def test_ui_params():
     # the prior is offered only to the solvers that consult it
     for solver in (Adam, Ppxa):
         assert "lambda_reg" in solver.get_ui_params(features(Feature.TWO_D)), solver.name
-    for solver in (Mcmc, McmcV2, Admm, AdmmV2, Pnp, PnpAdmm):
+    for solver in (Mcmc, McmcV2, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm):
         assert "lambda_reg" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
 
     # the noise model is NOT an algorithm parameter any more: it belongs to the measurement
@@ -157,7 +159,7 @@ def test_ui_params():
         assert "data_fidelity" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
     assert Adam.supported_noise_models == {"gaussian", "poisson", "poisson-gaussian"}
     assert Mcmc.supported_noise_models == McmcV2.supported_noise_models == Adam.supported_noise_models
-    for solver in (Ppxa, Admm, AdmmV2, Pnp, PnpAdmm):
+    for solver in (Ppxa, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm):
         assert solver.supported_noise_models == {"gaussian"}, solver.name
     print("  ui params       prior gated by solver, delta by ANISOTROPIC, noise models declared")
 
@@ -233,6 +235,7 @@ def test_every_solver_on_both_physics():
         "ADMM": {"iter": 30, "mu": 0.1, "threshold_ratio": 0.0},
         "ADMMv2": {"iter": 100, "mu": 1.0, "kappa": 0.001},
         "PNP": {"iter": 8, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
+        "PNPv2": {"iter": 6, "sigma": 5.0, "denoiser": "None"},
         "ADMM-PnP": {"iter": 20, "rho": 0.1, "sigma": 5.0, "denoiser": "None"},
         "MCMC": {"max_iter": 60, "beta": 1e-3, "sigma": 0.01, "K": 30, "lambda_rr": 1e-3},
         "MCMCv2": {"max_iter": 60, "sigma": 0.03, "K": 30},
@@ -494,6 +497,50 @@ def test_admm_v2_parameters_mean_what_they_say():
           f"nonzeros for mu 0.3 / 1.5, NaN at 2.5)")
 
 
+def test_pnp_v2_is_scale_free():
+    """
+    PNPv2's central claim: its denoising does not depend on the image's intensity scale.
+
+    The same 2D problem with H's gain multiplied by c has a solution divided by c. With the
+    data weight scaled consistently (lambda_kz x c^2, the eigenvalues of H^T H), PNPv2 with
+    an intensity-based denoiser (Wiener) returns exactly the reconstruction divided by c;
+    PnP, which assumes f in [0, 1], does not.
+    """
+    torch.manual_seed(1)
+    n = 32
+    fy = torch.fft.fftfreq(n, dtype=DTYPE)
+    kernel = torch.exp(-2 * math.pi ** 2 * 1.2 ** 2 * (fy[:, None] ** 2 + fy[None, :] ** 2))
+
+    class _Blur(ForwardOperator):
+        name, features = "blur", features(Feature.TWO_D)
+        def __init__(self, gain):
+            self.gain = gain
+        def apply(self, f):
+            return self.gain * torch.fft.ifft2(torch.fft.fft2(f) * kernel).real
+        def adjoint(self, y):
+            return self.apply(y)
+
+    f_true = torch.zeros(n, n, dtype=DTYPE)
+    f_true[8:20, 6:14], f_true[18:28, 16:26] = 1.0, 0.6
+    g = (_Blur(1.0).apply(f_true) + 0.02 * torch.randn(n, n, dtype=DTYPE)).clamp(min=0)
+
+    def run(solver, gain, extra):
+        objective = Objective(_Blur(gain), g, _Gaussian())
+        params = {"iter": 8, "sigma": 20.0, "denoiser": "Wiener", "init": "ridge",
+                  "lambda_rr": 0.1 * gain ** 2, **extra}
+        return solver.solve(objective, solver.initial_guess(objective, params), params)
+
+    c = 50.0
+    v2 = [run(PnpV2(), gain, {"lambda_kz": 0.05 * gain ** 2}) for gain in (1.0, c)]
+    v1 = [run(Pnp(), gain, {"lambda_kz": 0.05 * gain ** 2}) for gain in (1.0, c)]
+    gap_v2 = float((c * v2[1] - v2[0]).norm() / v2[0].norm())
+    gap_v1 = float((c * v1[1] - v1[0]).norm() / v1[0].norm())
+    assert gap_v2 < 1e-4, f"PNPv2 must be scale-free (gap {gap_v2:.1e})"
+    assert gap_v1 > 1e-2, f"PnP is expected to depend on the scale (gap {gap_v1:.1e})"
+    print(f"  pnp v2          scale-free: gain x{c:g} gives the same image / {c:g} "
+          f"(gap {gap_v2:.0e}; PnP: {gap_v1:.2f})")
+
+
 def main():
     print("solvers — contract tests\n")
     test_registry()
@@ -508,6 +555,7 @@ def main():
     test_adam_and_ppxa_minimize_the_same_objective()
     test_mcmc_is_robust_to_its_temperature()
     test_admm_v2_parameters_mean_what_they_say()
+    test_pnp_v2_is_scale_free()
     print("\nAll solver contracts hold.")
 
 

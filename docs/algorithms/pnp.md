@@ -2,8 +2,9 @@
 
 > Status: **theoretical note** (Day 7, step 2). MA-TIRF spectrum as in `adam_ppxa.md` §1.1
 > ($s_1 = 38.9$, $s_2 = 6.02$, $s_3 = 0.562$). PnP is benchmarked on MA-TIRF only (the
-> deconvolution benchmark covers Adam, PPXA and MCMC). Nothing was modified; §5 lists
-> proposals. The denoiser analysis of §3 also applies to ADMM-PnP and MCMC.
+> deconvolution benchmark covers Adam, PPXA and MCMC). PnP itself is unchanged; its proposed
+> fixes exist as the separate solver PNPv2 (§5). The denoiser analysis of §3 also applies
+> to ADMM-PnP and MCMC. DCT is considered broken (to be redone) and left out.
 
 ---
 
@@ -175,25 +176,36 @@ For a user, PnP comes down to **three decisions: which denoiser, how strong at t
 
 ---
 
-## 5. Issues and proposals (not applied)
+## 5. PNPv2 — the proposals, as a separate solver
 
-1. **Scale-free denoising** — apply denoisers to $f$ normalized by its peak,
-   $p \cdot D(255 f/p, \sigma)/255$ with $p = \max f$, so that $\sigma$ means "noise level for an
-   image whose peak is 255" on every problem. This makes $\sigma$ transferable between
-   inverse problems (§3); it changes results for Bilateral, Wiener and DCT on MA-TIRF, not
-   on deconvolution. The same change would apply to ADMM-PnP.
-2. **Noise-aware final level** — use the measurement's noise level (from the noise model,
-   on the 0–255 scale) as $\sigma_{final}$ instead of the hard-coded 1, as in DPIR.
-3. **Estimated `delta`** — let the pipeline estimate `delta` for denoisers too (as it does
-   for regularizations) when the user leaves it empty.
-4. **A proper start** — offer `init`, or start from the ridge estimate, so the null-space
-   components of the first iterates have the right scale and shape.
+At the project owner's request the proposals exist as `solvers/pnp_v2.py` ("PNPv2"); PnP is
+unchanged. The benchmark compares them.
 
-Evidence for 1 is the measurement of §3; 2–4 follow from §1.1–1.2 and are to be confirmed by
-the hypotheses below. Should any be wanted, the pattern used for ADMMv2 / MCMCv2 (a separate
-PnPv2) keeps the current solver intact for comparison.
+| | PnP | PNPv2 |
+|---|---|---|
+| denoiser input | $255 f$ — assumes $f \in [0,1]$ | $255 f / p$, $p$ = peak of the start — **scale-free** |
+| final level $\sigma_{final}$ | 1 (hard-coded) | the measurement's noise level relative to its peak, $255\,\mathrm{std}(n)/\max g$, estimated from $g$ (or set by hand) |
+| `delta` for Gaussian / Bilateral | 1 by default | the operator's estimate when left empty |
+| start | $H^Tg$ (~850× too large on MA-TIRF) | ridge, $\lambda_{rr} = s_2^2$ by default (or `adjoint`) |
+| schedule, positivity | switchable | always on |
+| DCT | offered | not offered (implementation to be redone) |
+| default `sigma`, `iter` | 5, 5 | 25, 16 |
 
----
+**Why $s_2^2$ and not $s_2$.** $\lambda_{rr}$ is compared to the eigenvalues $s_i^2$ of $H^TH$, so
+$s_2^2$ (the second eigenvalue) is the choice that scales with the operator's gain — hence
+transferable. On MA-TIRF $s_2^2 = 36$ keeps $s_1$ fully and $s_2$ half-way, and lies inside the
+$[s_2, s_1] = [6, 39]$ range the MCMC study found good. Operators that do not expose their
+spectrum fall back on $s_1^2$.
+
+*Evidence (`solvers/_tests.py`)*: on a 2D blur, multiplying $H$'s gain by 50 (with $\lambda_{kz}$
+scaled by $50^2$ accordingly) leaves PNPv2's reconstruction exactly divided by 50 (gap
+$3\cdot10^{-6}$); PnP's changes by 49 %.
+
+**Open point, not changed.** $\lambda_{kz}$ is still absolute: it is compared to the
+eigenvalues $s_i^2$ (§1.1), so it does not transfer across operators of different gain.
+Expressing it relative to $s_1^2$ would make it gain-free, but the best value would still
+differ between problems whose spectra decay differently (MA-TIRF: 2–3 useful directions per
+column; a blur: a continuous spectrum). To be settled by H-P4 and H-P7.
 
 ## 6. Hypotheses the benchmark must test
 
@@ -204,5 +216,6 @@ PnPv2) keeps the current solver intact for comparison.
 | H-P3 | Wiener / DCT / Bilateral: best $\sigma$ on MA-TIRF far below their best on deconvolution | $\sigma$ sweep on both problems (denoiser-level test) |
 | H-P4 | $\lambda_{kz}$ best in $[10^{-3}, 0.3]$ on MA-TIRF; below: noisy, above: data ignored | $\lambda_{kz}$ sweep |
 | H-P5 | results stable for `iter` 8–30; 5 is coarse | `iter` sweep |
-| H-P6 | the start matters (adjoint vs ridge) because the null space keeps $z_0$ | start comparison (needs proposal 4 to test inside PnP; otherwise pre-scaling $f_0$ externally) |
+| H-P6 | the start matters (adjoint vs ridge) because the null space keeps $z_0$ | PNPv2 with `init` = adjoint vs ridge |
 | H-P7 | transferability between problems holds for Gaussian / TV Bregman $\sigma$, not for the others | same $\sigma$ on MA-TIRF and deconvolution |
+| H-P8 | PNPv2 ≥ PnP on MA-TIRF (scale-free denoisers, proper start), equal on deconvolution for Gaussian / TV Bregman | PnP vs PNPv2, same settings |

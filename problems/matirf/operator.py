@@ -125,6 +125,16 @@ class MatirfOperator(ForwardOperator):
             wavelength_nm=self.measurement_params["wavelength_nm"],
         )
 
+    def singular_values(self) -> torch.Tensor:
+        """
+        The singular values of H, largest first — one depth column's spectrum.
+
+        Every column shares the same 13 x nz matrix, so this is the whole operator's spectrum.
+        Solvers that pick a ridge weight from it (PnPv2's s2 start) look for this method and
+        fall back on the operator norm when a problem does not provide it.
+        """
+        return torch.linalg.svdvals(self.H)
+
     def __repr__(self) -> str:
         n_angles, nz = self.H.shape
         return f"<MatirfOperator {n_angles} angles x {nz} depth slices>"

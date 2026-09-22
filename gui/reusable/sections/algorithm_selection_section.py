@@ -89,7 +89,10 @@ class AlgorithmSelectionSection(QGroupBox):
         self._update_cache(['algorithm'], self.selected_algo_name)
         widget = self.algo_widgets[self.selected_algo_name]
         config = self._load_toml(self._config_path)
-        config['algo-params'] = widget.get_parameters()
+        ## an empty field (None: "automatic") is stored as "null", as update_cache does —
+        ## TOML has no None, and every solver reads "null" as unset
+        config['algo-params'] = {key: ("null" if value is None else value)
+                                 for key, value in widget.get_parameters().items()}
         self._save_toml(config, self._config_path)
         self.parent.load_cached_config()
 
