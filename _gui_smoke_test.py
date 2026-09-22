@@ -317,8 +317,9 @@ print("\n=== B. LES SIX SOLVEURS ===")
 def b1():
     section = cw.algorithm_selection_section
     names = [section.algo_combo.itemText(i) for i in range(section.algo_combo.count())]
-    assert names == ["None", "ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "PNPv2", "ADMM-PnP", "MCMC", "MCMCv2"], names
-    return "les neuf proposés (les « v2 » : des propositions), dans l'ordre du registre"
+    assert names == ["None", "ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "PNPv2", "ADMM-PnP", "ADMM-PnPv2",
+                     "MCMC", "MCMCv2"], names
+    return "les dix proposés (les « v2 » : des propositions), dans l'ordre du registre"
 check("B1  le sélecteur liste tous les solveurs", b1)
 
 
@@ -326,7 +327,8 @@ def b2():
     """Chaque solveur, pas seulement les deux commodes : panneau construit, défauts écrits."""
     section = cw.algorithm_selection_section
     summary = []
-    for name in ("ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "PNPv2", "ADMM-PnP", "MCMC", "MCMCv2"):
+    for name in ("ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "PNPv2", "ADMM-PnP", "ADMM-PnPv2",
+                 "MCMC", "MCMCv2"):
         section.algo_combo.setCurrentText(name)
         app.processEvents()
         config = load_or_create_toml(MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG)

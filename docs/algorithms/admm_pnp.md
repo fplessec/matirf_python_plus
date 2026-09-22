@@ -3,7 +3,8 @@
 > Status: **theoretical note** (Day 7, step 2). MA-TIRF spectrum as in `adam_ppxa.md` §1.1
 > ($s_1 = 38.9$, $s_2 = 6.02$, $s_3 = 0.562$, $s_4 = 0.033$). The denoisers, their scale
 > problem and their MA-TIRF limits are analysed once in `pnp.md` §2–3 and not repeated here.
-> ADMM-PnP is benchmarked on MA-TIRF only. Nothing was modified; §5 lists proposals.
+> ADMM-PnP is benchmarked on MA-TIRF only. ADMM-PnP itself is unchanged; its proposed
+> fixes exist as the separate solver ADMM-PnPv2 (§4).
 
 ---
 
@@ -131,25 +132,27 @@ denoiser) instead of sparsity only.
 
 ---
 
-## 4. Issues and proposals (not applied)
+## 4. ADMM-PnPv2 — the proposals, as a separate solver
 
-The same four as PnP (`pnp.md` §5), for the same reasons, plus one of its own:
+At the project owner's request the proposals exist as the solver "ADMM-PnPv2"
+(`solvers/pnp_v2.py`, class `PnpAdmmV2`); ADMM-PnP is unchanged. The benchmark compares them.
 
-1. **Scale-free denoising** — $p \cdot D(255\,(x+u)/p, \sigma)/255$ with $p$ the start's peak, so that
-   $\sigma$ transfers between inverse problems (`pnp.md` §3).
-2. **Estimated `delta`** when left empty.
-3. **A proper start** — ridge with $\lambda_{rr} = s_2^2$ (the second eigenvalue of $H^TH$), or
-   `adjoint` on request.
-4. **Gain-free $\rho$** — like PnP's $\lambda_{kz}$, $\rho$ is compared to the eigenvalues $s_i^2$ and
-   does not transfer across operators of different gain (open point, see `pnp.md` §5).
-5. **$\sigma$ tied to the noise** *(its own)* — with no schedule, $\sigma$ is the only prior knob; a
-   natural default is a multiple of the measurement's noise level (relative to its peak, as in
-   PNPv2), so that the prior follows the noise automatically.
+| | ADMM-PnP | ADMM-PnPv2 |
+|---|---|---|
+| denoiser input | $255(x+u)$ — assumes $f \in [0,1]$ | $255(x+u)/p$, $p$ = the start's peak — **scale-free** |
+| `sigma` | fixed, default 15 | fixed; **empty = 3 × the measurement's noise level** (relative to its peak, 0–255) |
+| `delta` | 1 by default | the operator's estimate when empty |
+| start | $H^Tg$ (~850× too large on MA-TIRF) | ridge, $\lambda_{rr} = s_2^2$ by default (or `adjoint`) |
+| positivity | switchable | always on |
+| default `rho`, `iter` | 1.0, 20 | 0.1, 50 (inside the predicted ranges) |
 
-If wanted, an "ADMM-PnPv2" beside ADMM-PnP (the pattern of ADMMv2 / MCMCv2 / PNPv2) keeps the
-current solver intact for comparison.
+The factor 3 tying $\sigma$ to the noise is a **first guess**: the benchmark settles it
+(H-AP7). Not changed — open point shared with PNPv2: $\rho$ is still compared to the
+eigenvalues of $H^TH$, so it does not transfer across operators of different gain.
 
----
+*Evidence (`solvers/_tests.py`)*: on a 2D blur, multiplying $H$'s gain by 50 (with $\rho$
+scaled by $50^2$) leaves ADMM-PnPv2's reconstruction exactly divided by 50 (gap
+$9\cdot10^{-7}$).
 
 ## 5. Hypotheses the benchmark must test
 
@@ -161,3 +164,4 @@ current solver intact for comparison.
 | H-AP4 | the iterates plateau within 20–50 iterations (or oscillate slightly) | `iter` sweep, change between consecutive iterates |
 | H-AP5 | PnP (annealed) vs ADMM-PnP (dual, fixed): which is better on MA-TIRF, and which is easier to tune | comparison at each one's best settings, sensitivity to its knobs |
 | H-AP6 | as for PnP: $\sigma$ transfers between problems only for Gaussian / TV Bregman | same $\sigma$ on MA-TIRF and deconvolution (denoiser-level test) |
+| H-AP7 | ADMM-PnPv2 ≥ ADMM-PnP on MA-TIRF; its noise-tied $\sigma$ (3 × noise) is near the best $\sigma$ at every noise level | ADMM-PnP vs v2; $\sigma$ sweep per noise level |

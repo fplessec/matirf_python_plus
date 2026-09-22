@@ -163,6 +163,7 @@ def test_all_solvers_run():
         "PNP": {"iter": 6, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
         "PNPv2": {"iter": 6, "sigma": 20.0, "denoiser": "Gaussian"},
         "ADMM-PnP": {"iter": 15, "rho": 0.05, "sigma": 5.0, "denoiser": "None"},
+        "ADMM-PnPv2": {"iter": 15, "rho": 0.05, "sigma": 20.0, "denoiser": "Gaussian"},
         "MCMC": {"max_iter": 40, "beta": 1e-4, "sigma": 0.005, "K": 40, "lambda_rr": 0.05},
         "MCMCv2": {"max_iter": 40, "sigma": 0.02, "K": 40, "denoiser": "TV Bregman"},
     }

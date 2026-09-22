@@ -29,7 +29,7 @@ from .ppxa import Ppxa
 from .admm import Admm
 from .admm_v2 import AdmmV2
 from .pnp import Pnp, PnpAdmm
-from .pnp_v2 import PnpV2
+from .pnp_v2 import PnpV2, PnpAdmmV2
 from .mcmc import Mcmc
 from .mcmc_v2 import McmcV2
 
@@ -42,6 +42,7 @@ SOLVERS = {cls.name: cls for cls in [
     Pnp,
     PnpV2,
     PnpAdmm,
+    PnpAdmmV2,
     Mcmc,
     McmcV2,
 ]}
@@ -52,5 +53,5 @@ def available_for(problem_features) -> dict:
     return {name: cls for name, cls in SOLVERS.items() if cls.supported_by(problem_features)}
 
 
-__all__ = ["Solver", "Adam", "Ppxa", "Admm", "AdmmV2", "Pnp", "PnpV2", "PnpAdmm", "Mcmc", "McmcV2",
+__all__ = ["Solver", "Adam", "Ppxa", "Admm", "AdmmV2", "Pnp", "PnpV2", "PnpAdmm", "PnpAdmmV2", "Mcmc", "McmcV2",
            "SOLVERS", "available_for"]

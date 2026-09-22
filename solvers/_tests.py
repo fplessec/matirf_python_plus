@@ -27,7 +27,7 @@ import torch
 
 from core import Feature, features, ForwardOperator, Objective
 from solvers import (SOLVERS, available_for, Adam, Ppxa, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm,
-                     Mcmc, McmcV2)
+                     PnpAdmmV2, Mcmc, McmcV2)
 
 DTYPE = torch.float64
 
@@ -116,19 +116,19 @@ def test_registry():
     """The registry answers which solvers a given problem can run."""
     ## the "v2" solvers are proposed alternatives, kept separate until their owner decides
     assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "PNPv2", "ADMM-PnP",
-                            "MCMC", "MCMCv2"}
+                            "ADMM-PnPv2", "MCMC", "MCMCv2"}
     assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["MCMCv2"] is McmcV2
 
     # no solver requires any feature any more, so every problem gets all of them — that is the
     # whole promise of the layer, and it is checked rather than asserted in prose:
     for feats in (features(Feature.TWO_D),
                   features(Feature.THREE_D, Feature.ANISOTROPIC, Feature.SCALE_AMBIGUOUS)):
-        assert len(available_for(feats)) == 9, f"every solver must serve {feats}"
+        assert len(available_for(feats)) == 10, f"every solver must serve {feats}"
 
     assert Mcmc.estimator_type == McmcV2.estimator_type == "MMSE", "the posterior means"
     assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if not n.startswith("MCMC"))
     assert "MAP" in Adam.description() and "ADAM" in Adam.description()
-    print("  registry        nine solvers (the v2 ones are proposals), all available to every problem")
+    print("  registry        ten solvers (the v2 ones are proposals), all available to every problem")
 
 
 def test_ui_params():
@@ -150,7 +150,7 @@ def test_ui_params():
     # the prior is offered only to the solvers that consult it
     for solver in (Adam, Ppxa):
         assert "lambda_reg" in solver.get_ui_params(features(Feature.TWO_D)), solver.name
-    for solver in (Mcmc, McmcV2, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm):
+    for solver in (Mcmc, McmcV2, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm, PnpAdmmV2):
         assert "lambda_reg" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
 
     # the noise model is NOT an algorithm parameter any more: it belongs to the measurement
@@ -159,7 +159,7 @@ def test_ui_params():
         assert "data_fidelity" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
     assert Adam.supported_noise_models == {"gaussian", "poisson", "poisson-gaussian"}
     assert Mcmc.supported_noise_models == McmcV2.supported_noise_models == Adam.supported_noise_models
-    for solver in (Ppxa, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm):
+    for solver in (Ppxa, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm, PnpAdmmV2):
         assert solver.supported_noise_models == {"gaussian"}, solver.name
     print("  ui params       prior gated by solver, delta by ANISOTROPIC, noise models declared")
 
@@ -237,6 +237,7 @@ def test_every_solver_on_both_physics():
         "PNP": {"iter": 8, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
         "PNPv2": {"iter": 6, "sigma": 5.0, "denoiser": "None"},
         "ADMM-PnP": {"iter": 20, "rho": 0.1, "sigma": 5.0, "denoiser": "None"},
+        "ADMM-PnPv2": {"iter": 15, "rho": 0.05, "sigma": 5.0, "denoiser": "None"},
         "MCMC": {"max_iter": 60, "beta": 1e-3, "sigma": 0.01, "K": 30, "lambda_rr": 1e-3},
         "MCMCv2": {"max_iter": 60, "sigma": 0.03, "K": 30},
     }
@@ -536,9 +537,12 @@ def test_pnp_v2_is_scale_free():
     gap_v2 = float((c * v2[1] - v2[0]).norm() / v2[0].norm())
     gap_v1 = float((c * v1[1] - v1[0]).norm() / v1[0].norm())
     assert gap_v2 < 1e-4, f"PNPv2 must be scale-free (gap {gap_v2:.1e})"
+    admm = [run(PnpAdmmV2(), gain, {"rho": 0.05 * gain ** 2, "iter": 10}) for gain in (1.0, c)]
+    gap_admm = float((c * admm[1] - admm[0]).norm() / admm[0].norm())
+    assert gap_admm < 1e-4, f"ADMM-PnPv2 must be scale-free (gap {gap_admm:.1e})"
     assert gap_v1 > 1e-2, f"PnP is expected to depend on the scale (gap {gap_v1:.1e})"
     print(f"  pnp v2          scale-free: gain x{c:g} gives the same image / {c:g} "
-          f"(gap {gap_v2:.0e}; PnP: {gap_v1:.2f})")
+          f"(PNPv2 {gap_v2:.0e}, ADMM-PnPv2 {gap_admm:.0e}; PnP: {gap_v1:.2f})")
 
 
 def main():
