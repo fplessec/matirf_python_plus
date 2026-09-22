@@ -33,10 +33,15 @@ SOLVER_ITERS = {
 }
 ALL_SOLVERS = list(SOLVER_ITERS)
 DECONV_SOLVERS = ["ADAM", "PPXA", "MCMC"]        # the plan: deconv keeps the general solvers
-DENOISER_SOLVERS = {"PNP", "PNPv2", "ADMM-PnP", "ADMM-PnPv2", "MCMC", "MCMCv2"}
+PNP_SOLVERS = {"PNP", "PNPv2", "ADMM-PnP", "ADMM-PnPv2"}
+MCMC_SOLVERS = {"MCMC", "MCMCv2"}
+DENOISER_SOLVERS = PNP_SOLVERS | MCMC_SOLVERS
 REG_SOLVERS = {"ADAM", "PPXA"}                   # take reg + lambda_reg on the shared objective
 
-PNP_DENOISER = "Bilateral"                       # anisotropic-aware; never NL-Ridge, never DCT
+## anisotropic-aware, never NL-Ridge / DCT. TV Bregman is the robust denoiser for the MCMC
+## chain (the MCMC study: Bilateral drifts); PnP keeps the anisotropic Bilateral.
+PNP_DENOISER = "Bilateral"
+MCMC_DENOISER = "TV Bregman"
 ATLAS_REG, ATLAS_LAMBDA = "tv", 0.1              # for the reg-based solvers in the atlas
 NOISES = [0.02, 0.05]                            # sigma as a fraction of the peak (low, moderate)
 MATIRF_TRUTHS = ["vesicles", "fibres", "cell", "cell_fibres_vesicles"]
@@ -54,7 +59,9 @@ JSON_DECONV = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
 
 def _algo_params(solver, *, reg=None, lam=None):
     params = dict(SOLVER_ITERS[solver])
-    if solver in DENOISER_SOLVERS:
+    if solver in MCMC_SOLVERS:
+        params["denoiser"] = MCMC_DENOISER
+    elif solver in PNP_SOLVERS:
         params["denoiser"] = PNP_DENOISER
     if solver in REG_SOLVERS:
         params["reg"] = reg if reg is not None else ATLAS_REG
