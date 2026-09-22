@@ -76,22 +76,23 @@ OBJECTIVE_UI_PARAMS = dict(REGULARIZATION_UI_PARAMS)
 
 
 ## Where the iteration starts. Generic since ForwardOperator.ridge_inverse exists for every
-## problem — in v1 the ridge start was a MA-TIRF-only subclass override.
+## problem — in v1 the ridge start was a MA-TIRF-only subclass override. Default: the ridge
+## start with lambda_rr = s2^2 (empty), the better-conditioned universal warm start.
 INIT_UI_PARAM = {
     "init": {
         "title": "Initialization",
         "type": "option",
-        "param_info": {"options_list": ["adjoint", "ridge"]},
+        "param_info": {"options_list": ["ridge", "adjoint"]},
     },
     "lambda_rr": {
-        "title": "Ridge regularization (initialization)",
+        "title": "Ridge weight of the start (empty = s2^2)",
         "type": "value",
         "depends_on": {"init": "ridge"},
         "param_info": {
             "dtype": float,
             "unit": "",
             "latex_name": "\\lambda_{rr}",
-            "default": 10000.0,
+            "default": None,
         },
     },
 }

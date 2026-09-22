@@ -170,20 +170,24 @@ def test_initial_guess():
     objective = Objective(op, torch.randn(10, dtype=DTYPE), _Gaussian())
     solver = Adam()
 
-    adjoint_start = solver.initial_guess(objective, {})
-    assert torch.allclose(adjoint_start, op.adjoint(objective.g)), "default is f0 = H^t g"
+    # default: the ridge s2^2 warm start (empty lambda_rr = second eigenvalue of H^T H)
+    from solvers.base import second_eigenvalue
+    default_start = solver.initial_guess(objective, {})
+    expected_default = op.ridge_inverse(objective.g, second_eigenvalue(objective)).clamp(min=0.0)
+    assert torch.allclose(default_start, expected_default, atol=1e-8), "default is the ridge s2^2 start"
 
-    # the ridge warm start was a MA-TIRF-only override in v1; it is generic now
-    ridge_start = solver.initial_guess(objective, {"init": "ridge", "lambda_rr": 1.0})
-    expected = op.ridge_inverse(objective.g, 1.0)
-    assert torch.allclose(ridge_start, expected, atol=1e-8)
+    # an explicit weight, and the cheap adjoint alternative (was the default in v1)
+    ridge = solver.initial_guess(objective, {"init": "ridge", "lambda_rr": 1.0})
+    assert torch.allclose(ridge, op.ridge_inverse(objective.g, 1.0).clamp(min=0.0), atol=1e-8)
+    adjoint_start = solver.initial_guess(objective, {"init": "adjoint"})
+    assert torch.allclose(adjoint_start, op.adjoint(objective.g).clamp(min=0.0))
 
     try:
         solver.initial_guess(objective, {"init": "nonsense"})
         raise AssertionError("an unknown init strategy must raise")
     except ValueError as e:
         assert "Unknown init strategy" in str(e)
-    print("  initial guess   adjoint default, generic ridge warm start, bad value rejected")
+    print("  initial guess   ridge s2^2 default, explicit weight and adjoint, bad value rejected")
 
 
 def _recover(operator, f_true, params, lambda_reg=0.0):

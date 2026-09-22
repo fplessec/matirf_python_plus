@@ -87,11 +87,15 @@ def second_eigenvalue(objective) -> float:
 def ridge_start(objective, params: dict) -> torch.Tensor:
     """
     The start 'init' asks for: 'ridge' (default) with lambda_rr, empty = s2^2, or 'adjoint'.
-    Used by the v2 solvers, whose starts must have the right scale and shape.
+    The one start every solver shares (`Solver.initial_guess` delegates here), so its
+    starts have the right scale and shape.
     """
     operator, g = objective.operator, objective.g
-    if params.get("init", "ridge") == "adjoint":
+    strategy = params.get("init", "ridge")
+    if strategy == "adjoint":
         return operator.adjoint(g).detach().clamp(min=0.0)
+    if strategy != "ridge":
+        raise ValueError(f"Unknown init strategy {strategy!r}; expected 'ridge' or 'adjoint'.")
     weight = params.get("lambda_rr")
     weight = second_eigenvalue(objective) if weight in (None, "", "None", "null", "auto") \
         else float(weight)
@@ -245,22 +249,19 @@ class Solver(ABC):
         """
         Where the iteration starts. Chosen by a parameter, not by a subclass.
 
-            "adjoint"  f0 = H^T g        cheap back-projection (the default)
             "ridge"    f0 = (H^T H + lam I)^-1 H^T g    a warm start much closer to the
-                       solution, at the cost of one linear solve
+                       solution (the default); lambda_rr empty = s2^2, the second
+                       eigenvalue of H^T H, which keeps the well-determined directions and
+                       cuts the noise-dominated rest — a modest but consistent gain over a
+                       lighter weight and a determinate, universal start (D1 ridge study).
+            "adjoint"  f0 = H^T g        cheap back-projection
 
-        In v1 the ridge start was a MA-TIRF-only subclass override, because only MA-TIRF's
-        mixin knew how to invert its operator. `ForwardOperator.ridge_inverse` now provides
-        it for every problem, so the choice becomes an ordinary parameter and the override
-        disappears.
+        Delegates to `ridge_start`, the one start every solver shares: in v1 the ridge start
+        was a MA-TIRF-only subclass override, because only MA-TIRF's mixin knew how to invert
+        its operator; `ForwardOperator.ridge_inverse` now provides it for every problem, so
+        the ridge s2^2 start is the ordinary default here.
         """
-        strategy = params.get("init", "adjoint")
-        operator, g = objective.operator, objective.g
-        if strategy == "ridge":
-            return operator.ridge_inverse(g, ridge_weight(objective, params.get("lambda_rr", 1e4))).detach()
-        if strategy == "adjoint":
-            return operator.adjoint(g).detach().clone()
-        raise ValueError(f"Unknown init strategy {strategy!r}; expected 'adjoint' or 'ridge'.")
+        return ridge_start(objective, params)
 
     # ── execution: threading, reporting, interruption ────────────────────────
     # Written once. Subclasses use `report` / `publish` / `interrupted` and nothing else.
