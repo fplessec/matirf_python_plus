@@ -33,8 +33,8 @@ DIFFERENCES FROM PNP:
       remains available.
 
     Also: the schedule and the positivity are always on (PnP's `kai_zhang` and `forced_pos`
-    switches had one sensible value), and DCT is not offered (its implementation does not
-    work and is to be redone).
+    switches had one sensible value). The denoisers offered are PnP's, DCT included (it is
+    not used in the benchmark: its implementation is to be redone).
 
 Parameters — critical: `denoiser`, `sigma`, `lambda_kz`. Fixed by rule (empty = automatic):
 `sigma_final`, `delta`, `lambda_rr`. Comfort: `iter`, `init`.
@@ -51,15 +51,11 @@ from solvers.base import Solver
 from solvers.denoising import resolve, denoise, warn_if_slice_by_slice
 from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
 
-## DCT's implementation does not work (to be redone); NL-Ridge is kept for GPU users
-_DENOISERS = [name for name in DENOISER_LIST if name != "DCT"]
-
-
 PNP_V2_UI_PARAMS = {
     "denoiser": {
         "title": "Denoiser (the prior)",
         "type": "option",
-        "param_info": {"options_list": _DENOISERS},
+        "param_info": {"options_list": DENOISER_LIST},
     },
     "sigma": {
         "title": "Initial denoising level (0-255, relative to the image peak)",

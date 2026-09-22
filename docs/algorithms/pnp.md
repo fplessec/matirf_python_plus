@@ -4,7 +4,8 @@
 > ($s_1 = 38.9$, $s_2 = 6.02$, $s_3 = 0.562$). PnP is benchmarked on MA-TIRF only (the
 > deconvolution benchmark covers Adam, PPXA and MCMC). PnP itself is unchanged; its proposed
 > fixes exist as the separate solver PNPv2 (§5). The denoiser analysis of §3 also applies
-> to ADMM-PnP and MCMC. DCT is considered broken (to be redone) and left out.
+> to ADMM-PnP and MCMC. DCT is considered broken (to be redone): offered by both solvers,
+> but not used in the benchmark.
 
 ---
 
@@ -188,7 +189,6 @@ unchanged. The benchmark compares them.
 | `delta` for Gaussian / Bilateral | 1 by default | the operator's estimate when left empty |
 | start | $H^Tg$ (~850× too large on MA-TIRF) | ridge, $\lambda_{rr} = s_2^2$ by default (or `adjoint`) |
 | schedule, positivity | switchable | always on |
-| DCT | offered | not offered (implementation to be redone) |
 | default `sigma`, `iter` | 5, 5 | 25, 16 |
 
 **Why $s_2^2$ and not $s_2$.** $\lambda_{rr}$ is compared to the eigenvalues $s_i^2$ of $H^TH$, so
