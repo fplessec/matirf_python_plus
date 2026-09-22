@@ -28,8 +28,10 @@ from .adam import Adam
 from .ppxa import Ppxa
 from .admm import Admm
 from .admm_v2 import AdmmV2
-from .pnp import Pnp, PnpAdmm
-from .pnp_v2 import PnpV2, PnpAdmmV2
+from .pnp import Pnp
+from .pnp_v2 import PnpV2
+from .pnp_admm import PnpAdmm
+from .pnp_admm_v2 import PnpAdmmV2
 from .mcmc import Mcmc
 from .mcmc_v2 import McmcV2
 

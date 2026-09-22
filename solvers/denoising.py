@@ -25,7 +25,8 @@ result ever produced, so the v1 behaviour is preserved deliberately. See `Mcmc`.
 
 import torch
 
-from solvers.denoisers import DENOISER_REGISTRY
+from core.features import Feature
+from solvers.denoisers import DENOISER_REGISTRY, DENOISER_LIST, ANISOTROPIC_DENOISERS
 
 
 ## denoisers are calibrated for the [0, 255] intensity convention:
@@ -73,3 +74,44 @@ def warn_if_slice_by_slice(report, name: str, data: torch.Tensor) -> None:
     if is_3d and not getattr(denoiser, "supports_3d", False):
         report(f"[WARNING] Denoiser '{name}' has no native 3D support; "
                f"it will be applied slice by slice along z.")
+
+
+# ── shared by the denoiser-based solvers ──────────────────────────────────────
+
+## The denoiser, its anisotropy and positivity — the parameters PnP and ADMM-PnP share.
+DENOISER_UI_PARAMS = {
+    "denoiser": {
+        "title": "Denoiser (implicit prior)",
+        "type": "option",
+        "param_info": {"options_list": DENOISER_LIST},
+    },
+    "delta": {
+        "title": "Anisotropy ratio coefficient",
+        "type": "value",
+        "requires": {Feature.ANISOTROPIC},
+        "depends_on": {"denoiser": ANISOTROPIC_DENOISERS},
+        "param_info": {"dtype": float, "unit": "",
+                       "latex_name": "\\delta = \\frac{\\Delta z}{\\Delta xy}",
+                       "default": 1.0},
+    },
+    "forced_pos": {
+        "title": "Forced positivity",
+        "type": "bool",
+        "param_info": {"default": True},
+    },
+}
+
+
+def relative_noise_level(g: torch.Tensor) -> float:
+    """
+    The measurement's Gaussian noise std relative to its peak, on the 0-255 scale (0 when g
+    is too small to estimate). The scale-free noise level PNPv2 and ADMM-PnPv2 tie their
+    denoising to: comparable between inverse problems whatever their intensity scale.
+    """
+    from core import noise
+    try:
+        _, b = noise.estimate(g, poisson=False, gaussian=True)
+    except ValueError:
+        return 0.0
+    peak = float(g.max()) or 1.0
+    return DENOISER_SCALE * (b ** 0.5) / peak

@@ -1,29 +1,25 @@
 """
-Plug-and-Play — reconstruction whose prior is a denoiser rather than a formula.
+PnP — Plug-and-Play reconstruction whose prior is a denoiser rather than a formula.
 
-Two variants live here, sharing the same idea: replace the proximal operator of an explicit
-prior R(f) by a call to an off-the-shelf denoiser (Venkatakrishnan et al., 2013). The prior
-is then whatever the denoiser implicitly encodes — usually far richer than a hand-written
-R(f) — at the cost of losing the closed-form objective.
+Replace the proximal operator of an explicit prior R(f) by a call to an off-the-shelf
+denoiser (Venkatakrishnan et al., 2013). The prior is then whatever the denoiser implicitly
+encodes — usually far richer than a hand-written R(f) — at the cost of losing the
+closed-form objective.
 
-    Pnp       Half-Quadratic Splitting: no dual variable.
-                  f <- (H^T H + alpha I)^-1 (H^T g + alpha z)      inversion
-                  z <- D_sigma(f)                                  denoising
-              Supports Zhang et al. (DPIR) scheduling: alpha grows and sigma shrinks
-              logarithmically across iterations, which is what makes plain HQS converge.
+This solver is Half-Quadratic Splitting: no dual variable.
 
-    PnpAdmm   The augmented-Lagrangian counterpart, with a dual variable u.
-                  x <- (H^T H + rho I)^-1 (H^T g + rho (v - u))    data
-                  v <- D_sigma(x + u)                              prior
-                  u <- u + (x - v)                                 dual
-              Keeping the dual lets rho stay FIXED — no annealing schedule to tune.
+    f <- (H^T H + alpha I)^-1 (H^T g + alpha z)      inversion
+    z <- D_sigma(f)                                  denoising
 
-Because neither consults an explicit regularization term, both declare
-`uses_regularization = False` and are offered no regularization parameters.
+It supports Zhang et al. (DPIR) scheduling: alpha grows and sigma shrinks logarithmically
+across iterations, which is what makes plain HQS converge. Its augmented-Lagrangian
+counterpart, with a dual variable, is ADMM-PnP (solvers/pnp_admm.py).
 
-sigma is on the [0, 255] denoiser scale for both; see solvers/denoising.py for why.
+It does not consult an explicit regularization term: `uses_regularization = False`, and no
+regularization parameters are offered. sigma is on the [0, 255] denoiser scale; see
+solvers/denoising.py for why.
 
-Both were problem-specific in v1 solely because of their inversion step;
+It was problem-specific in v1 solely because of its inversion step;
 `ForwardOperator.solve_normal` supplies it generically, so nothing here is specialized.
 """
 
@@ -33,32 +29,9 @@ import numpy as np
 import torch
 
 from solvers.base import Solver
-from solvers.denoising import resolve, denoise, warn_if_slice_by_slice
-from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
-from core.features import Feature
+from solvers.denoising import resolve, denoise, warn_if_slice_by_slice, DENOISER_UI_PARAMS
 
 
-_DENOISER_PARAM = {
-    "denoiser": {
-        "title": "Denoiser (implicit prior)",
-        "type": "option",
-        "param_info": {"options_list": DENOISER_LIST},
-    },
-    "delta": {
-        "title": "Anisotropy ratio coefficient",
-        "type": "value",
-        "requires": {Feature.ANISOTROPIC},
-        "depends_on": {"denoiser": ANISOTROPIC_DENOISERS},
-        "param_info": {"dtype": float, "unit": "",
-                       "latex_name": "\\delta = \\frac{\\Delta z}{\\Delta xy}",
-                       "default": 1.0},
-    },
-    "forced_pos": {
-        "title": "Forced positivity",
-        "type": "bool",
-        "param_info": {"default": True},
-    },
-}
 
 
 PNP_UI_PARAMS = {
@@ -83,27 +56,7 @@ PNP_UI_PARAMS = {
         "param_info": {"dtype": float, "unit": "", "latex_name": "\\lambda_{kz}",
                        "default": 0.23},
     },
-    **_DENOISER_PARAM,
-}
-
-
-PNP_ADMM_UI_PARAMS = {
-    "iter": {
-        "title": "Number of ADMM-PnP iterations",
-        "type": "value",
-        "param_info": {"dtype": int, "unit": "", "latex_name": "\\text{iter}", "default": 20},
-    },
-    "rho": {
-        "title": "Penalty coefficient",
-        "type": "value",
-        "param_info": {"dtype": float, "unit": "", "latex_name": "\\rho", "default": 1.0},
-    },
-    "sigma": {
-        "title": "Denoiser strength (0-255 scale)",
-        "type": "value",
-        "param_info": {"dtype": float, "unit": "", "latex_name": "\\sigma", "default": 15},
-    },
-    **_DENOISER_PARAM,
+    **DENOISER_UI_PARAMS,
 }
 
 
@@ -171,51 +124,3 @@ class Pnp(Solver):
         alphas = np.logspace(np.log10(alpha_first), np.log10(lambda_kz), n_iter)
         sigmas = np.sqrt(lambda_kz / alphas) * sigma_final
         return alphas, sigmas
-
-
-class PnpAdmm(Solver):
-    """Plug-and-Play ADMM: a denoiser prior with a dual variable, so rho stays fixed."""
-
-    name = "ADMM-PnP"
-    estimator_type = "MAP"
-    uses_denoiser = True
-    supported_noise_models = frozenset({"gaussian"})   # the data step is a least-squares solve
-    uses_regularization = False
-    ui_params = PNP_ADMM_UI_PARAMS
-
-    def solve(self, objective, f0, params):
-        self.fix_randomness()
-
-        n_iter = int(params.get("iter", 20))
-        rho = float(params.get("rho", 1.0))
-        sigma = float(params.get("sigma", 15))
-        delta = float(params.get("delta", 1.0))
-        forced_pos = bool(params.get("forced_pos", True))
-        name = params.get("denoiser", "None")
-
-        operator = objective.operator
-        Htg = operator.adjoint(objective.g)
-        denoiser_fn = resolve(name)
-
-        x = f0.clamp(min=0.0)
-        warn_if_slice_by_slice(self.report, name, x)
-        v = x.clone()
-        u = torch.zeros_like(x)
-
-        started = time.time()
-        for k in range(n_iter):
-            if self.interrupted:
-                self.report(f"Interrupted at iteration {k + 1}.")
-                return v
-
-            self.report(f"[ADMM-PnP] iter {k + 1}/{n_iter} | rho={rho:.3g} | sigma={sigma:.3g}")
-
-            x = operator.solve_normal(Htg + rho * (v - u), rho)   # data step
-            v = denoise(denoiser_fn, x + u, sigma, delta)         # prior step
-            if forced_pos:
-                v = v.clamp(min=0.0)
-            u = u + (x - v)                                       # dual step
-            self.publish(v)
-
-        self.report(f"Execution in {time.time() - started:.2f} s.")
-        return v

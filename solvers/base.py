@@ -65,6 +65,38 @@ def ridge_weight(objective, value) -> float:
     return float(value)
 
 
+
+def second_eigenvalue(objective) -> float:
+    """
+    s2^2, the second eigenvalue of H^T H, when the operator exposes its spectrum
+    (`singular_values()`, e.g. MA-TIRF), else s1^2 = ||H^T H|| from a power iteration.
+
+    It is the ridge weight a start (H^T H + lambda I)^-1 H^T g is compared to: s2^2 keeps the
+    best determined direction fully and the second half-way, and scales with the operator's
+    gain (on MA-TIRF s2^2 = 36, inside the [s2, s1] = [6, 39] range the MCMC study found good).
+    """
+    spectrum = getattr(objective.operator, "singular_values", None)
+    if spectrum is not None:
+        values = spectrum()
+        if values.numel() > 1:
+            return float(values[1]) ** 2
+    like = objective.operator.adjoint(objective.g)
+    return float(objective.operator.lipschitz(like))
+
+
+def ridge_start(objective, params: dict) -> torch.Tensor:
+    """
+    The start 'init' asks for: 'ridge' (default) with lambda_rr, empty = s2^2, or 'adjoint'.
+    Used by the v2 solvers, whose starts must have the right scale and shape.
+    """
+    operator, g = objective.operator, objective.g
+    if params.get("init", "ridge") == "adjoint":
+        return operator.adjoint(g).detach().clamp(min=0.0)
+    weight = params.get("lambda_rr")
+    weight = second_eigenvalue(objective) if weight in (None, "", "None", "null", "auto") \
+        else float(weight)
+    return operator.ridge_inverse(g, weight).detach().clamp(min=0.0)
+
 class Solver(ABC):
     """
     Base class for reconstruction algorithms.

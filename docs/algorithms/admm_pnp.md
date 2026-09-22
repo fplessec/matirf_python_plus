@@ -135,7 +135,7 @@ denoiser) instead of sparsity only.
 ## 4. ADMM-PnPv2 — the proposals, as a separate solver
 
 At the project owner's request the proposals exist as the solver "ADMM-PnPv2"
-(`solvers/pnp_v2.py`, class `PnpAdmmV2`); ADMM-PnP is unchanged. The benchmark compares them.
+(`solvers/pnp_admm_v2.py`); ADMM-PnP is unchanged. The benchmark compares them.
 
 | | ADMM-PnP | ADMM-PnPv2 |
 |---|---|---|
