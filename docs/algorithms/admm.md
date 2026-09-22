@@ -167,4 +167,4 @@ $\mu$ fastest in $[s_3^2, s_1^2]$; `iter` a pure budget (default 100).
 | H-A2 | at fixed $\kappa$, $\mu$ changes the sparsity (not only the speed); $\mu > 1.618$ oscillates | $\mu$ sweep 0.03 – 3, loss / iterate history |
 | H-A3 | with $\kappa$ in range the result plateaus for `iter` ≳ 50; with $\kappa \approx 0$ it drifts with `iter` | `iter` sweep 10 – 2 000 at two $\kappa$ |
 | H-A4 | $\mu \approx s_3^2$ – 1 converges fastest on MA-TIRF | iterations to plateau vs $\mu$ |
-| H-A5 | ADMMv2: same reconstruction for any $\mu$ once converged; its best $\kappa$ is transferable across truths and noise levels better than ADMM's `threshold_ratio` | $\mu$ and $\kappa$ sweeps, ADMM vs ADMMv2 |
+| H-A5 | ADMMv2: same reconstruction for any $\mu$ once converged; its best $\kappa$ transfers across truths, noise levels **and inverse problems** (MA-TIRF ↔ deconvolution) better than ADMM's `threshold_ratio` | $\mu$ and $\kappa$ sweeps, ADMM vs ADMMv2, both problems |

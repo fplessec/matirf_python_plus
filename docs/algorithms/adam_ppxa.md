@@ -312,3 +312,4 @@ and (SHV) how sparse** — everything else follows from the data or can be left 
 | H8 | SHV: $\rho \approx 0.3$–0.6 for sparse truths, $\to 1$ for the membrane | $\rho$ sweep per truth |
 | H9 | SHV / TV / L1 beat L2 / Tikhonov on these truths | comparison at each prior's best $\lambda$ |
 | H10 | L2 is enough for MA-TIRF; Poisson fidelity helps only at low photon counts | Poisson noise, Adam with L2 vs KL vs PG |
+| H11 | parameter values transfer between inverse problems (MA-TIRF ↔ deconvolution) wherever they are scale-free: `lambda_reg` only if made interpretable (D1), `gamma` only through its spectral rule ($[1/s_1^2, 1/s_2^2]$), `lr` only relative to $\max f_0$ | same settings on both problems |
