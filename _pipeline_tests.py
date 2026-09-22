@@ -114,6 +114,16 @@ def test_build_objective():
     assert regularized.data_weight == 0.8, "the v1 blend convention is applied"
     assert "L1 norm of the gradient" in regularized.describe()
 
+    # D1 (B with C2): a regularized objective is calibrated by reg_scale = 1 / R(f_init)
+    # (the ridge s2^2 start; the iterative ridge_inverse is deterministic only to ~0.1 %)
+    from math import isclose
+    from solvers.base import ridge_start
+    r_ref = float(regularized.regularization.loss(
+        ridge_start(regularized, {"init": "ridge"}), regularized.diff_ops))
+    assert isclose(regularized.reg_scale, 1.0 / r_ref, rel_tol=0.02), "reg_scale = 1 / R(f_init)"
+    assert regularized.reg_scale > 1.0, "R << D, so R is scaled up"
+    assert plain.reg_scale == 1.0, "no prior term, no calibration"
+
     # a solver with a hardcoded quadratic data step is given no prior at all
     none_given = build_objective(prepared, {"reg": "L1 norm", "lambda_reg": 0.5},
                                  uses_regularization=False)

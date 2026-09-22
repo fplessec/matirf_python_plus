@@ -41,6 +41,7 @@ from core.result import Result
 from core.enums import PipelineState
 from fileio import save_toml, save_txt, load_txt, save_json, load_json
 from solvers import SOLVERS
+from solvers.base import ridge_start
 from solvers.differential_operators import DifferentialOperators
 from solvers.fidelities import DATA_FIDELITY_REGISTRY, GaussianFidelity
 from solvers.regularizers import REGULARIZATION_REGISTRY, NoRegularization
@@ -183,9 +184,19 @@ def build_objective(prepared, params: dict, uses_regularization: bool = True,
         estimate = getattr(prepared.operator, "estimate_anisotropy_ratio", None)
         delta = estimate() if estimate is not None else 1.0
     diff_ops = DifferentialOperators(delta=float(delta))
+    objective = Objective(prepared.operator, prepared.g, fidelity, regularization,
+                          lambda_reg=lambda_reg, diff_ops=diff_ops)
 
-    return Objective(prepared.operator, prepared.g, fidelity, regularization,
-                     lambda_reg=lambda_reg, diff_ops=diff_ops)
+    ## D1 (B with C2): calibrate R onto D by reg_scale = 1 / R(f_init), so lambda_reg reads
+    ## as a regularization share (core/objective.py, docs/algorithms/lambda_interpretability.md).
+    ## f_init is the ridge s2^2 start (the solver default); this is the one place with the
+    ## operator to form it. Skipped when the prior is unused (lambda_reg = 0).
+    if regularization is not None and lambda_reg > 0.0:
+        r_ref = float(regularization.loss(ridge_start(objective, {"init": "ridge"}), diff_ops))
+        if r_ref > 0.0:
+            objective.reg_scale = 1.0 / r_ref
+
+    return objective
 
 
 def _accepted_kwargs(cls, params: dict) -> dict:

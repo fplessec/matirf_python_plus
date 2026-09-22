@@ -31,6 +31,28 @@ on a large image or a small one. That is what makes lambda_reg comparable across
 models, problems and algorithms — the point of a benchmark.
 
 --------------------------------------------------------------------------------------
+Calibrating R onto D so lambda_reg reads as a regularization share (D1)
+--------------------------------------------------------------------------------------
+
+D is O(1) (about 1/2 at the truth), but R has no intrinsic scale, so raw R is orders of
+magnitude below D and lambda_reg is a dead knob until it is within a hair of 1. The fix
+(decision D1 = B with C2, docs/algorithms/lambda_interpretability.md) rescales R by a single
+scalar reg_scale = 1 / R(f_init), R(f_init) being the roughness of the ridge s2^2 start:
+
+    L(f) = (1 - lambda) D(Hf, g)  +  lambda * reg_scale * R(f)
+
+so the two terms are comparable and lambda_reg reads as a graded, transferable share.
+reg_scale is set by the builder (`pipeline.build_objective`, which has the operator to form
+the ridge start); a directly constructed Objective is uncalibrated (reg_scale = 1.0). The
+reported `regularization_share` is invariant under reg_scale (it cancels in the ratio), so
+the ruler is untouched.
+
+MIGRATION: a stored lambda_reg means something different once R is calibrated — the same
+value now applies lambda * reg_scale * R, not lambda * R, so configs tuned before this change
+reconstruct differently. Accepted for the v2 rewrite; do not apply it to a v1 config without
+retuning lambda_reg.
+
+--------------------------------------------------------------------------------------
 Why the problem builds this, and not the solver
 --------------------------------------------------------------------------------------
 
@@ -54,7 +76,7 @@ The contract solvers rely on
     value(f)          L(f), differentiable                  — every solver
     grad(f)           dL/df                                 — gradient solvers (Adam, ...)
     residual(f)       H f - g                               — data-consistency steps
-    prox_reg(f, tau)  prox of tau * lambda_reg * R          — proximal solvers (PPXA)
+    prox_reg(f, tau)  prox of tau * lambda_reg * reg_scale * R  — proximal solvers (PPXA)
     quadratic_weight  w with (1-lambda) D = w/2 ||Hf-g||^2   — least-squares data steps
     operator          the ForwardOperator                   — MCMC, warm starts, step sizes
 
@@ -119,18 +141,21 @@ class Objective:
 
     def __init__(self, operator: ForwardOperator, g: torch.Tensor,
                  data_fidelity, regularization=None, lambda_reg: float = 0.0,
-                 diff_ops=None):
+                 diff_ops=None, reg_scale: float = 1.0):
         if not 0.0 <= lambda_reg <= 1.0:
             raise ValueError(
                 f"lambda_reg is a blend weight and must lie in [0, 1], got {lambda_reg}. "
                 f"L = (1 - lambda_reg) * D + lambda_reg * R."
             )
+        if reg_scale <= 0.0:
+            raise ValueError(f"reg_scale calibrates R onto D and must be positive, got {reg_scale}.")
         self.operator = operator
         self.g = g
         self.data_fidelity = data_fidelity
         self.regularization = regularization
         self.lambda_reg = float(lambda_reg)
         self.diff_ops = diff_ops
+        self.reg_scale = float(reg_scale)
 
     # ── the objective itself ─────────────────────────────────────────────────
 
@@ -176,10 +201,18 @@ class Objective:
         return self.data_fidelity.loss(self.operator.apply(f), self.g)
 
     def reg_term(self, f: torch.Tensor) -> torch.Tensor:
-        """R(f) alone, UNweighted (the caller multiplies by lambda_reg if it wants L)."""
+        """
+        The calibrated prior `reg_scale * R(f)`, still UNweighted by lambda_reg (the caller
+        multiplies by lambda_reg if it wants L).
+
+        `reg_scale = 1 / R(f_init)` calibrates R onto D so lambda_reg reads as a regularization
+        share (D1 — see the module docstring); it is 1.0 (no calibration) unless the builder
+        sets it. The reported `regularization_share` r = 1 - R(f_l)/R(f0) is invariant under it
+        (the scale cancels), so the ruler is untouched.
+        """
         if self.regularization is None:
             return torch.zeros((), dtype=f.dtype, device=f.device)
-        return self.regularization.loss(f, self.diff_ops)
+        return self.reg_scale * self.regularization.loss(f, self.diff_ops)
 
     def value(self, f: torch.Tensor) -> torch.Tensor:
         """
@@ -216,7 +249,8 @@ class Objective:
 
     def prox_reg(self, f: torch.Tensor, tau: float = 1.0) -> torch.Tensor:
         """
-        Proximal operator of `tau * lambda_reg * R`, for splitting methods (PPXA, ADMM, PnP).
+        Proximal operator of `tau * lambda_reg * reg_scale * R`, for splitting methods
+        (PPXA, ADMM, PnP). `reg_scale` is the D1 calibration (1.0 when uncalibrated).
 
         Returns f unchanged when there is no regularization, which is the mathematically
         correct prox of the zero function — so a solver needs no special case.
@@ -234,7 +268,7 @@ class Objective:
                 f"so it cannot be used with a proximal solver. Use a gradient-based solver "
                 f"(e.g. ADAM), or choose a regularization that defines prox()."
             )
-        return prox(f, tau * self.lambda_reg, self.diff_ops)
+        return prox(f, tau * self.lambda_reg * self.reg_scale, self.diff_ops)
 
     def describe(self) -> str:
         """One-line summary of what is being minimized — for the run log and saved metadata."""
@@ -242,8 +276,9 @@ class Objective:
         if not self.is_regularized:
             return f"L(f) = {fidelity}(Hf, g)"
         reg = getattr(self.regularization, "display_name", type(self.regularization).__name__)
+        calibrated = "" if self.reg_scale == 1.0 else f" [reg_scale={self.reg_scale:.4g}]"
         return (f"L(f) = {self.data_weight:g} * {fidelity}(Hf, g) "
-                f"+ {self.lambda_reg:g} * {reg}(f)")
+                f"+ {self.lambda_reg:g} * {reg}(f){calibrated}")
 
     def __repr__(self) -> str:
         return f"<Objective {self.describe()}>"

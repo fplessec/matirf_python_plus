@@ -9,9 +9,11 @@
 > start**, 2026-09-22, `benchmarks/studies/lambda_interpretability.py`. The benchmark repeats
 > them across truths and noise levels.
 >
-> Not yet wired into `core/objective.py`: the decision is recorded here; the calibration
-> (wrap `reg_term` / `prox_reg` by `1/R(f_init)`) is the next implementation step, and it
-> **changes the meaning of every stored λ** — to be stated in the migration note.
+> Implemented: `Objective` carries a `reg_scale` factor on `R` (`reg_term` / `prox_reg`),
+> and `pipeline.build_objective` sets it to `1/R(f_init)` for a regularized run. Directly
+> constructed objectives stay uncalibrated (`reg_scale = 1.0`). **Migration:** a stored λ now
+> means something different (it applies `λ·reg_scale·R`, not `λ·R`), so v1 configs must be
+> retuned — see the migration note in `core/objective.py`.
 
 ---
 
@@ -123,7 +125,8 @@ Tikhonov (the case that separates them; TV behaves similarly for C1 and C2):
 **Decision — D1 = B with C2.** $L = (1-\lambda)D + \lambda\,R/R(f_{\text{init}})$: interpretable
 like C1, tracks the oracle at least as well, and it is free, deterministic and universal (no
 operator spectrum, no pre-pass, no unstable anchor). A (keep standard) is out — λ does not
-transfer; C (operator reference $s_2$) is out — not transferable across problems.
+transfer; C (operator reference $s_2$) is out — not transferable across problems. Implemented
+as `Objective.reg_scale = 1/R(f_{\text{init}})`, set by `pipeline.build_objective`.
 
 ---
 
