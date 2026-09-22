@@ -10,6 +10,11 @@ happens — a crash, a kill, a power cut, a Ctrl-C:
     RESTART = SAME COMMAND    a run is identified by a hash of its full configuration, so
                               relaunching the campaign skips what is done and resumes at the
                               exact run that was interrupted — even if the list was reordered.
+    STOP ON DEMAND            a `STOP` file in the campaign folder (dropped by `matirf
+                              benchmark stop`, or by hand) makes the loop exit cleanly before
+                              the next run — a safe checkpoint regardless of how it was
+                              launched. Ctrl-C on a foreground run does the same for the run
+                              in flight (marked 'interrupted', redone on resume).
     A CRASH STAYS CONTAINED   each run executes in its own process, with a time limit. A
                               segfault, an out-of-memory kill or a hang ends that run as
                               'failed' or 'timeout'; the campaign itself survives.
@@ -127,6 +132,7 @@ def execute(problem_name: str, config: dict, run_dir: str) -> dict:
                if isinstance(value, (int, float))}
     if isinstance((pipeline.result.metrics or {}).get("FSC"), dict):
         metrics["FSC"] = pipeline.result.metrics["FSC"].get("summary")
+    metrics.update(_curated_metrics(pipeline, config))   # the benchmark's curated set
     noise = next((line for line in pipeline.result.messages.splitlines()
                   if line.startswith("Noise model")), "")
     return {"seconds": round(time.time() - started, 2),
@@ -135,6 +141,35 @@ def execute(problem_name: str, config: dict, run_dir: str) -> dict:
             "findings": [finding.code for finding in (diagnosis.findings if diagnosis else [])],
             "diagnosis": diagnosis.summary() if diagnosis else "",
             "noise": noise}
+
+
+def _curated_metrics(pipeline, config: dict) -> dict:
+    """
+    The benchmark's curated metrics (benchmarks/metrics.py), computed on this run:
+    nmse and chi2_ratio always, depth_error_nm / stack_recovery for a 3D (MA-TIRF) result.
+    `regularization_share` is NOT here — it needs the paired lambda=0 run, so phase B's
+    analysis computes it across the sweep. Non-finite values (e.g. no stacked columns) become
+    None so the record stays valid JSON.
+    """
+    import math
+
+    from benchmarks import metrics as M
+    from pipeline import noise_parameters
+
+    f, truth, g = pipeline.result.f, pipeline.result.f_true, pipeline.result.g
+    if f is None:
+        return {}
+    _, a, b, _ = noise_parameters(config, g)
+    out = {"chi2_ratio": M.chi2_ratio(f, pipeline.prepared.operator, g, a, b)}
+    if truth is not None:
+        out["nmse"] = M.nmse(f, truth)
+        if f.dim() == 3:                        # depth metrics only mean something in 3D
+            oper = config.get("oper-params", {})
+            nz = float(oper.get("nz", f.shape[0])) or float(f.shape[0])
+            dz = (float(oper.get("zN", nz)) - float(oper.get("z0", 0.0))) / nz
+            out["depth_error_nm"] = M.depth_error_nm(f, truth, dz)
+            out["stack_recovery"] = M.stack_recovery(f, truth)
+    return {k: (v if isinstance(v, float) and math.isfinite(v) else None) for k, v in out.items()}
 
 
 def _child(problem_name, config, run_dir, queue):
@@ -200,6 +235,11 @@ def run_campaign(specs, directory, *, stop_on_reject: bool = True, accept_reject
     directory = Path(directory)
     (directory / "runs").mkdir(parents=True, exist_ok=True)
     journal = directory / "journal.jsonl"
+    ## the STOP sentinel: `matirf benchmark stop` (or anyone) drops this file, and the loop
+    ## exits cleanly BEFORE the next run — a safe checkpoint whatever the launch mode
+    ## (foreground, background, grid). Cleared here so relaunching resumes.
+    stop_flag = directory / "STOP"
+    stop_flag.unlink(missing_ok=True)
     settled = FINISHED | ({REJECTED} if accept_rejected else set())
     counts = {}
     ids = [spec.run_id for spec in specs]
@@ -212,6 +252,9 @@ def run_campaign(specs, directory, *, stop_on_reject: bool = True, accept_reject
         f"{len(todo)} to go.")
 
     for position, spec in enumerate(todo, start=1):
+        if stop_flag.exists():
+            log("Stop requested (STOP file) — exiting cleanly; relaunch to resume here.")
+            break
         run_dir = directory / "runs" / spec.run_id
         run_dir.mkdir(exist_ok=True)
         write_atomically(run_dir / "status.json", json.dumps(

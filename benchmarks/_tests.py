@@ -102,11 +102,31 @@ def test_stopped_on_rejection():
     print("  stopped         a meaningless run stops the campaign; retried, or accepted and kept")
 
 
+def test_stop_sentinel():
+    """A STOP file dropped mid-campaign halts the loop before the next run; relaunch resumes."""
+    directory = Path(tempfile.mkdtemp())
+    specs = [_spec(40), _spec(60), _spec(80)]
+
+    def stopper(msg):                              # act as an external `benchmark stop`
+        if "->" in msg:                            # once the first run has finished
+            (directory / "STOP").write_text("stop")
+
+    counts = run_campaign(specs, directory, isolate=False, log=stopper)
+    assert counts == {"done": 1}, counts           # the loop broke before the second run
+    assert (directory / "STOP").exists()
+
+    # relaunching clears the flag and finishes the remaining two (the first stays settled)
+    assert run_campaign(specs, directory, isolate=False, log=_quiet) == {"done": 2}
+    assert not (directory / "STOP").exists()
+    print("  stop on demand  a STOP file halts before the next run; relaunch clears it, resumes")
+
+
 def main():
     print("benchmarks — the campaign runner\n")
     test_saved_and_resumed()
     test_contained()
     test_stopped_on_rejection()
+    test_stop_sentinel()
     print("\nA campaign survives crashes, resumes where it stopped, and stops on nonsense.")
 
 

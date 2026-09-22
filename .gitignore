@@ -27,3 +27,6 @@ settings.toml
 
 # === Misc ===
 import_log.txt
+
+# benchmark campaign outputs (large, regenerated)
+benchmarks/results/

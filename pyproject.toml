@@ -93,6 +93,7 @@ deconv = "cli:main"
 list = "cli:main"
 help = "cli:main"
 settings = "cli:main"
+benchmark = "benchmarks.__main__:main"
 
 
 # -----------------------------------------------------------------------------
