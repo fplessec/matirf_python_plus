@@ -18,6 +18,7 @@ from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QApplication, QStyleFactory
 
 import settings as settings
+from gui.errors import install_error_handlers
 
 
 def open_gui(problem) -> None:
@@ -25,6 +26,7 @@ def open_gui(problem) -> None:
     from gui.factory import control_window_class
 
     app = QApplication(sys.argv)
+    install_error_handlers()                  # an error prints its traceback, never aborts
     app.setStyle(QStyleFactory.create(settings.app_style))
     palette = settings.dark_palette if settings.dark_style else settings.light_palette
     app.setPalette(palette())

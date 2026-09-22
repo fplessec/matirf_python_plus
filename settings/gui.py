@@ -119,6 +119,8 @@ def open_settings_gui():
     from settings import _settings
 
     app = QApplication(sys.argv)
+    from gui.errors import install_error_handlers
+    install_error_handlers()                  # an error prints its traceback, never aborts
     app.setStyle(QStyleFactory.create(_settings.get("app_style")))
 
     from settings import dark_palette, light_palette

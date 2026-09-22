@@ -56,6 +56,12 @@ from PyQt5.QtWidgets import QApplication, QMessageBox, QPushButton
 
 app = QApplication(sys.argv)
 
+# ── an exception inside a Qt callback is a FAILURE of the current check, not a crash ──
+## (without this, PyQt aborts the process and the summary line never prints)
+from gui.errors import install_error_handlers
+UNCAUGHT = []
+install_error_handlers(show_dialog=False, on_error=lambda *error: UNCAUGHT.append(error))
+
 # ── neutralise anything modal, and record what the user would have been shown ──
 SHOWN = []
 QMessageBox.warning = staticmethod(
@@ -178,8 +184,13 @@ RESULTS = []
 
 
 def check(name, fn):
+    seen = len(UNCAUGHT)
     try:
         detail = fn()
+        app.processEvents()
+        if len(UNCAUGHT) > seen:
+            names = ", ".join(f"{e[0].__name__}: {e[1]}" for e in UNCAUGHT[seen:])
+            raise AssertionError(f"uncaught exception in a Qt callback — {names}")
         RESULTS.append((True, name, detail or ""))
         print(f"  PASS  {name}" + (f"  — {detail}" if detail else ""))
     except Exception as error:
@@ -959,6 +970,21 @@ check("H2  une seule classe liée par problème", h2)
 # ── restore the caches exactly as they were ───────────────────────────────────
 for path, content in BACKUPS.items():
     Path(path).write_text(content)
+
+def h3():
+    """An error in a click prints its traceback and is reported; the application survives."""
+    button_ = QPushButton("boom")
+    def explode():
+        raise RuntimeError("deliberate error in a Qt callback")
+    button_.clicked.connect(explode)
+    before = len(UNCAUGHT)
+    click(button_)
+    assert len(UNCAUGHT) == before + 1, "the error was not routed to the handler"
+    assert UNCAUGHT[-1][0] is RuntimeError
+    UNCAUGHT.pop()                              # expected here: not a failure of this check
+    return "exception rattrapée : traceback dans le terminal, l'application continue"
+check("H3  une erreur dans un clic n'arrête plus l'application", h3)
+
 
 print("\n" + "=" * 66)
 ok = sum(1 for r in RESULTS if r[0])

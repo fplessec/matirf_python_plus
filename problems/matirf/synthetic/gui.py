@@ -27,6 +27,7 @@ from PyQt5.QtWidgets import (
 import settings as settings
 from fileio import load_or_create_toml
 from gui.base.base_section_qgroup import BaseSectionQGroup
+from gui.errors import install_error_handlers
 from gui.file_dialog import open_file, save_file
 from gui.factory import figures_section_class
 from problems.matirf import MATIRF_SYNTHETIC_DIR
@@ -195,6 +196,7 @@ class SyntheticTruthGeneratorWindow(QWidget):
 
 def main():
     app = QApplication(sys.argv)
+    install_error_handlers()                  # an error prints its traceback, never aborts
     app.setStyle(QStyleFactory.create(settings.app_style))
     palette = settings.dark_palette if settings.dark_style else settings.light_palette
     app.setPalette(palette())
