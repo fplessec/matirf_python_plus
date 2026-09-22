@@ -89,13 +89,19 @@ class Settings:
     # ── persistence ──────────────────────────────────────────────
 
     def _load(self):
-        if SETTINGS_PATH.exists():
-            with open(SETTINGS_PATH, "rb") as f:
-                data = tomli.load(f)
-            for k, v in data.items():
-                if k in self._values:
-                    self._values[k] = self._cast(k, v)
-        else:
+        if not SETTINGS_PATH.exists():
+            self._save()
+            return
+        with open(SETTINGS_PATH, "rb") as f:
+            data = tomli.load(f)
+        for k, v in data.items():
+            if k in self._values:
+                self._values[k] = self._cast(k, v)
+        ## Keep the file in sync with the schema: rewrite it when its keys differ from the
+        ## current settings -- otherwise a setting added after the file was written (like
+        ## live_preview) lives only in memory and never appears on disk, and a removed one
+        ## lingers. Loaded values are preserved; missing ones fall back to their default.
+        if set(data) != set(_DEFAULTS):
             self._save()
 
     def _save(self):
