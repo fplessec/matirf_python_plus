@@ -1,170 +1,189 @@
-# ADMM — theory of the parameters, before any benchmark
+# ADMM & ADMMv2 — a priori analysis of the parameters
 
-> Status: **theoretical note** (Day 7, step 2). Ranges are *predicted* from the mathematics
-> and from the MA-TIRF spectrum (see `adam_ppxa.md` §1.1: $s_1 = 38.9$, $s_2 = 6.02$,
-> $s_3 = 0.562$, $s_4 = 0.033$). ADMM itself is unchanged; its two proposed fixes exist as
-> the separate solver ADMMv2 (§4).
-
----
-
-## 1. What this ADMM solves
-
-ADMM (Alternating Direction Method of Multipliers) splits a problem into two easy halves
-tied by a constraint. Here the unknown is duplicated as $u$ (seen by the data) and $f$ (seen
-by the prior), with $u = f$:
-
-$$
-\min_{u,f}\; \tfrac12 \lVert Hu - g \rVert_2^2 \;+\; \tau \lVert f \rVert_1 \;+\; \iota_{f \ge 0}(f)
-\quad \text{s.t.} \quad u = f .
-$$
-
-The prior is **fixed**: sparsity ($\ell_1$) plus positivity. ADMM does not use the
-objective's `reg` / `lambda_reg`, nor the noise level: its data term is the plain
-$\tfrac12\lVert Hu-g\rVert_2^2$ (Gaussian noise only).
-
-One iteration of the code, with $\eta$ the (scaled) dual variable:
-
-| step | code | meaning |
-|---|---|---|
-| data | $u = (H^TH + \mu I)^{-1}\big(H^Tg + \mu (f - \eta)\big)$ | a ridge-regularized fit to the data, pulled toward $f - \eta$ |
-| prior | $f = \max(u + \eta - t,\ 0)$ | soft threshold at $t$, then positivity |
-| dual | $\eta = \eta + \mu\,(u - f)$ | accumulate the disagreement between $u$ and $f$ |
-
-with the threshold $t = \kappa\, \max(g) / \lVert H \rVert$ ($\kappa$ = `threshold_ratio`,
-$\lVert H\rVert = s_1$ from a power iteration). The run starts from the data step with
-$f = \eta = 0$, i.e. from the ridge estimate $(H^TH + \mu I)^{-1} H^T g$.
-
-### 1.1 The objective actually reached
-
-At a fixed point ($u = f$), the optimality conditions of the two steps combine into
-
-$$
-H^T(g - Hf) \in \mu\, t\; \partial \lVert f \rVert_1 + N_{f\ge 0}(f),
-$$
-
-which are exactly those of $\min_{f\ge0} \tfrac12\lVert Hf-g\rVert^2 + \tau\lVert f\rVert_1$ with
-
-$$
-\boxed{\tau = \mu \cdot t = \mu\, \kappa\, \max(g) / s_1 .}
-$$
-
-**The prior's weight is the product of two parameters.** In textbook ADMM the threshold is
-$\tau/\mu$, so that $\mu$ only affects speed; here the threshold is fixed and $\mu$ therefore
-changes the solution itself (see §4).
-
-### 1.2 The dual step
-
-In the standard scaled form the dual update is $\eta \leftarrow \eta + (u - f)$. The code
-multiplies it by $\mu$: this is ADMM with a *relaxed dual step* equal to $\mu$, which
-converges for dual steps in $(0,\ \tfrac{1+\sqrt5}{2}) \approx (0, 1.618)$ (Glowinski). So $\mu$
-has **three roles at once**: ridge weight of the data step, factor of the prior weight, and
-dual step size. The last one caps it: **$\mu > 1.618$ is expected to oscillate or diverge.**
+Reads on top of `00_foundation.md`. ADMM (Alternating Direction Method of Multipliers) is a
+**MAP** estimator with a **fixed** prior: sparsity (L1) + positivity. It does **not** use the
+objective's `reg` / `lambda_reg` / κ (foundation §3.2) — its prior is hard-wired. ADMMv2 is a
+separate solver with a cleaner threshold and dual step (§4). Physical operator throughout
+(s1 = 38.9, s2 = 6.02, s3 = 0.562, s4 = 0.033). Math in plain text.
 
 ---
 
-## 2. The parameters
+## 1. What ADMM solves — and its Bayesian reading
 
-### `threshold_ratio` $\kappa$ — the sparsity threshold *(critical)*
+```
+minimize over u, f :   ½·||H·u − g||²  +  τ·||f||₁  +  ι_{f ≥ 0}(f)     subject to  u = f
+```
 
-Since $f \sim g / s_1$ (`adam_ppxa.md` §1.2), $t = \kappa \max(g)/s_1 \approx \kappa \max f$:
-**$\kappa$ is the threshold as a fraction of the image's peak**. At each iteration, voxels
-whose value (after the data step) falls below about $\kappa \times$ the peak are set to zero.
+`u` is the copy "seen by the data", `f` the copy "seen by the prior", tied by `u = f`.
 
-- $\kappa \to 0$: no sparsity; ADMM tends to non-negative least squares — ill-posed on
-  MA-TIRF (47 undetermined depth directions per column), so the result is then decided by
-  the data step's ridge and by the number of iterations (see `iter`).
-- $\kappa \to 1$ (threshold ≈ peak): everything is thresholded away → empty image.
-- In between: sparsity. **Predicted useful range: $\kappa \in [0.02, 0.3]$** — larger for
-  sparse truths (`vesicles`, `fibres`), and a poor fit whatever $\kappa$ for continuous
-  objects (the `cell` membrane), since $\ell_1$ on voxels is the wrong prior for them.
+**Bayesian reading.** `½||Hu−g||²` is the Gaussian negative log-likelihood (up to the noise
+scale); `τ·||f||₁` is a **Laplacian prior** `p(f) ∝ exp(−τ·||f||₁)` (i.i.d. Laplace on the
+voxels = "most voxels are ~0, a few are bright"); `ι_{f≥0}` is a uniform prior on the positive
+orthant. So ADMM is the MAP estimator for **a sparse, non-negative object under Gaussian
+noise** — the right model for point-like / filamentary structures, the wrong one for a
+continuous membrane.
 
-This is ADMM's only real "what does the object look like" knob — the counterpart of
-Adam/PPXA's `reg` + `lambda_reg`, restricted to one prior (sparsity).
-
-### `mu` $\mu$ — penalty *(critical, but mostly fixed by a rule)*
-
-1. **Data step.** $(H^TH + \mu I)^{-1}$ keeps the singular directions with $s_i^2 \gg \mu$ and
-   damps the others — the same mechanism as the ridge weight $\lambda_{rr}$ of MCMC. On
-   MA-TIRF: $\mu \ll s_2^2 = 36$ keeps the two determined directions each iteration;
-   $\mu \approx s_3^2 = 0.32$ also half-keeps the third; $\mu \ll s_4^2 = 10^{-3}$ lets noise
-   through along the poorly determined directions.
-2. **Prior weight** $\tau = \mu t$ (§1.1): at fixed $\kappa$, a larger $\mu$ means a sparser
-   result.
-3. **Dual step** (§1.2): must stay below ≈ 1.618.
-
-**Predicted range on MA-TIRF: $\mu \in [s_3^2,\ 1.6] \approx [0.3, 1.6]$.** The default 0.5 sits
-in it (and $\approx s_3^2$). For deconvolution (normalized PSF, $s_1 = 1$, a continuous
-spectrum) the data step is a Wiener filter of parameter $\mu$; $\mu$ should then be of the order
-of the noise-to-signal power, **$\mu \in [10^{-4}, 10^{-1}]$**, well inside the dual limit.
-
-### `iter` — number of iterations *(critical when $\kappa$ is small)*
-
-ADMM starts from the ridge estimate and converges toward the $\ell_1$-regularized solution.
-
-- With $\kappa > 0$ well chosen: the iterates converge; beyond a few tens of iterations
-  nothing changes (a plateau) → `iter` is a budget.
-- With $\kappa \approx 0$: each data step is a proximal (iterated-Tikhonov) step; after $k$
-  iterations the filter along direction $i$ behaves like a ridge of parameter $\sim \mu/k$.
-  **Stopping early is then itself the regularization**: 20 iterations and 2 000 do not
-  give the same image. This is v1's behaviour with its default `iter = 20`.
-
-**Prediction:** with $\kappa \in [0.02, 0.3]$ the result is stable for `iter` $\gtrsim 50$;
-with $\kappa \to 0$ it drifts with `iter` toward a noisier image.
-
-### Not offered, on purpose
-
-No `init` (the start is the data step itself), no `reg`/`lambda_reg`, no noise model other
-than Gaussian.
+Note it uses the **plain** `½||Hu−g||²`, not the scaled D of foundation §3.1: ADMM does not
+carry the noise level, and τ is an absolute weight, not a share.
 
 ---
 
-## 3. Summary
+## 2. Logic, pseudo-code, and the fixed point (`solvers/admm.py`)
 
-| parameter | role | critical? | predicted range (MA-TIRF) | toward 0 | toward large |
+```
+threshold  t = κ · max(g) / ||H|| ,   ||H|| = s1        (κ = threshold_ratio)
+f ← solve_normal(Hᵀg, μ) = (HᵀH + μI)⁻¹ Hᵀg            # ridge start, from f = η = 0
+η ← 0
+repeat for `iter`:
+    u ← (HᵀH + μI)⁻¹ ( Hᵀg + μ·(f − η) )               # data step: ridge fit pulled to f−η
+    f ← max( u + η − t , 0 )                            # prox step: soft-threshold at t, then ≥0
+    η ← η + μ·(u − f)                                   # dual step (note the factor μ)
+```
+
+### 2.1 The objective actually reached
+
+At a fixed point (`u = f`, η stationary) the two steps' optimality conditions combine into the
+KKT conditions of
+
+```
+min over f ≥ 0 :  ½·||Hf − g||²  +  τ·||f||₁ ,   with   τ = μ · t = μ · κ · max(g) / s1
+```
+
+**The prior's weight is a product of two knobs: `τ = μ · κ · max(g)/s1`.** In textbook ADMM the
+threshold is τ/μ, so μ only sets speed; here the threshold t is fixed, so **μ changes the
+solution** (§3.2). This is the awkwardness ADMMv2 removes.
+
+### 2.2 The dual step and the stability cap on μ
+
+The standard scaled dual update is `η ← η + (u − f)`. This code multiplies it by μ:
+`η ← η + μ·(u − f)`. That is ADMM with a **relaxed dual step equal to μ**, which converges only
+for a dual step in `(0, (1+√5)/2) ≈ (0, 1.618)` (Glowinski). So μ has **three roles at once**:
+ridge weight of the data step, factor of the prior weight τ, and dual step size. The last one
+caps it: **μ > 1.618 is expected to oscillate or diverge** (measured on a toy problem: μ = 2.5
+→ NaN).
+
+---
+
+## 3. The parameters of ADMM v1
+
+### 3.1 `threshold_ratio` (κ) — the sparsity threshold *(critical, but hard to predict)*
+
+The soft-threshold zeroes every voxel of `u + η` below `t = κ·max(g)/s1`. Since `max(g)/s1` is
+the scale of f's peak (foundation §1.2), naively `t ≈ κ·(peak of f)` — i.e. κ would be "the
+threshold as a fraction of the peak", useful around 0.02–0.3.
+
+**But this is exactly the parameter the a priori analysis cannot pin, and here is why.** The
+data step `u` is a ridge reconstruction: with only 2–3 determined directions, it **spreads the
+object's energy across the ~47 null-space depth directions** (foundation §1.1). So the voxels
+of `u` are far smaller than a hypothetical concentrated peak — a diffuse object can have *every*
+voxel below `κ·(peak)` for a modest κ, and the threshold then empties it. How much energy sits
+above the threshold depends on the truth's shape, which is not known a priori.
+
+- `κ → 0` : no sparsity → non-negative least squares; the null space is decided by μ's ridge
+  and by `iter` (§3.3) → noisy / depth-collapsed.
+- `κ → large` : threshold above the (spread) voxel values → empty image.
+- **Predicted useful band: κ ∈ [0.01, 0.3]**, wider for concentrated truths (`vesicles`,
+  `fibres`), narrow-to-none for the continuous `cell` (L1 is the wrong prior there). **This is
+  the least certain prediction in the whole analysis** — it entangles κ with μ, with s1, and
+  with the truth's spread — so Phase A must sweep it **log-spaced over a wide band**
+  (`κ ∈ {3e-3, 1e-2, 3e-2, 1e-1, 3e-1}`) per truth, not around a single value.
+
+### 3.2 `mu` (μ) — penalty *(critical, three coupled roles)*
+
+1. **Data-step ridge.** `(HᵀH + μI)⁻¹` keeps directions with `s_i² ≫ μ` and damps the rest
+   (foundation §4). `μ ≈ s3² = 0.3` keeps s1, s2 fully and s3 half; `μ ≪ s4² = 1e-3` lets noise
+   through the poorly determined directions.
+2. **Prior weight.** `τ = μ·t` (§2.1): at fixed κ, larger μ ⇒ sparser result.
+3. **Dual step.** Must stay below ≈ 1.618 (§2.2).
+
+**Predicted range: μ ∈ [s3², 1.6] ≈ [0.3, 1.6]** on MA-TIRF (the default 0.5 sits in it, ≈ s3²).
+Because μ moves the solution *and* the speed *and* has a hard cap, it is genuinely
+three-in-one — a design smell ADMMv2 fixes. **Phase A:** `μ ∈ {0.1, 0.3, 0.5, 1.0, 1.5}`; show
+that it changes the sparsity (not only the speed) and that ≥ 1.618 oscillates.
+
+### 3.3 `iter` — iterations *(critical only when κ ≈ 0)*
+
+- With κ in band, the iterates converge to the lasso solution (§2.1); beyond a few tens they
+  plateau → `iter` is a budget.
+- With `κ ≈ 0`, each data step is one proximal (iterated-Tikhonov) step; after k steps the
+  filter along a weak direction behaves like a ridge of weight ~μ/k. **Stopping early is then
+  itself the regularization** → 20 vs 2000 iterations give different images.
+
+**Predicted:** with κ in band the result plateaus by `iter ≳ 50`; with κ ≈ 0 it drifts. Since a
+few tens are cheap, **Phase A should give ADMM a generous budget (≈ 200)** and read the plateau
+from the `||u−f||/||f||` gap the code logs — this is exactly the setting a user flagged as
+under-iterated at the default 20.
+
+### 3.4 Not offered
+
+No `init` (the start is the data step), no `reg` / `lambda_reg`, no noise model but Gaussian.
+
+---
+
+## 4. ADMMv2 — the principled threshold and dual step (`solvers/admm_v2.py`)
+
+Same chain, two changes that remove the coupling of §2:
+
+```
+τ  = κ · max(Hᵀg)          (κ = kappa)      # absolute prior weight, independent of μ
+threshold = τ / μ                            # so the fixed point's weight is τ, not μ·t
+f ← solve_normal(Hᵀg, μ), clamped ≥ 0
+η ← 0
+repeat for `iter`:
+    u ← (HᵀH + μI)⁻¹ ( Hᵀg + μ·(f − η) )
+    f ← max( u + η − τ/μ , 0 )
+    η ← η + (u − f)                          # standard dual step (no μ factor)
+```
+
+### 4.1 Why `κ` is now scale-free and interpretable
+
+`τ_max = max(Hᵀg)` is **exactly** the weight that empties the image. Optimality of the lasso
+at `f = 0` (with positivity): `f = 0` is the minimizer iff `Hᵀg ≤ τ` componentwise, i.e. iff
+`τ ≥ max(Hᵀg)`. So with `τ = κ·max(Hᵀg)`:
+
+```
+κ ≥ 1  → empty image            κ → 0  → non-negative least squares
+κ ∈ (0,1)  → the fraction of the "empties-it" weight that is applied
+```
+
+This reads the **same whatever the data scale, the operator gain, or the normalization of g** —
+unlike v1's κ, which is `τ_v1 = μ·κ·max(g)/s1`, entangled with μ and s1 (for the same sparsity,
+`κ_v1 ≈ κ_v2 · max(Hᵀg)·s1 / (μ·max(g))`, i.e. hundreds of times apart).
+
+### 4.2 The dual step frees μ
+
+With the standard `η ← η + (u−f)` the method converges for **any μ > 0**, and the fixed-point
+weight is τ (independent of μ, §4.1). So in ADMMv2:
+
+- **κ ∈ (0,1)** = the sparsity, scale-free, moves the **solution**;
+- **μ = speed only** — no cap, no effect on the solution once converged; fastest when the
+  data-step ridge conditions the determined directions well, `μ ∈ [s3², s1²] ≈ [0.3, 1.5e3]`;
+- **iter** = a pure budget (default 100).
+
+*Evidence (`solvers/_tests.py`, sparse toy):* ADMMv2 — κ = 1 returns exactly zero; μ = 0.3 and
+μ = 30 reach the same solution to 5e-7. ADMM v1 — at a fixed threshold, μ from 0.3 to 1.7 moves
+the solution from 21 to 6 non-zero voxels, μ = 2.5 → NaN.
+
+**Phase A (ADMMv2):** `κ ∈ {0.02, 0.05, 0.1, 0.2, 0.5}` (the real solution axis, transferable to
+deconvolution); `μ` fixed in [s3², s1²] (e.g. 1.0); `iter` a generous budget. Verify that any μ
+gives the same reconstruction once converged, and that κ's best value transfers across truths /
+noise / problems better than v1's `threshold_ratio`.
+
+---
+
+## 5. Summary — the Phase-A axes
+
+| param | solver | role | moves solution or speed? | predicted range | Phase-A values |
 |---|---|---|---|---|---|
-| `threshold_ratio` $\kappa$ | sparsity threshold, ≈ fraction of the peak | **yes** | 0.02 – 0.3 | NNLS, decided by `iter` | empty image |
-| `mu` $\mu$ | data-step ridge × prior weight × dual step | yes, by rule | 0.3 – 1.6 | noise through poorly determined directions | data barely used; > 1.618: oscillation |
-| `iter` | budget, or implicit regularization if $\kappa \approx 0$ | only if $\kappa \approx 0$ | ≥ 50 | the ridge start | converged ($\kappa>0$) / noisier ($\kappa\approx0$) |
+| `threshold_ratio` κ | ADMM | sparsity threshold (entangled) | **solution** | [0.01, 0.3], uncertain | log band {3e-3 … 3e-1} per truth |
+| `mu` μ | ADMM | ridge × prior weight × dual step | **solution** + speed, cap 1.618 | [0.3, 1.6] | {0.1, 0.3, 0.5, 1.0, 1.5} |
+| `iter` | ADMM | budget; regularization if κ≈0 | speed (solution if κ≈0) | ≥ 200 | fixed generous |
+| `kappa` κ | ADMMv2 | sparsity as fraction of τ_max | **solution**, scale-free | (0,1), useful [0.02, 0.5] | {0.02, .05, .1, .2, .5} |
+| `mu` μ | ADMMv2 | speed only | speed | [s3², s1²] | fixed (e.g. 1.0) |
+| `iter` | ADMMv2 | budget | speed | ≥ 100 | fixed generous |
 
-For a user, ADMM comes down to **one decision: how sparse ($\kappa$)** — provided $\mu$ is in
-its range. It is the natural method for sparse objects and the wrong one for continuous
-ones.
-
----
-
-## 4. ADMMv2 — the two proposals, as a separate solver
-
-At the project owner's request the two proposals exist as a separate solver,
-`solvers/admm_v2.py` ("ADMMv2"); ADMM is unchanged. The benchmark compares them and only
-one will be kept if one is clearly worse.
-
-| | ADMM | ADMMv2 |
-|---|---|---|
-| threshold in the f-step | fixed $t = \kappa \max(g)/s_1$ | $\tau/\mu$ |
-| prior weight at convergence | $\tau = \mu\, t$ — depends on $\mu$ | $\tau = \kappa \max(H^Tg)$ — independent of $\mu$ |
-| dual step | $\eta \mathrel{+}= \mu(u-f)$, needs $\mu < 1.618$ | $\eta \mathrel{+}= (u-f)$, any $\mu > 0$ |
-| role of $\mu$ | ridge × prior weight × dual step | **speed only** |
-| meaning of $\kappa$ | threshold ≈ fraction of the image peak | fraction of $\tau_{max} = \max(H^Tg)$: **1 = empty image, → 0 = NNLS** |
-
-$\tau_{max} = \max(H^Tg)$ is exact: with positivity, $f = 0$ is optimal iff $H^Tg \le \tau$
-(the optimality condition at 0). So ADMMv2's $\kappa$ reads the same whatever the data scale,
-the operator's gain or the normalization of $g$.
-
-*Evidence (sparse toy problem, `solvers/_tests.py`)*: ADMMv2 — $\kappa = 1$ returns exactly
-zero; $\mu = 0.3$ and $\mu = 30$ reach the same solution to $5\cdot10^{-7}$. ADMM — at a fixed
-threshold, $\mu$ from 0.3 to 1.7 takes the solution from 21 to 6 non-zero voxels, and
-$\mu = 2.5$ diverges to NaN (the 1.618 bound is sufficient, not necessary: 1.7 still
-converged there).
-
-**Predicted ranges for ADMMv2:** $\kappa \in [10^{-3}, 10^{-1}]$ on MA-TIRF (to be established);
-$\mu$ fastest in $[s_3^2, s_1^2]$; `iter` a pure budget (default 100).
-
-## 5. Hypotheses the benchmark must test
-
-| # | Hypothesis | Test |
-|---|---|---|
-| H-A1 | $\kappa \to 0$: NNLS-like (noisy / depth errors); $\kappa \gtrsim 0.5$: empty; best $\kappa \in [0.02, 0.3]$ on sparse truths; poor on `cell` for any $\kappa$ | $\kappa$ sweep per truth, realism check |
-| H-A2 | at fixed $\kappa$, $\mu$ changes the sparsity (not only the speed); $\mu > 1.618$ oscillates | $\mu$ sweep 0.03 – 3, loss / iterate history |
-| H-A3 | with $\kappa$ in range the result plateaus for `iter` ≳ 50; with $\kappa \approx 0$ it drifts with `iter` | `iter` sweep 10 – 2 000 at two $\kappa$ |
-| H-A4 | $\mu \approx s_3^2$ – 1 converges fastest on MA-TIRF | iterations to plateau vs $\mu$ |
-| H-A5 | ADMMv2: same reconstruction for any $\mu$ once converged; its best $\kappa$ transfers across truths, noise levels **and inverse problems** (MA-TIRF ↔ deconvolution) better than ADMM's `threshold_ratio` | $\mu$ and $\kappa$ sweeps, ADMM vs ADMMv2, both problems |
+**Take-away:** ADMM v1's `threshold_ratio` is the one parameter the a priori analysis can only
+bracket loosely (it entangles the threshold with μ, the operator gain, and the truth's depth
+spread), so it needs a **wide log sweep with a generous iteration budget** — the opposite of
+the default (κ = 0.1, iter = 20). ADMMv2's `κ ∈ (0,1)` is the principled, scale-free version and
+is the axis to trust for the sparse-prior family.

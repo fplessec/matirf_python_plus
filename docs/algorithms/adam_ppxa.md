@@ -1,315 +1,282 @@
-# Adam and PPXA — theory of the parameters, before any benchmark
+# Adam & PPXA — a priori analysis of the parameters
 
-> Status: **theoretical note** (Day 7, step 2). Every range below is *predicted* from the
-> mathematics and from the MA-TIRF operator's spectrum; the benchmark exists to confirm or
-> refute each prediction. Numbers marked *(pre-study)* come from the exploratory runs of
-> 2026-09-21 on one cropped truth and are not yet benchmark results.
+Reads on top of `00_foundation.md` (the inverse problem, the shared objective L, the
+spectrum, the scale f ~ 0.02). Adam and PPXA **minimize the same L** (foundation §3); they
+differ only in *how* they descend it — which is why "do they return the same image?" tests
+the framework rather than being a coincidence. Both are **MAP** estimators and both consult
+`reg` / `lambda_reg` (unlike ADMM / PnP / MCMC). Ranges below are *predicted* from the maths;
+Phase A tests them **around** these values.
 
-Adam and PPXA are treated together because they minimize **the same objective**. They
-differ only in *how* they descend it — which is exactly what makes their comparison a test
-of the framework: with the right parameters, they must find the same reconstruction.
-
----
-
-## 1. The objective they share
-
-$$
-\min_{f \ge 0}\; L(f) = (1-\lambda)\, D(Hf, g) + \lambda\, R(f), \qquad \lambda \in [0, 1]
-$$
-
-- $D$ — the data fidelity: the per-pixel negative log-likelihood of the noise model,
-  scaled by the noise level (Gaussian: $D = \frac{1}{2 b n_g}\lVert Hf-g\rVert_2^2$, $b=\sigma^2$).
-- $R$ — the regularization (the prior), a **mean over voxels**.
-- $f \ge 0$ — positivity, enforced by projection (Adam) or as a third proximal term (PPXA).
-
-Every term is convex (D, all six regularizations, the positivity constraint), so $L$ is
-convex. It is **strictly** convex only if $R$ is strictly convex on the directions $H$ does
-not see — this single fact explains most of what follows (§1.3).
-
-### 1.1 The MA-TIRF operator, in numbers
-
-With the synthetic microscope (13 angles, 62.6–69.8°, 50 planes over 0–300 nm), each depth
-column is acted on by a $13 \times 50$ matrix whose singular values are
-
-| $s_1$ | $s_2$ | $s_3$ | $s_4$ | $s_5$ | $s_6 \dots s_{13}$ |
-|---|---|---|---|---|---|
-| 38.9 | 6.02 | 0.562 | 0.0331 | 0.00137 | $< 5\cdot10^{-5}$ |
-
-So **only 2–3 directions per column are determined by the data**; 47 of the 50 depth
-degrees of freedom are fixed by the prior (and positivity) alone. Three consequences used
-throughout:
-
-1. the reconstruction is dominated by the prior → the choice of $R$ and $\lambda$ is the
-   single most important decision;
-2. the objective has a **near-flat valley** (the quasi-null space of $H$) → an optimizer
-   stopped before convergence lands somewhere in that valley depending on its *path*
-   (initialization, step size, iterations): *implicit regularization*;
-3. the curvature of the data term spans $s_1^2/s_3^2 \approx 5\,000$ → step sizes must be
-   chosen relative to this spectrum (PPXA, §3.2).
-
-### 1.2 Scale of the unknown
-
-`g` is normalized (peak = 1). Since $Hf \approx g$ and $s_1 \approx 39$, the reconstruction
-has values $f \sim g / s_1 \sim$ **0.01–0.03** (measured: the f that explains g peaks at 0.022–0.025 on the benchmark truths). Every parameter measured in "units of f"
-(Adam's learning rate, the MCMC noise level) must be compared to this scale, not to 1.
-
-### 1.3 The flat valley and uniqueness
-
-If $R$ is weak (small $\lambda$, or a prior of small magnitude), many $f$ reach almost the
-same $L$. Then:
-
-- two different algorithms, or the same one from two starts, **can return very different
-  images with the same $L$** — observed *(pre-study)*: Adam and PPXA equal to $10^{-3}$ in
-  $L$, yet their images are far apart (angle 0.5–0.8) at $\lambda = 0.5$;
-- the answer depends on the path, not on the objective — which is not a reconstruction
-  method one can reason about.
-
-When $R$ weighs enough to fix the null space, the minimizer becomes (nearly) unique and all
-paths converge to it. **A well-posed use of Adam/PPXA is one where the prior, not the path,
-decides.** This is the lens for every parameter below.
+Math is written in plain text (code blocks / Unicode) on purpose, so it stays readable
+without a LaTeX renderer. Notation: `||x||` = L2 norm, `s1 s2 s3` = singular values of H,
+`s_i^2` = eigenvalues of HᵀH, `f ~ 0.02` = f peaks around 0.02 on MA-TIRF.
 
 ---
 
-## 2. The shared (objective) parameters
+## 0. The objective, restated
 
-These describe *what* is minimized; they are identical for Adam and PPXA.
+```
+minimize over f ≥ 0 :   L(f) = (1−λ)·D(Hf,g)  +  λ·κ·R(f)          λ ∈ [0,1]
+                         D    = ||Hf−g||² / (2·b·n_g)              (Gaussian noise, variance b)
+                         κ    = 1 / R(f_init)                      (C2 calibration, foundation §3.2)
+```
 
-### `reg` — the regularization *(critical)*
+L is convex (foundation §3.4). So *in principle* the minimizer is unique and both solvers
+must reach it; *in practice* the near-flat valley (foundation §1.1) means that unless the
+`λ·κ·R` term weighs on the null space, the finite-iteration result depends on the path. This
+is the recurring split below:
 
-The prior belief about the object. Each option favours a kind of image:
-
-| Regularization | Favours | Homogeneity |
-|---|---|---|
-| L1 norm | few bright voxels (sparse) | degree 1 |
-| L2 norm | small values overall (mildest) | degree 2 |
-| L2 norm of the gradient (Tikhonov) | smooth everywhere, blurs edges | degree 2 |
-| L1 norm of the gradient (TV) | piecewise-constant, sharp edges | degree 1 |
-| Frobenius norm of the Hessian | piecewise-linear, no staircasing | degree 1 |
-| Sparse Hessian Variation (SHV) | sparse **and** smooth, jointly | degree 1 |
-
-"Degree" is the homogeneity: $R(cf) = c^p R(f)$. It matters for $\lambda$ (below): a degree-2
-prior grows like the *square* of the image scale, a degree-1 prior linearly.
-
-**Prediction.** For the synthetic truths (sparse objects with smooth profiles), SHV, TV and
-L1 should beat L2 and Tikhonov; for the membrane (`cell`), Hessian-type priors should give
-the smoothest surfaces.
-
-### `lambda_reg` — the prior's weight *(critical)*
-
-- $\lambda \to 0$: non-negative least squares. On MA-TIRF, the 47 undetermined depth
-  directions are then set by the path and by noise amplification along $s_3, s_4$ →
-  expected: noisy, possibly depth-collapsed reconstructions (the realism check's
-  "collapsed" / "no better than ridge").
-- $\lambda \to 1$: the data are ignored; $f \to \arg\min R$ ($f = 0$ for L1, L2, SHV;
-  a constant for TV, Tikhonov) → the realism check's "empty".
-- In between: the trade-off.
-
-**Why $\lambda$ is not (yet) a percentage.** With the current formulation the balance at the
-solution is set by $\lambda/(1-\lambda)$ times $D$'s curvature over $R$'s scale, and $R$'s scale
-follows $f$'s ($\sim 0.01$, raised to the degree $p$). So $R \ll D$: $R$ weighs almost nothing
-until $\lambda$ is very close to 1. *(pre-study)*: with TV, the regularization share
-$r = 1 - R(f_\lambda)/R(f_0)$ stays at 0.01 / 0.07 / 0.17 for $\lambda$ = 0.1 / 0.5 / 0.9, and
-the best reconstruction needs $\lambda \ge 0.99$. **Predicted useful range today:
-$1-\lambda \in [10^{-4}, 10^{-1}]$, i.e. $\lambda \in [0.9, 0.9999]$, prior-dependent.**
-Making $\lambda$ interpretable is decision D1 (normalizing $D$ and $R$ by reference values),
-studied separately.
-
-### `rho` — SHV's trade-off *(critical, SHV only)*
-
-$R(f) = \text{mean}_x \sqrt{\rho^2 \lVert \mathrm{Hess}\, f(x) \rVert_F^2 + (1-\rho)^2 f(x)^2}$
-
-- $\rho \to 1$: pure Hessian-Frobenius (smooth, not sparse);
-- $\rho \to 0$: pure L1 (sparse, not smooth);
-- SPITFIRe's default 0.6 — "moderately sparse".
-
-> Note for the internship report (III.4): its formula is right, but one sentence inverts the
-> limits ("si fixé à 0 … seulement les variations hessiennes"). $\rho = 0$ is pure sparsity.
-> Its three levels (0.9 / 0.6 / 0.1 = weakly / moderately / strongly sparse) are consistent
-> with the formula.
-
-**Prediction.** Sparse truths (`vesicles`, `fibres`) prefer $\rho \approx 0.3$–0.6; the
-continuous membrane prefers $\rho \to 0.8$–1.
-
-### `delta` — anisotropy ratio *(not tuned: fixed by the physics)*
-
-The axial derivative is weighted by $\delta = \Delta z / \Delta xy$ so that a gradient means the
-same thing along z and in the plane. It is a property of the grid and the optics, which is
-why the GUI **estimates** it. **Recommendation: always use the estimated value**; it is a
-parameter that must be *kept fixed*, not explored. Only regularizations with derivatives
-use it (Tikhonov, TV, Hessian, SHV).
-
-### The noise model (`[noise-model]` section)
-
-PPXA accepts only the Gaussian model (its data step is a least-squares solve). Adam accepts
-all three. Not critical for MA-TIRF at moderate noise: L2 is expected to be enough (to be
-checked in the Poisson experiment).
+> **A parameter moves the *solution* when the prior is weak, and only the *convergence* when
+> the prior weighs.**
 
 ---
 
-## 3. Solver parameters
+## 1. The shared (objective) parameters — *what* is minimized
 
-### 3.1 Adam
+### 1.1 `reg` — the prior *(critical: it decides the ~47 undetermined directions)*
 
-Adam keeps running averages of the gradient ($m$) and of its square ($v$), and moves each
-voxel by
+The six priors and their homogeneity are in foundation §3.3. The MA-TIRF-specific reasoning:
 
-$$ \Delta f = -\,\mathrm{lr}\; \frac{\hat m}{\sqrt{\hat v} + \epsilon}. $$
+- the data fix only span(v1, v2, [v3]); **`reg` alone shapes the depth profile** of every
+  column (foundation §1.1). This is the most consequential choice, well ahead of the optimizer.
+- degree-1 priors (L1, TV, Hessian-Frobenius, SHV) grow linearly with the image scale;
+  degree-2 (L2, Tikhonov) grow like the square, so at `f ~ 0.02` they are intrinsically ~50×
+  weaker for the same nominal λ — expect degree-2 priors to need a larger λ and to over-smooth
+  once they bite.
 
-The ratio $\hat m / \sqrt{\hat v}$ is **dimensionless and of order 1**: each voxel moves by about
-`lr` per iteration, *whatever the scale of the gradient*. Hence:
+**Predicted:** for the synthetic truths (sparse objects with smooth axial profiles), TV / SHV
+/ L1 beat L2 / Tikhonov; for a continuous membrane (`cell`), the Hessian-based priors
+(Hessian-Frobenius, SHV) give the smoothest surface. **Phase A:** treat `reg` as a discrete
+axis — sweep λ (below) *per prior*, compare priors at each one's best λ.
 
-#### `lr` — learning rate *(critical only if too small)*
+### 1.2 `lambda_reg` (λ) — the prior's weight, now a share *(critical)*
 
-It is a step **in units of f**. With $f \sim 0.01$–0.03 (§1.2):
+At an interior minimum the gradient balance is
 
-- `lr` $\gg \max f$ (the default 0.1 is ~5× too large): the first steps overshoot, the loss
-  rises, and the built-in scheduler halves `lr` every K iterations until it fits — a few
-  wasted checks, then normal descent. **Self-correcting.**
-- `lr` $\ll \max f$: each voxel crawls; within the iteration budget the image barely leaves
-  its starting point → the realism check's "trivial". **Not self-correcting** (the
-  scheduler only ever *decreases* `lr`).
+```
+(1−λ)·∇D  =  −λ·κ·∇R
+```
 
-**Prediction: any `lr` in $[\max f_0,\ 10 \max f_0]$ gives the same result; below
-$0.1 \max f_0$ it fails.** The asymmetry is the practical rule: *start too large, never too
-small*. (A future improvement would express `lr` relative to $\max f_0$ so the rule holds for
-any data scale — a proposal, not a change.)
+Because `κ = 1/R(f_init)` puts R on D's scale (foundation §3.2), λ reads as a **regularization
+share**, not a dead knob:
 
-#### `init` and `lambda_rr` — where the descent starts *(critical for Adam, through the scale)*
+- `λ → 0` : non-negative least squares. The 47 undetermined directions are set by noise
+  amplification along s3, s4 and by the path → *predicted*: noisy / depth-collapsed (realism
+  check: "no better than ridge", "collapsed").
+- `λ → 1` : the data are dropped; f → argmin R (= 0 for L1/L2/SHV, a constant for TV/Tikhonov)
+  → realism check's "empty".
+- in between : the trade-off, spread across [0,1] instead of crammed near 1 thanks to κ. The
+  D1 study measured the best NMSE near `λ ≈ 0.05–0.1` on the calibrated form.
 
-For a convex objective the start does not change the minimizer — but it changes **which
-point of the flat valley** a finite run reaches (§1.3) and, for Adam, **how many steps** it
-needs, since each voxel moves by about `lr` per iteration. Measured on the benchmark truths
-(the f that explains g peaks at 0.022–0.025):
+**Predicted useful range: λ ∈ [0.02, 0.4]**, prior-dependent (degree-2 priors toward the top).
+**Phase A:** sweep `λ ∈ {0, 0.02, 0.05, 0.1, 0.2, 0.35, 0.5}` per prior; report the share
+`r(λ) = 1 − R(f_λ)/R(f_{λ=0})`, the NMSE, and the realism verdict along it.
 
-| start | peak value | relative to f | shape |
+### 1.3 `rho` — SHV's sparse/smooth balance *(critical, SHV only)*
+
+```
+R_SHV(f) = mean_x sqrt( ρ²·||Hess f(x)||_F²  +  (1−ρ)²·f(x)² )
+```
+
+`ρ → 1` : pure Hessian-Frobenius (smooth, not sparse). `ρ → 0` : pure L1 (sparse, not smooth).
+**Predicted:** sparse truths `ρ ≈ 0.3–0.6`, continuous membrane `ρ → 0.8–1`. **Phase A:**
+`ρ ∈ {0.1, 0.3, 0.6, 0.9}` per truth (only when `reg = SHV`).
+
+### 1.4 `delta` (δ) — anisotropy Δz/Δxy *(fixed, not swept)*
+
+Weights the axial derivative so a gradient means the same along z and laterally; a property of
+the grid and optics. **Always the estimated value** (the operator provides it). Only the
+derivative-based priors (Tikhonov, TV, Hessian, SHV) use it. Not a Phase-A axis.
+
+### 1.5 noise model — L2 for MA-TIRF at moderate noise; PPXA is Gaussian-only
+
+D's b is the measurement's, set in `[noise-model]`, not by the solver. PPXA accepts only the
+Gaussian model (its data step is a least-squares solve); Adam accepts all three. Not an atlas
+axis (a separate Poisson experiment covers it).
+
+---
+
+## 2. Adam — logic and the parameters of the descent
+
+### 2.1 Logic and pseudo-code (`solvers/adam.py`)
+
+Gradient descent on L with a per-coordinate adaptive step (Adam), positivity by clamping, a
+learning rate halved whenever the loss rises, and a small-change stop.
+
+```
+f ← f0                                   # the ridge s2^2 start (foundation §4)
+init Adam optimizer over f with step size lr
+repeat for max_iter:
+    loss ← L(f)
+    gradient ← ∇ loss           (autograd)
+    f ← Adam_step(f, gradient, lr)       # f ← f − lr · m̂ / (√v̂ + ε)
+    f ← max(f, 0)                        # positivity, by projection
+    every K iterations:
+        if loss rose since last check:      lr ← lr / 2      # step overshot
+        elif loss fell by less than EPS:    stop             # converged
+```
+
+### 2.2 The mathematics of the step
+
+Adam keeps running means m (gradient) and v (gradient²) and moves each voxel by
+
+```
+Δf = − lr · m̂ / (√v̂ + ε),      with   | m̂ / √v̂ | ≈ 1
+```
+
+The ratio is **dimensionless and O(1)** by construction: **each voxel moves by about `lr` per
+iteration, whatever the gradient's magnitude.** That is the key to reading `lr` — it is a
+*displacement in the units of f* (~0.02), not a gradient scaling.
+
+Convexity gives a unique minimizer when the prior weighs (foundation §3.4). The loss is **not
+monotone** under Adam, so the scheduler halves lr only when the loss *rises*, and the stop
+tests `|Δloss| < EPS`.
+
+### 2.3 `lr` — learning rate *(critical only if too small)*
+
+A step in units of f, with `max f ≈ 0.02` (foundation §1.2):
+
+- `lr ≫ max f` (the default 0.1 is ~5× too large): first steps overshoot, the loss rises, the
+  scheduler halves lr until it fits — a few wasted checks, then normal descent.
+  **Self-correcting.**
+- `lr ≪ max f` : each voxel crawls; within the budget f barely leaves its start → realism
+  check's "trivial". **Not self-correcting** (the scheduler only ever decreases lr).
+
+Solution vs convergence: with a weighing prior, lr sets *speed* only (all lr in range reach
+the same image); with a weak prior it also picks the null-space point the finite run stops at.
+
+**Predicted: any `lr ∈ [max f0, 10·max f0]` is equivalent; below `0.1·max f0` it fails.** Rule:
+*start too large, never too small.* **Phase A:** `lr ∈ {0.5, 1, 2, 5} × max f0` on one truth,
+to confirm the plateau and the low-end failure (a diagnostic, not a per-truth axis).
+
+### 2.4 `init` / `lambda_rr` — where the descent starts *(critical for Adam, through the scale)*
+
+For a convex L the start does not change the minimizer, but it changes **how many steps** Adam
+needs (§2.2: it walks in steps of lr) and **which null-space point** a finite run reaches. The
+three starts, at MA-TIRF's scale (f ~ 0.02):
+
+| start | peak | vs f | why |
 |---|---|---|---|
-| `adjoint`, $H^T g$ | ~20 | **~850× too large** (order $s_1^2$) | back-projection |
-| `ridge`, $\lambda_{rr} = 10^4$ | ~0.0017 | ~13× too small | $pprox H^Tg / 10^4$: the same back-projection, rescaled |
-| `ridge`, $\lambda_{rr} \in [s_2, s_1]$ | ~f | right scale | contains the two determined components |
+| `adjoint`  Hᵀg | ~20 | ~850× too large | scale ~ s1²·f |
+| `ridge`, λ_rr = 1e4 | ~0.0017 | ~13× too small | ≈ Hᵀg / 1e4 : a rescaled back-projection |
+| `ridge`, λ_rr = s2² ≈ 36 | ~f | right scale | keeps s1 fully, s2 half |
 
-Hence the v1 regression explained *(measured: cosine 0.11 from `adjoint` vs 0.89 from
-`ridge(1e4)`, same 5 000 iterations)*: from `adjoint`, Adam must walk every voxel down from
-~20 to ~0.02 in steps of `lr`, and the scheduler halves `lr` each time the descent
-oscillates — the budget runs out on the way. From `ridge(1e4)` it only has to climb a
-factor ~13 from nearly the right shape. The benefit of v1's ridge start was therefore
-mostly its **scale**, not its shape (with $\lambda_{rr} = 10^4 \gg s_1^2$, it *is* a scaled
-back-projection).
+From `adjoint`, Adam must walk every voxel from ~20 down to ~0.02 in steps of lr while the
+scheduler keeps halving lr on the oscillations — the budget runs out first (the v1 "depth
+shift" regression). **Predicted:** (i) `ridge` with `λ_rr ∈ [s2², s1²]` converges fastest and
+is the default; (ii) `adjoint` fails within Adam's budget on MA-TIRF; (iii) with a strong
+prior and a long run all starts agree. **Phase A:** `init ∈ {ridge(s2²), adjoint}` on one
+truth × two λ (a diagnostic of the claim, not a per-truth axis).
 
-**Prediction:** (i) with a strong enough prior and enough iterations, all starts converge to
-the same image; (ii) with Adam's budget, `adjoint` fails on MA-TIRF whatever the prior;
-(iii) `ridge` with $\lambda_{rr} \in [s_2, s_1]$ converges fastest. Recommendation: `ridge`,
-fixed — and a scale-free alternative would be to rescale any start to match $\lVert g
-Vert$
-(a proposal, not a change). For PPXA the start matters far less: its data prox rescales
-toward the data within a few iterations.
+### 2.5 `max_iter`, `K`, `EPS` — budget and stopping *(fixed)*
 
-#### `max_iter`, `K`, `EPS` — budget and stopping *(comfort)*
+All three are **fixed**, not swept:
 
-- `max_iter`: budget. Too small → a path-dependent answer (§1.3); never harmful when large
-  thanks to `EPS`.
-- `K`: the loss is checked every K iterations; if it rose, `lr` is halved; if it fell by
-  less than `EPS`, the run stops. Adam here uses the full gradient (deterministic), so
-  there is no stochastic noise to average: any K in 10–50 behaves the same.
-- `EPS`: an **absolute** threshold on the loss change. With $L \sim 10^{-2}$–$10^{-1}$,
-  $10^{-8}$–$10^{-10}$ means "converged to 7–8 digits". (It is scale-dependent: another
-  normalization of $D$ would shift its meaning.)
-
-### 3.2 PPXA
-
-PPXA (Combettes & Pesquet, 2008) minimizes a sum of convex functions by evaluating each one's
-**proximal operator in parallel**, averaging, and relaxing. Here three terms:
-$\;f_1 = $ data, $f_2 = $ prior, $f_3 = $ positivity indicator, with equal weights
-$\omega_i = 1/3$:
-
-$$
-p_i = \mathrm{prox}_{\gamma f_i/\omega_i}(u_i), \quad
-\bar p = \sum_i \omega_i p_i, \quad
-u_i \leftarrow u_i + \rho_n (2\bar p - f - p_i), \quad
-f \leftarrow f + \rho_n (\bar p - f).
-$$
-
-Convergence to a minimizer is guaranteed **for any $\gamma > 0$** and relaxations
-$\rho_n \in (0, 2)$ with $\sum \rho_n (2-\rho_n) = \infty$. So $\gamma$ and the relaxation change
-*speed*, never the answer — provided the proximal operators are exact.
-
-(Implementation note: PPXA works on $L$ rescaled so that its data term is
-$\frac12 \lVert Hf - g\rVert_2^2$ — a pure rescaling, the minimizer is unchanged.)
-
-#### `gamma` — the proximal step *(critical in practice)*
-
-The data prox is $(I + \gamma H^TH)^{-1}(u + \gamma H^T g)$: along singular direction $i$ it
-moves $u$ toward the data by the factor $\gamma s_i^2 / (1 + \gamma s_i^2)$.
-
-- $\gamma \ll 1/s_1^2$ ($\approx 7\cdot10^{-4}$): even the best-determined direction barely moves
-  → very slow.
-- $\gamma \gg 1/s_3^2$ ($\approx 3$): every prox jumps to its own term's minimizer; averaging
-  three conflicting minimizers oscillates → slow again. Worse, the prior's prox weight grows
-  with $\gamma$, and the iterative proxes (TV: 30, Hessian/SHV: 20 inner iterations) stop
-  being exact → PPXA can stall above the true minimum.
-- In between, directions $s_1, s_2$ are handled well and the prior fills the rest.
-
-**Prediction: $\gamma \in [1/s_1^2,\ 1/s_2^2] \approx [7\cdot10^{-4},\ 0.03]$ on MA-TIRF.**
-*(pre-study)*: $\gamma = 0.01$ reached Adam's $L$ exactly; $\gamma \ge 1$ failed with TV.
-The default 0.05 sits just above the range. For deconvolution (normalized PSF, $s_1 = 1$),
-the same rule predicts $\gamma \sim 1$.
-
-#### `lambda_relax` — relaxation *(keep fixed)*
-
-Theory: any constant in $(0, 2)$ converges; $> 1$ over-relaxes (faster when the proxes are
-exact), $\to 2$ is the stability edge. **The relaxation is now fixed** (default 1.5; v1 halved
-it whenever the loss rose — see `solvers/ppxa.py` for why that was dropped: a geometric decay
-breaks the convergence condition $\sum \rho_n(2-\rho_n) = \infty$, and PPXA's loss is not
-monotone, so the halving fired on normal transients). *(measured, 1500 iterations)*: fixed
-1.5 never let the loss rise and ended within 1–2 % of the best $L$; fixed 1.9 reached the
-same $L$ but could oscillate; the halving ended up to 7 % higher. **Recommendation: 1.0–1.5.**
-
-#### `init`, `lambda_rr`, `max_iter`, `K`, `EPS`
-
-As for Adam. PPXA is exact in the limit, so with enough iterations the start matters less
-than for Adam — but only if $\gamma$ is in range.
+- `K = 10` — the loss is checked every 10 iterations. Adam uses the full gradient (no
+  stochasticity), so 10 is fine.
+- `EPS = 1e-8` — an **absolute** threshold on `|Δloss|`. With `L ~ 1e-2 … 1e-1`, `1e-8` means
+  "7–8 digits": the run stops when the loss has essentially stopped moving.
+- `max_iter = 3000` (at least) — large enough that **the EPS stop, not the budget, ends the
+  run**. The ill-conditioning (foundation §1.1) slows descent, so a small budget would stop
+  mid-valley (path-dependent); 3000 lets the loss plateau and EPS fire. Most runs stop before
+  3000; a run that hits it did not converge, which is itself informative.
 
 ---
 
-## 4. Adam versus PPXA — what "the same solution" can mean
+## 3. PPXA — logic and the parameters of the splitting
 
-| Situation | Same $L$? | Same image? |
+### 3.1 Logic and pseudo-code (`solvers/ppxa.py`)
+
+PPXA (Combettes–Pesquet 2008) minimizes a **sum of convex terms** by evaluating each one's
+proximal operator in parallel, averaging, and relaxing. Three terms with equal weights 1/3:
+f1 = data, f2 = prior, f3 = positivity indicator.
+
+```
+f ← f0 ;  u_i ← f   (i = 1,2,3)
+repeat for max_iter:
+    p1 ← prox_data(u1) = (I + γ·HᵀH)⁻¹ (u1 + γ·Hᵀg)     # pull toward the data
+    p2 ← prox_reg(u2, γ/w)                               # prox of (γ/w)·λ·R
+    p3 ← max(u3, 0)                                      # prox of the positivity indicator
+    p̄  ← (p1 + p2 + p3) / 3
+    u_i ← u_i + relax·(2·p̄ − f − p_i)                    # i = 1,2,3
+    f   ← f + relax·(p̄ − f)
+```
+
+PPXA runs on L rescaled by `w = quadratic_weight` so its data term is exactly `½·||Hf−g||²` (a
+pure rescaling; the minimizer is unchanged), which is why the prior prox weight is `γ·λ/w`.
+
+### 3.2 The mathematics of `gamma` (γ)
+
+The data prox moves u toward the data, direction by direction:
+
+```
+p1 = (I + γ·HᵀH)⁻¹ (u + γ·Hᵀg)
+
+along singular direction i :   [p1]_i = (1/(1+γ·s_i²))·u_i  +  (γ·s_i²/(1+γ·s_i²))·[LS]_i
+```
+
+So `γ·s_i²` is the **gain** on direction i: `γ ≫ 1/s_i²` pulls direction i fully to the data,
+`γ ≪ 1/s_i²` barely touches it. To handle the determined directions s1, s2 without overreaching,
+γ must bracket their inverse squares:
+
+```
+γ ∈ [ 1/s1² , 1/s2² ] ≈ [ 7e-4 , 0.03 ]   on MA-TIRF
+```
+
+- `γ ≪ 1/s1²` : even s1 barely moves → very slow.
+- `γ ≫ 1/s2²` : each prox jumps to its own term's minimizer; averaging three conflicting
+  minimizers oscillates, *and* the prior's iterative prox (TV: 30 inner iterations,
+  Hessian/SHV: 20) stops being exact → PPXA can **stall above** the true minimum.
+
+### 3.3 Convergence, and `lambda_relax`
+
+Theory: PPXA converges to a minimizer for **any γ > 0** and any relaxation `ρ_n ∈ (0,2)` with
+`Σ ρ_n·(2−ρ_n) = ∞` — so γ and the relaxation change *speed only*, **provided the proxes are
+exact**. The §3.2 caveat is exactly when they are not. `lambda_relax` is held fixed in (0,2)
+(default 1.5; > 1 over-relaxes = faster when proxes are exact, → 2 is the stability edge).
+Predicted best in [1.0, 1.5]; not a per-truth axis.
+
+**Phase A:** `γ ∈ {1e-3, 3e-3, 1e-2, 3e-2, 1e-1}` (spanning the bracket and just outside),
+MA-TIRF and deconvolution; confirm the plateau inside the bracket, the slow-down below, the
+stall above with a non-smooth prior (TV/SHV).
+
+### 3.4 `init`, `max_iter`, `K`, `EPS` *(fixed)*
+
+Same as Adam: `K = 10`, `EPS = 1e-8`, `max_iter = 3000` (at least) so the EPS stop ends the
+run, not the budget. PPXA is exact in the limit, so with enough iterations the start matters
+less than for Adam — **but only if γ is in range** (otherwise it stalls regardless, and hits
+the budget). `init` = ridge s2².
+
+---
+
+## 4. Adam vs PPXA — what "the same solution" means
+
+| situation | same L? | same image? |
 |---|---|---|
 | strong prior, both converged | yes | **yes** (unique minimizer) |
-| weak prior (flat valley) | yes, to $\sim10^{-3}$ | **no** — each stops at its own point of the valley |
-| $\gamma$ out of range, or non-smooth prior with inexact prox | no — PPXA stalls higher | no |
+| weak prior (flat valley) | yes, to ~1e-3 | **no** — each stops at its own null-space point |
+| γ out of range / non-smooth prior with inexact prox | no — PPXA stalls higher | no |
 
-So the benchmark's claim is precise: **with $\gamma$ in its range and a prior that weighs,
-PPXA and Adam return the same reconstruction.** A disagreement is then a diagnostic —
-either the prior is too weak for the reconstruction to be defined by the objective, or a
-step size is wrong.
-
----
-
-## 5. Critical versus comfort parameters
-
-| | Critical (changes the reconstruction) | Fixed by rule | Comfort |
-|---|---|---|---|
-| shared | `reg`, `lambda_reg`, `rho` (SHV) | `delta` (estimated), noise model (L2) | — |
-| Adam | — (`lr` only if too small) | `init = ridge`, `lr` $\in [\max f_0, 10\max f_0]$ | `max_iter`, `K`, `EPS` |
-| PPXA | `gamma` (speed, and correctness with non-smooth priors) | `lambda_relax` fixed $\in [1, 1.5]$, `init = ridge` | `max_iter`, `K`, `EPS` |
-
-For a user, Adam and PPXA therefore come down to **three decisions: which prior, how much,
-and (SHV) how sparse** — everything else follows from the data or can be left at its rule.
+The framework's claim is precise: **with γ in its bracket and a prior that weighs, Adam and
+PPXA return the same image.** A disagreement is a diagnostic — the prior is too weak, or a step
+size is wrong.
 
 ---
 
-## 6. Hypotheses the benchmark must test
+## 5. Summary — the Phase-A axes
 
-| # | Hypothesis | Test |
-|---|---|---|
-| H1 | Useful $\lambda$ lies in $[0.9, 0.9999]$ today, prior-dependent | $\lambda$ sweep, log-spaced in $1-\lambda$, all priors |
-| H2 | $\lambda \to 0$ collapses or matches ridge; $\lambda \to 1$ empties | realism check along the sweep |
-| H3 | Adam: same result for `lr` $\in [\max f_0, 10\max f_0]$, failure below $0.1\max f_0$ | `lr` sweep |
-| H4 | Adam from `adjoint` fails within budget on MA-TIRF; `ridge` in $[s_2, s_1]$ converges fastest; with a strong prior and a long run, all starts agree | init × $\lambda$ × iterations |
-| H5 | PPXA: $\gamma \in [1/s_1^2, 1/s_2^2]$; failure far outside | $\gamma$ sweep, MA-TIRF and deconvolution |
-| H6 | a fixed `lambda_relax` $\in [1, 1.5]$ is as good as 1.9 and safer *(partly shown, see §3.2)* | relaxation sweep, TV/SHV |
-| H7 | Adam = PPXA (image) when H5 holds and the prior weighs | paired runs, angle between images |
-| H8 | SHV: $\rho \approx 0.3$–0.6 for sparse truths, $\to 1$ for the membrane | $\rho$ sweep per truth |
-| H9 | SHV / TV / L1 beat L2 / Tikhonov on these truths | comparison at each prior's best $\lambda$ |
-| H10 | L2 is enough for MA-TIRF; Poisson fidelity helps only at low photon counts | Poisson noise, Adam with L2 vs KL vs PG |
-| H11 | parameter values transfer between inverse problems (MA-TIRF ↔ deconvolution) wherever they are scale-free: `lambda_reg` only if made interpretable (D1), `gamma` only through its spectral rule ($[1/s_1^2, 1/s_2^2]$), `lr` only relative to $\max f_0$ | same settings on both problems |
+| param | solver | role | moves solution or speed? | predicted range | Phase-A values |
+|---|---|---|---|---|---|
+| `reg` | both | the prior (decides the null space) | **solution** | 6 priors | all six, compared at best λ |
+| `lambda_reg` | both | prior share (calibrated) | **solution** | [0.02, 0.4] | 0, .02, .05, .1, .2, .35, .5 (per prior) |
+| `rho` | both (SHV) | sparse ↔ smooth | **solution** | 0.3–0.6 sparse, →1 continuous | .1, .3, .6, .9 |
+| `delta` | both | anisotropy | fixed | estimated | — |
+| `lr` | Adam | step in units of f | speed (solution if prior weak) | [max f0, 10·max f0] | {.5,1,2,5}×max f0 (diagnostic) |
+| `init` | Adam | start scale | speed (solution if prior weak) | ridge s2² | ridge vs adjoint (diagnostic) |
+| `gamma` | PPXA | prox gain per direction | speed (+correctness if non-smooth) | [1/s1², 1/s2²] | 1e-3 … 1e-1 |
+| `lambda_relax` | PPXA | relaxation | speed | [1, 1.5] | fixed 1.5 |
+| `max_iter`,`K`,`EPS` | both | budget / stop | speed | K=10, EPS=1e-8, max_iter=3000 | fixed |
+
+**The atlas's real axes for Adam/PPXA are `reg` × `lambda_reg` (× `rho` for SHV)** — the ones
+that move the solution. `lr`, `init`, `gamma`, `lambda_relax` are convergence knobs, tested
+once as diagnostics (do they behave as predicted?) rather than per truth.
