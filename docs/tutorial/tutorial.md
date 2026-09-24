@@ -142,14 +142,18 @@ figures — with a **view 1 / view 2** toggle.
 
 ![Display window, view 1: depth map and profiles](display_window.png)
 
+1. **Config** — the exact setup this result came from (the `config.toml`).
 2. **Messages** — the iteration log, the execution time, and the realism check (here a mild
    *depth-shift* warning).
 3. **Figures (view 1)** — the **Depths map** (each lateral pixel coloured by the depth, in nm,
    of its brightest voxel — the MA-TIRF answer, "how far from the glass"), and the **yz / zx
    profiles** (cross-sections through the volume). The matplotlib toolbars pan/zoom/save each.
+4. **view 1 / view 2 toggle** — switch between the depth-map view (view 1, here) and the
+   intensity + histogram view (view 2, below).
 5. **Save view as PNG** — export this figure at a fixed size (used for the report figures).
 6. **Save reconstruction** — write the output folder (§3).
-7. **Go To Truth** — switch to the ground-truth comparison (§6; synthetic mode only).
+7. **Go To Truth** — switch to the ground-truth comparison (§6). **Synthetic mode only** — in
+   real mode there is no truth, so this button is absent.
 
 ### View 2 — intensity and histogram
 
