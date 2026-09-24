@@ -40,7 +40,10 @@ ADAM_FIXED = {"max_iter": 3000, "K": 10, "EPS": 1e-8}        # EPS stops before 
 ADMM_KAPPA = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1]                  # threshold_ratio (log band)
 ADMM_MU = [0.3, 0.5, 1.0]
 
-DENOISERS = ["Gaussian", "Bilateral"]                        # + the no-denoiser case
+DENOISERS = ["Gaussian", "Bilateral"]                        # PnP family + the no-denoiser case
+## MCMC denoises with TV Bregman, not Bilateral (commit 36b1188 / docs mcmc.md): Bilateral makes
+## the chain drift, TV Bregman holds it near plausible solutions. Its own list, kept separate.
+MCMC_DENOISERS = ["TV Bregman"]
 PNP_SIGMA = [10.0, 25.0, 50.0]                               # 0-255 scale
 PNP_LAMBDA_KZ = [1e-3, 1e-2, 1e-1]                           # final data weight (≈ s4²..s3²)
 ADMMPNP_RHO = [1e-3, 1e-2, 1e-1]
@@ -106,7 +109,7 @@ def _denoiser_grid(strength_name, strengths):
 
 def _mcmc_grid():
     yield ({"denoiser": "None"}, {"denoiser": "None"})
-    for denoiser in DENOISERS:
+    for denoiser in MCMC_DENOISERS:
         for sigma in MCMC_SIGMA:
             yield ({"denoiser": denoiser, "sigma": sigma}, {"denoiser": denoiser, "sigma": sigma})
 
@@ -205,6 +208,113 @@ def summary():
         key = (spec.tags["problem"], spec.tags["solver"])
         by[key] = by.get(key, 0) + 1
     lines = [f"Phase A: {len(all_specs)} runs (full resolution)"]
+    for (problem, solver), n in sorted(by.items()):
+        lines.append(f"  {problem:7} {solver:12} {n:4d}")
+    return "\n".join(lines)
+
+
+# ── the minimal pass (Étape 4 quick, ~4h) ─────────────────────────────────────
+# One composite truth; grids tightened to the predicted bands of the Étapes 1-3 notes
+# (docs/benchmark/pre_benchmark.md, docs/algorithms/limits.md), keeping the failure-edge points
+# the limits figures need. The full atlas above is untouched.
+
+MIN_TRUTH = "cell_fibres_vesicles"       # composite: exercises the sparsity AND denoiser priors
+
+
+def _min_solver_specs(solver):
+    """(tag_extra, algo-params) for the minimal grids — each choice grounded in the notes."""
+    if solver == "ADAM":
+        yield ({"reg": "none", "lambda": 0.0}, {"lambda_reg": 0.0, **ADAM_FIXED})     # baseline
+        for reg, extra in (("tv", {}), ("shv", {"rho": SHV_RHO})):
+            for lam in (0.05, 0.1, 0.2, 0.35):     # U around ~0.1 (É1) + the over-reg edge (É3)
+                yield ({"reg": reg, "lambda": lam},
+                       {"reg": reg, "lambda_reg": lam, **extra, **ADAM_FIXED})
+    elif solver == "ADMM":
+        for kappa in (0.01, 0.1, 0.3):             # band [.01,.3]; .3 empties on diffuse (É3)
+            for mu in (0.5, 1.0):                  # mu <= 1.6 (É3)
+                yield ({"kappa": kappa, "mu": mu},
+                       {"iter": 200, "threshold_ratio": kappa, "mu": mu})
+    elif solver == "PNP":
+        yield ({"denoiser": "None"}, {"iter": 16, "denoiser": "None"})
+        for denoiser in DENOISERS:
+            for sigma in (25.0, 50.0):             # band [10,50] (É3); lambda_kz inert (É1), fixed
+                yield ({"denoiser": denoiser, "sigma": sigma},
+                       {"iter": 16, "denoiser": denoiser, "sigma": sigma, "lambda_kz": 1e-2})
+    elif solver == "ADMM-PnP":
+        yield ({"denoiser": "None"}, {"iter": 50, "denoiser": "None"})
+        for denoiser in DENOISERS:
+            for sigma in (25.0, 50.0):
+                for rho in (0.1, 1.0):             # push rho >= 0.1, test beyond (É1-D)
+                    yield ({"denoiser": denoiser, "sigma": sigma, "rho": rho},
+                           {"iter": 50, "denoiser": denoiser, "sigma": sigma, "rho": rho})
+    elif solver == "MCMC":
+        yield ({"denoiser": "None"}, {"max_iter": 300, "denoiser": "None"})
+        for denoiser in MCMC_DENOISERS:            # TV Bregman (36b1188)
+            for sigma in (0.01, 0.02, 0.03):       # low sigma better (É1-D)
+                yield ({"denoiser": denoiser, "sigma": sigma},
+                       {"max_iter": 300, "denoiser": denoiser, "sigma": sigma})
+
+
+def _minimal_matirf():
+    out = []
+    for solver in MATIRF_SOLVERS:
+        for tag_extra, ap in _min_solver_specs(solver):
+            for noise in NOISES:
+                out.append(RunSpec("matirf", matirf_synth_config(MIN_TRUTH, solver, noise, ap),
+                                   tags={"phase": "A-min", "problem": "matirf", "solver": solver,
+                                         "dataset": MIN_TRUTH, "noise": noise, **tag_extra}))
+            out.append(RunSpec("matirf", matirf_real_config(solver, ap),
+                               tags={"phase": "A-min", "problem": "matirf", "solver": solver,
+                                     "dataset": MATIRF_REAL, "noise": "native", **tag_extra}))
+    return out
+
+
+def _minimal_deconv():
+    out = []
+    for solver in DECONV_SOLVERS:
+        for tag_extra, ap in _min_solver_specs(solver):
+            for noise in NOISES:
+                out.append(RunSpec("deconv", deconv_config(solver, noise, ap),
+                                   tags={"phase": "A-min", "problem": "deconv", "solver": solver,
+                                         "dataset": DECONV_IMAGE, "noise": noise, **tag_extra}))
+    return out
+
+
+def _ppxa_min():
+    """Adam = PPXA confirmation: TV + SHV on the truth, one deconv point."""
+    base = {"max_iter": 3000, "K": 10, "EPS": 1e-8, "lambda_relax": 1.5, "gamma": 0.01}
+    out = []
+    for reg, extra in (("tv", {}), ("shv", {"rho": SHV_RHO})):
+        ap = {"reg": reg, "lambda_reg": 0.1, **extra, **base}
+        out.append(RunSpec("matirf", matirf_synth_config(MIN_TRUTH, "PPXA", 0.02, ap),
+                           tags={"phase": "A-min", "problem": "matirf", "solver": "PPXA",
+                                 "dataset": MIN_TRUTH, "noise": 0.02, "reg": reg, "lambda": 0.1,
+                                 "role": "confirm"}))
+    ap = {"reg": "tv", "lambda_reg": 0.1, **base}
+    out.append(RunSpec("deconv", deconv_config("PPXA", 0.02, ap),
+                       tags={"phase": "A-min", "problem": "deconv", "solver": "PPXA",
+                             "dataset": DECONV_IMAGE, "noise": 0.02, "reg": "tv", "lambda": 0.1,
+                             "role": "confirm"}))
+    return out
+
+
+def minimal_specs():
+    """The minimal Étape-4 pass, de-duplicated by run_id."""
+    seen, out = set(), []
+    for spec in _minimal_matirf() + _minimal_deconv() + _ppxa_min():
+        if spec.run_id not in seen:
+            seen.add(spec.run_id)
+            out.append(spec)
+    return out
+
+
+def minimal_summary():
+    all_specs = minimal_specs()
+    by = {}
+    for spec in all_specs:
+        key = (spec.tags["problem"], spec.tags["solver"])
+        by[key] = by.get(key, 0) + 1
+    lines = [f"Minimal (Étape 4 quick pass): {len(all_specs)} runs — truth={MIN_TRUTH}"]
     for (problem, solver), n in sorted(by.items()):
         lines.append(f"  {problem:7} {solver:12} {n:4d}")
     return "\n".join(lines)
