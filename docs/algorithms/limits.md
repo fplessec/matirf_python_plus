@@ -17,6 +17,10 @@
 >
 > Read after `00_foundation.md`. Convention: physical operator (`normalize = False`), spectrum
 > `s1 = 38.9, s2 = 6.02, s3 = 0.562, s4 = 0.033`; `f` peaks ≈ 0.02 on MA-TIRF, ≈ 1 on deconv.
+>
+> Part of the benchmark arc: **Étapes 1 & 2** (how to use, which v1/v2 to keep) are the
+> provisional pre-benchmark report in [`../benchmark/pre_benchmark.md`](../benchmark/pre_benchmark.md);
+> this file is **Étape 3**; **Étape 4** (effective ranges → the atlas) is the new benchmark.
 
 ---
 
