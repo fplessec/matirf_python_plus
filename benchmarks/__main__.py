@@ -45,6 +45,15 @@ def _select(args):
     return specs, summary, DEFAULT_DIR
 
 
+def _solver_filter(spec_list, args):
+    """With --solvers ADAM,PPXA keep only those solvers' specs (build the benchmark family by family)."""
+    names = _opt(args, "--solvers")
+    if not names:
+        return spec_list
+    wanted = {n.strip() for n in names.split(",")}
+    return [sp for sp in spec_list if sp.tags.get("solver") in wanted]
+
+
 def _cmd_run(args):
     from benchmarks.runner import run_campaign, CampaignStopped
 
@@ -60,7 +69,7 @@ def _cmd_run(args):
           f"{'(stops on a rejected run)' if stop_on_reject else '(records rejected runs, keeps going)'}")
     print("Ctrl-C to interrupt, or `python -m benchmarks stop` from another terminal.\n")
     try:
-        counts = run_campaign(specs(), directory, timeout=timeout,
+        counts = run_campaign(_solver_filter(specs(), args), directory, timeout=timeout,
                               stop_on_reject=not accept_rejected, accept_rejected=accept_rejected)
         print(f"\nDone this pass: {counts}")
     except CampaignStopped as stop:
@@ -85,7 +94,7 @@ def _cmd_status(args):
 
     specs, _, default_dir = _select(args)
     directory = Path(_opt(args, "--dir", str, str(default_dir)))
-    planned = {spec.run_id for spec in specs()}
+    planned = {spec.run_id for spec in _solver_filter(specs(), args)}
     records = campaign_records(directory)
     counts = {}
     for record in records:

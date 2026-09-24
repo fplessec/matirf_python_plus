@@ -35,7 +35,15 @@ JSON_DECONV = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
 
 LAMBDAS = [0.02, 0.05, 0.1, 0.2, 0.35, 0.5]                  # Adam/PPXA λ (calibrated share)
 SHV_RHO = 0.6                                                # + TV and the no-prior case (λ = 0)
-ADAM_FIXED = {"max_iter": 3000, "K": 10, "EPS": 1e-6}        # EPS stops before the budget
+## Adam/PPXA convergence knobs, now EXPLICIT and set for a serious convergence:
+##   lr=0.1  large-enough first steps (in [max f0, 10·max f0]; the scheduler halves on overshoot)
+##   init=ridge  the s2^2 warm start (below); never the adjoint (~850x too large on MA-TIRF)
+##   EPS=1e-8, max_iter=5000  stop only when the loss truly plateaus (1e-6 stopped too early)
+ADAM_FIXED = {"max_iter": 5000, "K": 10, "EPS": 1e-8, "lr": 0.1, "init": "ridge"}
+## MA-TIRF ridge-start weight: s2^2 = second eigenvalue of H^T H (operator.singular_values()[1]^2
+## = 36.24; same for the synthetic and esoubies geometries). Explicit so the config shows it;
+## deconv leaves lambda_rr auto (continuous spectrum -> s1^2).
+MATIRF_RIDGE_LAMBDA = 36.24
 
 ADMM_KAPPA = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1]                  # threshold_ratio (log band)
 ADMM_MU = [0.3, 0.5, 1.0]
@@ -141,7 +149,7 @@ DECONV_SOLVERS = ["ADAM", "MCMC"]                                # + PPXA confir
 
 def _ppxa_confirmation():
     """~10 runs: verify Adam=PPXA on TV/SHV at λ=0.1, and sweep γ once."""
-    base = {"max_iter": 3000, "K": 10, "EPS": 1e-6, "lambda_relax": 1.5, "gamma": 0.01}
+    base = {"max_iter": 5000, "K": 10, "EPS": 1e-8, "lambda_relax": 1.5, "gamma": 0.01, "init": "ridge"}
     out = []
     for truth in MATIRF_SYNTHETIC:                       # confirm on both truths, TV + SHV, λ=0.1, σ=0.02
         for reg, extra in (("tv", {}), ("shv", {"rho": SHV_RHO})):
@@ -169,6 +177,8 @@ def _matirf_specs():
     out = []
     for solver in MATIRF_SOLVERS:
         for tag_extra, ap in _solver_specs(solver):
+            if solver == "ADAM":                       # pin the ridge-start weight to s2^2 explicitly
+                ap = {**ap, "lambda_rr": MATIRF_RIDGE_LAMBDA}
             for truth in MATIRF_SYNTHETIC:
                 for noise in NOISES:
                     out.append(RunSpec("matirf", matirf_synth_config(truth, solver, noise, ap),
@@ -282,7 +292,7 @@ def _minimal_deconv():
 
 def _ppxa_min():
     """Adam = PPXA confirmation: TV + SHV on the truth, one deconv point."""
-    base = {"max_iter": 3000, "K": 10, "EPS": 1e-6, "lambda_relax": 1.5, "gamma": 0.01}
+    base = {"max_iter": 5000, "K": 10, "EPS": 1e-8, "lambda_relax": 1.5, "gamma": 0.01, "init": "ridge"}
     out = []
     for reg, extra in (("tv", {}), ("shv", {"rho": SHV_RHO})):
         ap = {"reg": reg, "lambda_reg": 0.1, **extra, **base}
