@@ -85,10 +85,13 @@ class QLatexLabel(QWidget):
     def update_latex(self, latex_formula):
         self.latex = latex_formula          # what is shown, readable by tests
         if not latex_formula:
-            ## an empty line that keeps its height, so the layout does not jump when the
-            ## formula arrives (or leaves)
+            ## an empty line of one text-line's height, so the layout does not jump when the
+            ## formula arrives (or leaves). A FIXED small height on purpose: `max(self.height(),
+            ## ...)` used to latch whatever the widget's current height was — and before the
+            ## widget is placed in a layout that is Qt's 640x480 default, which made every
+            ## empty label (e.g. a value display of a `default=None` parameter) 480 px tall.
             self.label.clear()
-            self.setFixedSize(1, max(self.height(), int(self.fontsize * 2.2)))
+            self.setFixedSize(1, int(self.fontsize * 2.2))
             return
         buf = render_latex(latex_formula, fontsize=self.fontsize, color=self.color, dpi=self.dpi)
         # we use a QPixmap to render the latex formula image
