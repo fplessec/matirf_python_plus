@@ -209,7 +209,11 @@ def matirf_ready_config():
     """A configuration where everything is set — the state just before clicking Run."""
     return {
         "algorithm": "ADAM",
-        "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": SJSON},
+        ## a complete input section carries a normalization, exactly as the real config does
+        ## (DEFAULT_MATIRF_CONFIG has one, and the combo always holds a value); leaving it out
+        ## let a later test's combo already sit on its target value, so its click wrote nothing.
+        "input-paths": {"mode": DataMode.SYNTHETIC.value, "tif": TRUTH, "json": SJSON,
+                        "normalization": "peak"},
         "oper-params": {"nz": 50, "z0": 0.0, "zN": 300.0, "normalize": False},
         "add-noise": {},
         "algo-params": {"max_iter": 12, "lr": 0.01, "K": 4, "EPS": 1e-14},
