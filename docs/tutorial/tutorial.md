@@ -174,7 +174,7 @@ comparing the reconstruction to the known `f_true`:
 ![The metrics table vs the ground truth](display_truth_metrics.png)
 
 - **Scale_alpha** — the positive factor α that best matches `f` to the truth. MA-TIRF fixes `f`
-  only up to such a factor (here α ≈ 37 ≈ s₁), so every error metric is computed **after**
+  only up to such a factor (here α ≈ 37 ≈ s1), so every error metric is computed **after**
   aligning by α.
 - **NMSE** — normalised mean-squared error (0 perfect, 1 = no better than zero). The workhorse.
 - **PSNR / SSIM** — the familiar image-processing measures (PSNR in dB; SSIM structural).
