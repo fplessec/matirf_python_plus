@@ -238,7 +238,22 @@ Useful ones: `dark_style` / `app_style` (appearance), `font_size_*`, `device`
 
 ---
 
-## 10. Housekeeping & next steps
+## 10. Troubleshooting
+
+Symptom → likely cause → what to do. (For *what a parameter does* and its useful range, see
+[docs/algorithms/](../algorithms/) — this table is only about things going wrong.)
+
+| symptom | likely cause | what to do |
+|---|---|---|
+| *"Realism check REJECTED: depth profile far from…"* | the reconstruction is implausible (emptied, collapsed or depth-shifted) — usually too much or too little prior | adjust λ / κ; match the prior to the structure (sparsity for point-like objects, a denoiser for continuous ones) |
+| warning *"depth profile shifted by …"* | noise with too weak a prior: the depth drifts | raise the regularisation — on MA-TIRF the prior, not the data, decides the depth |
+| reconstruction is **empty / flat** | over-regularised (λ → 1, or a high ADMM κ that empties the image) | lower λ / κ |
+| **out-of-memory / timeout** on real data | large real volume with a costly prior (SHV) or the PnP family | avoid SHV on full real volumes; use a lighter prior; reduce the resolution |
+| the run **fails at start** | file not found, invalid `.json`, or mismatched dimensions (angles vs stacks) | the error message says which; check the paths and the `.json` |
+| reconstruction is **very slow** | `device = cpu`, a large volume, many iterations | use a GPU (`settings set device cuda`/`mps`); the EPS criterion stops once the loss plateaus |
+| result at a **different scale** than the truth | expected — MA-TIRF fixes `f` only up to a positive factor α | nothing; metrics align by α first (see `Scale_alpha`, §6) |
+
+## 11. Housekeeping & next steps
 
 - `matirf reset` deletes the cached `config.toml` (back to defaults).
 - `list` shows the available inverse problems; `help` shows every command.
