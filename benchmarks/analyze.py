@@ -263,6 +263,56 @@ def render_pngs(exported: list) -> int:
     return count
 
 
+# ── Markdown → LaTeX (pipe tables) ────────────────────────────────────────────
+
+def _tex_escape(s: str) -> str:
+    for a, b in (("\\", r"\textbackslash "), ("_", r"\_"), ("%", r"\%"),
+                 ("&", r"\&"), ("#", r"\#")):
+        s = s.replace(a, b)
+    return s
+
+
+def _tex_cells(cells: list) -> list:
+    out = []
+    for c in cells:
+        c = c.strip()
+        bold = c.startswith("**") and c.endswith("**")
+        c = c[2:-2] if bold else c
+        c = _tex_escape(c)
+        out.append(f"\\textbf{{{c}}}" if bold else c)
+    return out
+
+
+def md_to_latex(md: str) -> str:
+    """Turn the pipe tables (and `### ` labels) of a summary .md into booktabs tabulars.
+
+    Prose and `##` headings are dropped — the report section carries those; only the tables are
+    \\input. Keeps this dependency-free (no pandoc)."""
+    lines, tex, i = md.splitlines(), [], 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("### "):
+            tex.append(r"\paragraph{" + _tex_escape(line[4:].strip()) + "}")
+            i += 1
+        elif line.startswith("|"):
+            block = []
+            while i < len(lines) and lines[i].startswith("|"):
+                block.append(lines[i])
+                i += 1
+            header = block[0].strip("|").split("|")
+            tex.append(r"\begin{center}\begin{tabular}{" + "l" * len(header) + "}")
+            tex.append(r"\toprule")
+            tex.append(" & ".join(_tex_cells(header)) + r" \\")
+            tex.append(r"\midrule")
+            for row in block[2:]:                       # skip the |---| separator
+                tex.append(" & ".join(_tex_cells(row.strip("|").split("|"))) + r" \\")
+            tex.append(r"\bottomrule")
+            tex.append(r"\end{tabular}\end{center}")
+        else:
+            i += 1
+    return "\n".join(tex) + "\n"
+
+
 # ── orchestration ─────────────────────────────────────────────────────────────
 
 def analyze(campaign_dir: Path, report_dir: Path, with_pngs: bool = True) -> None:
@@ -273,15 +323,31 @@ def analyze(campaign_dir: Path, report_dir: Path, with_pngs: bool = True) -> Non
     print(f"Analyzing {len(records)} runs from {campaign_dir}")
 
     summary = report_dir / "results" / "summary"
+    tables = report_dir / "tables"
     summary.mkdir(parents=True, exist_ok=True)
-    (summary / "cross_comparison_matirf.md").write_text(cross_comparison(records, "matirf"))
-    (summary / "cross_comparison_deconv.md").write_text(cross_comparison(records, "deconv"))
-    (summary / "effective_ranges.md").write_text(effective_ranges(records, "matirf"))
-    (summary / "rejects_and_cost.md").write_text(rejects_and_cost(records))
-    print(f"  wrote 4 summary tables to {summary}")
+    tables.mkdir(parents=True, exist_ok=True)
+    reports = {
+        "cross_comparison_matirf": cross_comparison(records, "matirf"),
+        "cross_comparison_deconv": cross_comparison(records, "deconv"),
+        "effective_ranges": effective_ranges(records, "matirf"),
+        "rejects_and_cost": rejects_and_cost(records),
+    }
+    for name, md in reports.items():
+        (summary / f"{name}.md").write_text(md)        # human-readable, committed synthesis
+        (tables / f"{name}.tex").write_text(md_to_latex(md))   # \input by the report
+    print(f"  wrote {len(reports)} tables (.md in {summary.name}/, .tex in {tables.name}/)")
 
     exported = export_showcase(records, campaign_dir, report_dir)
     print(f"  exported {len(exported)} showcase runs (config.toml + metrics.json)")
     if with_pngs:
         n = render_pngs(exported)
-        print(f"  rendered {n} depth-map/profile PNGs")
+        ## mirror the PNGs into figures/ so the report can \includegraphics{<figure_id>}
+        figures = report_dir / "figures"
+        figures.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        for _rec, _run_dir, out in exported:
+            png = out / "f.png"
+            if png.exists():
+                shutil.copy2(png, figures / f"{out.name}.png")
+                copied += 1
+        print(f"  rendered {n} PNGs, mirrored {copied} into figures/")
