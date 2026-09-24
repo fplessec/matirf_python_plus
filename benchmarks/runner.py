@@ -135,7 +135,13 @@ def execute(problem_name: str, config: dict, run_dir: str) -> dict:
     metrics.update(_curated_metrics(pipeline, config))   # the benchmark's curated set
     noise = next((line for line in pipeline.result.messages.splitlines()
                   if line.startswith("Noise model")), "")
+    import resource
+    import sys
+    ## peak resident memory of this (isolated) run — ru_maxrss is bytes on macOS, KiB on Linux
+    maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    peak_mem_mb = round(maxrss / (1024 ** 2 if sys.platform == "darwin" else 1024), 1)
     return {"seconds": round(time.time() - started, 2),
+            "peak_mem_mb": peak_mem_mb,
             "metrics": metrics,
             "rejected": bool(diagnosis is not None and diagnosis.rejected),
             "findings": [finding.code for finding in (diagnosis.findings if diagnosis else [])],
@@ -163,12 +169,15 @@ def _curated_metrics(pipeline, config: dict) -> dict:
     out = {"chi2_ratio": M.chi2_ratio(f, pipeline.prepared.operator, g, a, b)}
     if truth is not None:
         out["nmse"] = M.nmse(f, truth)
+        out["psnr"] = M.psnr(f, truth)          # dB companion to nmse (same ranking)
         if f.dim() == 3:                        # depth metrics only mean something in 3D
             oper = config.get("oper-params", {})
             nz = float(oper.get("nz", f.shape[0])) or float(f.shape[0])
             dz = (float(oper.get("zN", nz)) - float(oper.get("z0", 0.0))) / nz
             out["depth_error_nm"] = M.depth_error_nm(f, truth, dz)
             out["stack_recovery"] = M.stack_recovery(f, truth)
+        elif f.dim() == 2:                       # SSIM is reliable only on the 2D deconv image
+            out["ssim"] = M.ssim(f, truth)
     return {k: (v if isinstance(v, float) and math.isfinite(v) else None) for k, v in out.items()}
 
 
