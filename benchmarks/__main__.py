@@ -6,6 +6,7 @@ The benchmark, from the command line.
     python -m benchmarks status        # how far it got, by status
     python -m benchmarks stop          # ask it to stop cleanly before the next run
     python -m benchmarks specs         # print the matrix without running anything
+    python -m benchmarks analyze       # write the report's tables + showcase from the results
 
 Add --minimal to run / status / stop / specs to target the quick pass (dir defaults to
 benchmarks/results/minimal instead of .../main).
@@ -103,9 +104,18 @@ def _cmd_specs(args):
     print(summary())
 
 
+def _cmd_analyze(args):
+    from benchmarks.analyze import analyze, DEFAULT_REPORT_DIR
+
+    _, _, default_dir = _select(args)
+    directory = Path(_opt(args, "--dir", str, str(default_dir)))
+    report_dir = Path(_opt(args, "--report-dir", str, str(DEFAULT_REPORT_DIR)))
+    analyze(directory, report_dir, with_pngs="--no-pngs" not in args)
+
+
 def main():
     commands = {"run": _cmd_run, "resume": _cmd_run, "status": _cmd_status,
-                "stop": _cmd_stop, "specs": _cmd_specs}
+                "stop": _cmd_stop, "specs": _cmd_specs, "analyze": _cmd_analyze}
     args = sys.argv[1:]
     command = args[0] if args else "status"
     if command not in commands:
