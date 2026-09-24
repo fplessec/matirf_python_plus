@@ -250,11 +250,15 @@ def render_pngs(exported: list) -> int:
             continue
         oper = rec.get("config", {}).get("oper-params", {})
         z0, zN = float(oper.get("z0", 0.0)), float(oper.get("zN", 300.0))
+        ## write the figure straight into figures/ (referenced by the report); the reconstruction
+        ## itself is NOT duplicated into results/ — that dir keeps only config.toml + metrics.json.
+        figures = out.parents[1] / "figures"
+        figures.mkdir(parents=True, exist_ok=True)
         try:
             image = load_tif(tif)
             depth = DepthMapViewer(image, z0, zN, title=rec["tags"]["solver"])
             profiles = ProfilesViewer(image, z0, zN)
-            export_depth_and_profiles(depth, profiles, str(out / "f.png"))
+            export_depth_and_profiles(depth, profiles, str(figures / f"{out.name}.png"))
             depth.deleteLater(); profiles.deleteLater()
             count += 1
         except Exception as error:                          # pragma: no cover - rendering
@@ -300,14 +304,16 @@ def md_to_latex(md: str) -> str:
                 block.append(lines[i])
                 i += 1
             header = block[0].strip("|").split("|")
-            tex.append(r"\begin{center}\begin{tabular}{" + "l" * len(header) + "}")
+            ## adjustbox shrinks a too-wide table to the text width (and leaves narrow ones alone)
+            tex.append(r"\begin{center}\begin{adjustbox}{max width=\linewidth}")
+            tex.append(r"\begin{tabular}{" + "l" * len(header) + "}")
             tex.append(r"\toprule")
             tex.append(" & ".join(_tex_cells(header)) + r" \\")
             tex.append(r"\midrule")
             for row in block[2:]:                       # skip the |---| separator
                 tex.append(" & ".join(_tex_cells(row.strip("|").split("|"))) + r" \\")
             tex.append(r"\bottomrule")
-            tex.append(r"\end{tabular}\end{center}")
+            tex.append(r"\end{tabular}\end{adjustbox}\end{center}")
         else:
             i += 1
     return "\n".join(tex) + "\n"
@@ -340,14 +346,5 @@ def analyze(campaign_dir: Path, report_dir: Path, with_pngs: bool = True) -> Non
     exported = export_showcase(records, campaign_dir, report_dir)
     print(f"  exported {len(exported)} showcase runs (config.toml + metrics.json)")
     if with_pngs:
-        n = render_pngs(exported)
-        ## mirror the PNGs into figures/ so the report can \includegraphics{<figure_id>}
-        figures = report_dir / "figures"
-        figures.mkdir(parents=True, exist_ok=True)
-        copied = 0
-        for _rec, _run_dir, out in exported:
-            png = out / "f.png"
-            if png.exists():
-                shutil.copy2(png, figures / f"{out.name}.png")
-                copied += 1
-        print(f"  rendered {n} PNGs, mirrored {copied} into figures/")
+        n = render_pngs(exported)                          # writes straight into figures/
+        print(f"  rendered {n} depth-map/profile PNGs into figures/")
