@@ -51,6 +51,12 @@ DONE, REJECTED, FAILED, TIMEOUT, INTERRUPTED, RUNNING = (
 ## statuses a relaunch does not redo (a rejected run is retried unless accepted)
 FINISHED = {DONE}
 
+## the curated truth-comparison metrics (names from core.metrics), by dimensionality — the only
+## ones the benchmark records; picking them also skips the costly Sinkhorn / FSC. chi2_ratio is
+## added separately (it needs no truth, so it also reads on the real esoubies data).
+CURATED_3D = ("NMSE", "PSNR", "Depth Error (nm)", "Stack Recovery")   # MA-TIRF (no SSIM: anisotropic)
+CURATED_2D = ("NMSE", "PSNR", "SSIM")                                 # deconvolution
+
 
 @dataclass
 class RunSpec:
@@ -117,6 +123,10 @@ def execute(problem_name: str, config: dict, run_dir: str) -> dict:
     problem = importlib.import_module(f"problems.{problem_name}").PROBLEM
     started = time.time()
     pipeline = Pipeline.create(problem, config)
+    ## curate the metrics the pipeline computes to the benchmark's set (skips the costly
+    ## Sinkhorn / FSC and the redundant MSE/MAE/correlation); chi2 is added below (no truth).
+    features = {str(feature) for feature in problem.features}
+    pipeline.metric_names = CURATED_3D if "3d" in features else CURATED_2D
     errors = []
     pipeline.on_error = errors.append
     pipeline.start()
@@ -128,11 +138,11 @@ def execute(problem_name: str, config: dict, run_dir: str) -> dict:
     pipeline.save_results(run_dir)
 
     diagnosis = pipeline.result.diagnosis
+    ## truth-comparison metrics (nmse, psnr, depth, stack, ssim) come from core.metrics via the
+    ## pipeline, already curated to CURATED_3D / CURATED_2D above.
     metrics = {key: value for key, value in (pipeline.result.metrics or {}).items()
                if isinstance(value, (int, float))}
-    if isinstance((pipeline.result.metrics or {}).get("FSC"), dict):
-        metrics["FSC"] = pipeline.result.metrics["FSC"].get("summary")
-    metrics.update(_curated_metrics(pipeline, config))   # the benchmark's curated set
+    metrics.update(_curated_metrics(pipeline, config))   # + chi2_ratio (needs no truth)
     noise = next((line for line in pipeline.result.messages.splitlines()
                   if line.startswith("Noise model")), "")
     import resource
@@ -151,34 +161,23 @@ def execute(problem_name: str, config: dict, run_dir: str) -> dict:
 
 def _curated_metrics(pipeline, config: dict) -> dict:
     """
-    The benchmark's curated metrics (benchmarks/metrics.py), computed on this run:
-    nmse and chi2_ratio always, depth_error_nm / stack_recovery for a 3D (MA-TIRF) result.
-    `regularization_share` is NOT here — it needs the paired lambda=0 run, so phase B's
-    analysis computes it across the sweep. Non-finite values (e.g. no stacked columns) become
-    None so the record stays valid JSON.
+    chi2_ratio (benchmarks/metrics.py): the data-fidelity diagnostic that needs NO truth, so it
+    is the one quality number available on the real `esoubies` data. Everything that compares to
+    a truth (nmse, psnr, depth_error, stack_recovery, ssim) comes from core.metrics via the
+    pipeline (curated above). `regularization_share` is not here — it needs the paired lambda=0
+    run, so the analysis computes it across the sweep.
     """
     import math
 
     from benchmarks import metrics as M
     from pipeline import noise_parameters
 
-    f, truth, g = pipeline.result.f, pipeline.result.f_true, pipeline.result.g
+    f, g = pipeline.result.f, pipeline.result.g
     if f is None:
         return {}
     _, a, b, _ = noise_parameters(config, g)
-    out = {"chi2_ratio": M.chi2_ratio(f, pipeline.prepared.operator, g, a, b)}
-    if truth is not None:
-        out["nmse"] = M.nmse(f, truth)
-        out["psnr"] = M.psnr(f, truth)          # dB companion to nmse (same ranking)
-        if f.dim() == 3:                        # depth metrics only mean something in 3D
-            oper = config.get("oper-params", {})
-            nz = float(oper.get("nz", f.shape[0])) or float(f.shape[0])
-            dz = (float(oper.get("zN", nz)) - float(oper.get("z0", 0.0))) / nz
-            out["depth_error_nm"] = M.depth_error_nm(f, truth, dz)
-            out["stack_recovery"] = M.stack_recovery(f, truth)
-        elif f.dim() == 2:                       # SSIM is reliable only on the 2D deconv image
-            out["ssim"] = M.ssim(f, truth)
-    return {k: (v if isinstance(v, float) and math.isfinite(v) else None) for k, v in out.items()}
+    value = M.chi2_ratio(f, pipeline.prepared.operator, g, a, b)
+    return {"chi2_ratio": value} if math.isfinite(value) else {}
 
 
 def _child(problem_name, config, run_dir, queue):

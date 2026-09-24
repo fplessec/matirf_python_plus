@@ -34,6 +34,7 @@ from .psnr import PSNR
 from .ssim import SSIM
 from .sinkhorn_wasserstein import SinkhornWasserstein
 from .fsc import FSC
+from .depth import DepthError, StackRecovery
 
 
 _ALL_METRICS = [
@@ -48,6 +49,8 @@ _ALL_METRICS = [
     SSIM(),
     SinkhornWasserstein(),
     FSC(),
+    DepthError(),      # 3D: axial localization (MA-TIRF)
+    StackRecovery(),   # 3D: axial super-resolution (MA-TIRF)
 ]
 
 METRIC_REGISTRY = {m.name: m for m in _ALL_METRICS}

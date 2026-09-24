@@ -275,6 +275,9 @@ class Pipeline:
         ## whether the solver publishes snapshots of its iterate: only worth the copy when a
         ## display window polls them, so off by default and switched on by that window
         self.live_preview = False
+        ## which metrics to evaluate (names from core.metrics); None = every applicable one.
+        ## The benchmark sets a curated subset, which also skips the costly Sinkhorn/FSC.
+        self.metric_names = None
 
         self.on_message = None
         self.on_finished = None
@@ -445,8 +448,14 @@ class Pipeline:
         estimate = getattr(self.prepared.operator, "estimate_anisotropy_ratio", None)
         if estimate is not None:
             extra["delta"] = estimate()
+        ## the plane spacing (nm) the depth metric reports in — from the operator's z range
+        oper = self.config.get("oper-params", {})
+        nz = float(oper.get("nz", 0) or 0)
+        if nz:
+            extra["dz"] = (float(oper.get("zN", nz)) - float(oper.get("z0", 0.0))) / nz
 
-        self.result.metrics = compute_all_metrics(f, f_true, features=features, **extra)
+        self.result.metrics = compute_all_metrics(f, f_true, features=features,
+                                                  only=self.metric_names, **extra)
         alpha = optimal_scale(f, f_true)
         self.result.alpha = float(alpha)
         self.result.diff = f_true - alpha * f

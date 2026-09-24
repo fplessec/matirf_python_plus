@@ -60,7 +60,7 @@ from .base import Metric, optimal_scale, align_scale
 from .reusable import METRIC_REGISTRY, METRIC_LIST
 
 
-def compute_all_metrics(f, f_true, features=set(), **kw):
+def compute_all_metrics(f, f_true, features=set(), only=None, **kw):
     """
     Computes all metrics whose requirements are met by the given features.
 
@@ -68,17 +68,23 @@ def compute_all_metrics(f, f_true, features=set(), **kw):
         f: reconstructed tensor
         f_true: ground truth tensor
         features: set of problem features (e.g. {"3d", "scale_ambiguous"})
-        **kw: extra keyword arguments passed to each metric (e.g. delta)
+        only: optional iterable of metric names — when given, restricts the computation to
+              those (a curated subset, e.g. the benchmark's), which also skips the costly ones
+              (Sinkhorn, FSC) that are not asked for. None = every applicable metric.
+        **kw: extra keyword arguments passed to each metric (e.g. delta, dz)
 
     Returns:
         dict mapping metric name -> value, where value is:
             - a float for scalar metrics
             - a dict {"summary", "x", "y", "xlabel", "ylabel"} for curve metrics
     """
+    wanted = None if only is None else set(only)
     results = {}
     f = f.detach()
     f_true = f_true.detach()
     for name, metric in METRIC_REGISTRY.items():
+        if wanted is not None and name not in wanted:
+            continue
         if metric.requires <= features:
             try:
                 results[name] = metric.compute(f, f_true, features=features, **kw)
