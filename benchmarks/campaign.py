@@ -8,7 +8,7 @@ operator (`normalize = False`), g peak-normalized. Datasets: two synthetic MA-TI
 the real esoubies measurement (native noise, no truth), and one deconvolution image (img_001)
 at the three noise levels.
 
-Solvers: MA-TIRF gets all ten; deconvolution gets the general ones (Adam, PPXA, MCMC, MCMCv2).
+Solvers: MA-TIRF gets all six; deconvolution gets the general ones (Adam, PPXA, MCMC).
 PPXA is CONFIRMATION-ONLY: Adam and PPXA minimize the same objective, so the reg×λ atlas is
 Adam's; PPXA runs a handful of points to verify Adam=PPXA and to test its γ range.
 
@@ -34,13 +34,11 @@ JSON_DECONV = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
 # ── the parameter grids (from the notes) ──────────────────────────────────────
 
 LAMBDAS = [0.02, 0.05, 0.1, 0.2, 0.35, 0.5]                  # Adam/PPXA λ (calibrated share)
-REG_PRIORS = ["tv", "shv"]                                   # + the no-prior case (λ = 0)
-SHV_RHO = 0.6
+SHV_RHO = 0.6                                                # + TV and the no-prior case (λ = 0)
 ADAM_FIXED = {"max_iter": 3000, "K": 10, "EPS": 1e-8}        # EPS stops before the budget
 
-ADMM_KAPPA = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1]                  # v1 threshold_ratio (log band)
+ADMM_KAPPA = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1]                  # threshold_ratio (log band)
 ADMM_MU = [0.3, 0.5, 1.0]
-ADMMV2_KAPPA = [0.02, 0.05, 0.1, 0.2, 0.5]                   # fraction of τ_max, scale-free
 
 DENOISERS = ["Gaussian", "Bilateral"]                        # + the no-denoiser case
 PNP_SIGMA = [10.0, 25.0, 50.0]                               # 0-255 scale
@@ -122,23 +120,19 @@ def _solver_specs(solver):
             for mu in ADMM_MU:
                 yield ({"kappa": kappa, "mu": mu},
                        {"iter": 200, "threshold_ratio": kappa, "mu": mu})
-    elif solver == "ADMMv2":
-        for kappa in ADMMV2_KAPPA:
-            yield ({"kappa": kappa}, {"iter": 100, "kappa": kappa, "mu": 1.0})
-    elif solver in ("PNP", "PNPv2"):
+    elif solver == "PNP":
         for tag, p in _denoiser_grid("lambda_kz", PNP_LAMBDA_KZ):
             yield (tag, {"iter": 16, **p})
-    elif solver in ("ADMM-PnP", "ADMM-PnPv2"):
+    elif solver == "ADMM-PnP":
         for tag, p in _denoiser_grid("rho", ADMMPNP_RHO):
             yield (tag, {"iter": 50, **p})
-    elif solver in ("MCMC", "MCMCv2"):
+    elif solver == "MCMC":
         for tag, p in _mcmc_grid():
             yield (tag, {"max_iter": 300, **p})
 
 
-MATIRF_SOLVERS = ["ADAM", "ADMM", "ADMMv2", "PNP", "PNPv2",
-                  "ADMM-PnP", "ADMM-PnPv2", "MCMC", "MCMCv2"]     # PPXA handled separately
-DECONV_SOLVERS = ["ADAM", "MCMC", "MCMCv2"]                       # + PPXA confirmation
+MATIRF_SOLVERS = ["ADAM", "ADMM", "PNP", "ADMM-PnP", "MCMC"]     # PPXA handled separately
+DECONV_SOLVERS = ["ADAM", "MCMC"]                                # + PPXA confirmation
 
 # ── PPXA confirmation-only (Adam = PPXA on the same objective; + a γ range check) ─
 

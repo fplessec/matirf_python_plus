@@ -1,26 +1,43 @@
 """
-PnP — Plug-and-Play reconstruction whose prior is a denoiser rather than a formula.
+PnP — Plug-and-Play Half-Quadratic Splitting with the annealing schedule of Zhang et al. (DPIR).
 
-Replace the proximal operator of an explicit prior R(f) by a call to an off-the-shelf
-denoiser (Venkatakrishnan et al., 2013). The prior is then whatever the denoiser implicitly
-encodes — usually far richer than a hand-written R(f) — at the cost of losing the
-closed-form objective.
+    f <- (H^T H + alpha_k I)^-1 (H^T g + alpha_k z)      data
+    z <- D_{sigma_k}(f)                                  denoiser (the prior)
+    alpha_k sigma_k^2 = lambda_kz,   sigma_k: sigma -> sigma_final (log-spaced)
 
-This solver is Half-Quadratic Splitting: no dual variable.
+This is the scale-free version: the denoiser sees 255*f/peak (so a level sigma means the same
+at any data scale), sigma_final is tied to the measurement's noise, and the start is the ridge
+s2^2 estimate. It replaced an earlier variant that assumed f in [0,1] and started from H^T g
+(kept for reference in solvers/old/pnp.py). Rationale in docs/algorithms/pnp.md.
 
-    f <- (H^T H + alpha I)^-1 (H^T g + alpha z)      inversion
-    z <- D_sigma(f)                                  denoising
+Design choices (vs the earlier variant in solvers/old/):
+    > SCALE-FREE DENOISING. PnP feeds the denoisers 255 f, which assumes f in [0, 1] — true
+      for a photograph, false for MA-TIRF (peak ~0.02). Measured at sigma = 5: Wiener changes
+      the image by 84 % at MA-TIRF's scale and 20 % at a photograph's, DCT erases it. Here f
+      is normalized by the peak p of the starting estimate: z = p D(255 f / p, sigma) / 255.
+      sigma then means "noise level for an image whose peak is 255" on every problem, which
+      is what makes a value transferable from one inverse problem to another.
+    > NOISE-AWARE FINAL LEVEL. PnP ends the schedule at a hard-coded sigma_final = 1, i.e.
+      always assumes a noise of 1/255 of the peak. Here sigma_final is the measurement's
+      noise level relative to its peak, 255 x std(noise) / max(g), estimated from g
+      (core.noise.estimate) — the DPIR choice, made scale-free. Can be set by hand.
+    > ESTIMATED DELTA. Left empty, the anisotropy ratio of the Gaussian / Bilateral kernels is
+      the operator's own estimate (as for Adam/PPXA's regularizations), not 1.
+    > A PROPER START. PnP starts from H^T g (~850x too large on MA-TIRF), and the data step
+      keeps the start's components in every direction H does not see. Here the start is the
+      ridge estimate (H^T H + lambda_rr I)^-1 H^T g, with lambda_rr = s2^2 by default — the
+      second EIGENVALUE of H^T H, the quantity lambda_rr is compared to: it keeps the best
+      determined direction fully and the second half-way, and scales with the operator's
+      gain (on MA-TIRF s2^2 = 36, inside the [s2, s1] = [6, 39] range the MCMC study found
+      good). Falls back on s1^2 when the operator does not expose its spectrum. 'adjoint'
+      remains available.
 
-It supports Zhang et al. (DPIR) scheduling: alpha grows and sigma shrinks logarithmically
-across iterations, which is what makes plain HQS converge. Its augmented-Lagrangian
-counterpart, with a dual variable, is ADMM-PnP (solvers/pnp_admm.py).
+    Also: the schedule and the positivity are always on (PnP's `kai_zhang` and `forced_pos`
+    switches had one sensible value). The denoisers offered are PnP's, DCT included (it is
+    not used in the benchmark: its implementation is to be redone).
 
-It does not consult an explicit regularization term: `uses_regularization = False`, and no
-regularization parameters are offered. sigma is on the [0, 255] denoiser scale; see
-solvers/denoising.py for why.
-
-It was problem-specific in v1 solely because of its inversion step;
-`ForwardOperator.solve_normal` supplies it generically, so nothing here is specialized.
+Parameters — critical: `denoiser`, `sigma`, `lambda_kz`. Fixed by rule (empty = automatic):
+`sigma_final`, `delta`, `lambda_rr`. Comfort: `iter`, `init`.
 """
 
 import time
@@ -28,40 +45,69 @@ import time
 import numpy as np
 import torch
 
-from solvers.base import Solver
-from solvers.denoising import resolve, denoise, warn_if_slice_by_slice, DENOISER_UI_PARAMS
-
-
-
+from core.features import Feature
+from solvers.base import Solver, ridge_start
+from solvers.denoising import resolve, denoise, warn_if_slice_by_slice, relative_noise_level
+from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
 
 PNP_UI_PARAMS = {
-    "iter": {
-        "title": "Number of PnP iterations",
-        "type": "value",
-        "param_info": {"dtype": int, "unit": "", "latex_name": "\\text{iter}", "default": 5},
+    "denoiser": {
+        "title": "Denoiser (the prior)",
+        "type": "option",
+        "param_info": {"options_list": DENOISER_LIST},
     },
     "sigma": {
-        "title": "Noise standard deviation (0-255 scale)",
+        "title": "Initial denoising level (0-255, relative to the image peak)",
         "type": "value",
-        "param_info": {"dtype": float, "unit": "", "latex_name": "\\sigma", "default": 5},
-    },
-    "kai_zhang": {
-        "title": "Use Kai Zhang scheduling",
-        "type": "bool",
-        "param_info": {"default": True},
+        "param_info": {"dtype": float, "unit": "", "latex_name": "\\sigma", "default": 25.0},
     },
     "lambda_kz": {
-        "title": "Kai Zhang coefficient",
+        "title": "Final data weight",
         "type": "value",
         "param_info": {"dtype": float, "unit": "", "latex_name": "\\lambda_{kz}",
                        "default": 0.23},
     },
-    **DENOISER_UI_PARAMS,
+    "sigma_final": {
+        "title": "Final denoising level (empty = the measurement's noise level)",
+        "type": "value",
+        "param_info": {"dtype": float, "unit": "", "latex_name": "\\sigma_{final}",
+                       "default": None},
+    },
+    "iter": {
+        "title": "Number of annealing steps",
+        "type": "value",
+        "param_info": {"dtype": int, "unit": "", "latex_name": "\\text{iter}", "default": 16},
+    },
+    "init": {
+        "title": "Initialization",
+        "type": "option",
+        "param_info": {"options_list": ["ridge", "adjoint"]},
+    },
+    "lambda_rr": {
+        "title": "Ridge weight of the start (empty = s2^2)",
+        "type": "value",
+        "depends_on": {"init": "ridge"},
+        "param_info": {"dtype": float, "unit": "", "latex_name": "\\lambda_{rr}",
+                       "default": None},
+    },
+    "delta": {
+        "title": "Anisotropy ratio (empty = estimated)",
+        "type": "value",
+        "requires": {Feature.ANISOTROPIC},
+        "depends_on": {"denoiser": ANISOTROPIC_DENOISERS},
+        "param_info": {"dtype": float, "unit": "",
+                       "latex_name": "\\delta = \\frac{\\Delta z}{\\Delta xy}",
+                       "default": None},
+    },
 }
+
+_UNSET = (None, "", "None", "null", "auto")
+## below this final level (on the 0-255 scale) the last denoising is a no-op anyway
+_SIGMA_FINAL_FLOOR = 0.5
 
 
 class Pnp(Solver):
-    """Plug-and-Play HQS: alternate a data inversion and a denoising step, with annealing."""
+    """Plug-and-Play HQS with scale-free denoising, a noise-aware schedule and a ridge start."""
 
     name = "PNP"
     estimator_type = "MAP"
@@ -70,24 +116,39 @@ class Pnp(Solver):
     uses_regularization = False
     ui_params = PNP_UI_PARAMS
 
+    def initial_guess(self, objective, params):
+        return ridge_start(objective, params)
+
     def solve(self, objective, f0, params):
         self.fix_randomness()
 
-        n_iter = int(params.get("iter", 5))
-        sigma = float(params.get("sigma", 5))
-        delta = float(params.get("delta", 1.0))
+        n_iter = max(1, int(params.get("iter", 16)))
+        sigma = float(params.get("sigma", 25.0))
         lambda_kz = float(params.get("lambda_kz", 0.23))
-        forced_pos = bool(params.get("forced_pos", True))
         name = params.get("denoiser", "None")
-
-        operator = objective.operator
-        Htg = operator.adjoint(objective.g)
         denoiser_fn = resolve(name)
+        operator, g = objective.operator, objective.g
+        Htg = operator.adjoint(g)
+
+        delta = params.get("delta")
+        if delta in _UNSET:
+            estimate = getattr(operator, "estimate_anisotropy_ratio", None)
+            delta = estimate() if estimate is not None else 1.0
+        delta = float(delta)
+
+        sigma_final = params.get("sigma_final")
+        sigma_final = (relative_noise_level(g) if sigma_final in _UNSET else float(sigma_final))
+        sigma_final = max(sigma_final, _SIGMA_FINAL_FLOOR)
 
         z = f0.clamp(min=0.0)
+        ## the scale every denoising happens at: the start's peak
+        peak = float(z.max()) or 1.0
+        alphas, sigmas = self._schedule(sigma, sigma_final, lambda_kz, n_iter)
         warn_if_slice_by_slice(self.report, name, z)
-        alphas, sigmas = self._schedule(params.get("kai_zhang", True), sigma, lambda_kz, n_iter)
 
+        self.report(f"PNP | denoiser={name} | sigma {sigma:g} -> {sigma_final:.3g} "
+                    f"(relative to the peak {peak:.3g}) | lambda_kz={lambda_kz:g} | "
+                    f"delta={delta:.3g}")
         started = time.time()
         f = z
         for k in range(n_iter):
@@ -95,32 +156,20 @@ class Pnp(Solver):
                 self.report(f"Interrupted at iteration {k + 1}.")
                 return f
 
-            self.report(f"[PnP] iter {k + 1}/{n_iter} | "
-                        f"alpha={alphas[k]:.3g} | sigma={sigmas[k]:.3g}")
+            f = operator.solve_normal(Htg + alphas[k] * z, alphas[k]).clamp(min=0.0)
+            z = (peak * denoise(denoiser_fn, f / peak, sigmas[k], delta)).clamp(min=0.0)
 
-            f = operator.solve_normal(Htg + alphas[k] * z, alphas[k])   # inversion
-            z = denoise(denoiser_fn, f, sigmas[k], delta)               # implicit prior
-
-            if forced_pos:
-                f = f.clamp(min=0.0)
-                z = z.clamp(min=0.0)
+            self.report(f"[PnPv2] iter {k + 1}/{n_iter} | alpha={alphas[k]:.3g} | "
+                        f"sigma={sigmas[k]:.3g}")
             self.publish(f)
 
         self.report(f"Execution in {time.time() - started:.2f} s.")
         return f
 
     @staticmethod
-    def _schedule(kai_zhang, sigma, lambda_kz, n_iter):
-        """
-        Zhang et al. (DPIR) annealing: alpha rises and sigma falls logarithmically.
-
-        Starting with a weak data term and strong denoising, then reversing, is what lets
-        plain HQS converge without a dual variable. Disabled -> both stay constant.
-        """
-        if not kai_zhang:
-            return [lambda_kz] * n_iter, [sigma] * n_iter
-        sigma_final = 1.0
-        alpha_first = lambda_kz * sigma_final ** 2 / sigma ** 2
-        alphas = np.logspace(np.log10(alpha_first), np.log10(lambda_kz), n_iter)
-        sigmas = np.sqrt(lambda_kz / alphas) * sigma_final
+    def _schedule(sigma, sigma_final, lambda_kz, n_iter):
+        """DPIR: sigma_k log-spaced from sigma down to sigma_final, alpha_k = lambda_kz / sigma_k^2."""
+        sigma = max(sigma, sigma_final)
+        sigmas = np.logspace(np.log10(sigma), np.log10(sigma_final), n_iter)
+        alphas = lambda_kz * (sigma_final / sigmas) ** 2
         return alphas, sigmas

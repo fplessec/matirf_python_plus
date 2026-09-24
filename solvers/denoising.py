@@ -105,7 +105,7 @@ DENOISER_UI_PARAMS = {
 def relative_noise_level(g: torch.Tensor) -> float:
     """
     The measurement's Gaussian noise std relative to its peak, on the 0-255 scale (0 when g
-    is too small to estimate). The scale-free noise level PNPv2 and ADMM-PnPv2 tie their
+    is too small to estimate). The scale-free noise level PnP ties its
     denoising to: comparable between inverse problems whatever their intensity scale.
     """
     from core import noise

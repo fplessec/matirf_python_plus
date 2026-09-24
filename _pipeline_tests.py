@@ -249,13 +249,9 @@ def test_every_solver_through_the_pipeline():
         "ADAM": {"max_iter": 20, "lr": 0.02, "K": 20},
         "PPXA": {"max_iter": 15, "lambda_relax": 1.0, "gamma": 1.0, "K": 15},
         "ADMM": {"iter": 8, "mu": 0.05, "threshold_ratio": 0.0},
-        "ADMMv2": {"iter": 30, "mu": 1.0, "kappa": 0.001},
-        "PNP": {"iter": 4, "sigma": 5.0, "denoiser": "None"},
-        "PNPv2": {"iter": 6, "sigma": 20.0, "denoiser": "Gaussian"},
+        "PNP": {"iter": 6, "sigma": 20.0, "denoiser": "Gaussian"},
         "ADMM-PnP": {"iter": 8, "rho": 0.05, "sigma": 5.0, "denoiser": "None"},
-        "ADMM-PnPv2": {"iter": 15, "rho": 0.05, "sigma": 20.0, "denoiser": "Gaussian"},
-        "MCMC": {"max_iter": 20, "beta": 1e-4, "sigma": 0.005, "K": 20, "lambda_rr": 0.05},
-        "MCMCv2": {"max_iter": 20, "sigma": 0.03, "K": 20},
+        "MCMC": {"max_iter": 20, "sigma": 0.03, "K": 20},
     }
     for name, params in budgets.items():
         config = _deconv_config(algorithm=name)

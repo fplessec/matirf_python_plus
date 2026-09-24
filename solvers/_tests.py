@@ -26,8 +26,7 @@ import time
 import torch
 
 from core import Feature, features, ForwardOperator, Objective
-from solvers import (SOLVERS, available_for, Adam, Ppxa, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm,
-                     PnpAdmmV2, Mcmc, McmcV2)
+from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, Pnp, PnpAdmm, Mcmc
 
 DTYPE = torch.float64
 
@@ -114,21 +113,20 @@ def _step_signal(n: int) -> torch.Tensor:
 
 def test_registry():
     """The registry answers which solvers a given problem can run."""
-    ## the "v2" solvers are proposed alternatives, kept separate until their owner decides
-    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "ADMMv2", "PNP", "PNPv2", "ADMM-PnP",
-                            "ADMM-PnPv2", "MCMC", "MCMCv2"}
-    assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["MCMCv2"] is McmcV2
+    ## one solver per algorithm — the weaker of each v1/v2 pair was retired to solvers/old/
+    assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"}
+    assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["PNP"] is Pnp
 
     # no solver requires any feature any more, so every problem gets all of them — that is the
     # whole promise of the layer, and it is checked rather than asserted in prose:
     for feats in (features(Feature.TWO_D),
                   features(Feature.THREE_D, Feature.ANISOTROPIC, Feature.SCALE_AMBIGUOUS)):
-        assert len(available_for(feats)) == 10, f"every solver must serve {feats}"
+        assert len(available_for(feats)) == 6, f"every solver must serve {feats}"
 
-    assert Mcmc.estimator_type == McmcV2.estimator_type == "MMSE", "the posterior means"
-    assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if not n.startswith("MCMC"))
+    assert Mcmc.estimator_type == "MMSE", "MCMC is the posterior mean (MMSE)"
+    assert all(SOLVERS[n].estimator_type == "MAP" for n in SOLVERS if n != "MCMC")
     assert "MAP" in Adam.description() and "ADAM" in Adam.description()
-    print("  registry        ten solvers (the v2 ones are proposals), all available to every problem")
+    print("  registry        six solvers (one per algorithm), all available to every problem")
 
 
 def test_ui_params():
@@ -150,7 +148,7 @@ def test_ui_params():
     # the prior is offered only to the solvers that consult it
     for solver in (Adam, Ppxa):
         assert "lambda_reg" in solver.get_ui_params(features(Feature.TWO_D)), solver.name
-    for solver in (Mcmc, McmcV2, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm, PnpAdmmV2):
+    for solver in (Mcmc, Admm, Pnp, PnpAdmm):
         assert "lambda_reg" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
 
     # the noise model is NOT an algorithm parameter any more: it belongs to the measurement
@@ -158,8 +156,8 @@ def test_ui_params():
     for solver in SOLVERS.values():
         assert "data_fidelity" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
     assert Adam.supported_noise_models == {"gaussian", "poisson", "poisson-gaussian"}
-    assert Mcmc.supported_noise_models == McmcV2.supported_noise_models == Adam.supported_noise_models
-    for solver in (Ppxa, Admm, AdmmV2, Pnp, PnpV2, PnpAdmm, PnpAdmmV2):
+    assert Mcmc.supported_noise_models == Adam.supported_noise_models
+    for solver in (Ppxa, Admm, Pnp, PnpAdmm):
         assert solver.supported_noise_models == {"gaussian"}, solver.name
     print("  ui params       prior gated by solver, delta by ANISOTROPIC, noise models declared")
 
@@ -237,13 +235,9 @@ def test_every_solver_on_both_physics():
         "ADAM": {"max_iter": 400, "lr": 0.05, "K": 200, "EPS": 1e-14},
         "PPXA": {"max_iter": 300, "lambda_relax": 1.0, "gamma": 0.5, "K": 150, "EPS": 1e-14},
         "ADMM": {"iter": 30, "mu": 0.1, "threshold_ratio": 0.0},
-        "ADMMv2": {"iter": 100, "mu": 1.0, "kappa": 0.001},
-        "PNP": {"iter": 8, "sigma": 5.0, "denoiser": "None", "kai_zhang": True},
-        "PNPv2": {"iter": 6, "sigma": 5.0, "denoiser": "None"},
+        "PNP": {"iter": 6, "sigma": 5.0, "denoiser": "None"},
         "ADMM-PnP": {"iter": 20, "rho": 0.1, "sigma": 5.0, "denoiser": "None"},
-        "ADMM-PnPv2": {"iter": 15, "rho": 0.05, "sigma": 5.0, "denoiser": "None"},
-        "MCMC": {"max_iter": 60, "beta": 1e-3, "sigma": 0.01, "K": 30, "lambda_rr": 1e-3},
-        "MCMCv2": {"max_iter": 60, "sigma": 0.03, "K": 30},
+        "MCMC": {"max_iter": 60, "sigma": 0.03, "K": 30},
     }
 
     problems = {
@@ -449,9 +443,8 @@ def test_adam_and_ppxa_minimize_the_same_objective():
 
 def test_mcmc_is_robust_to_its_temperature():
     """
-    MCMCv2's claim, checked: beta is calibrated, so the relative temperature no longer decides
-    whether the chain works, and lambda_rr defaults to s1. And MCMC itself has lost the
-    meaningless `proposal_method` switch.
+    MCMC's calibration, checked: beta is calibrated, so the relative temperature no longer
+    decides whether the chain moves, and lambda_rr defaults to s1.
     """
     from solvers.base import ridge_weight
     op = _random_matrix_operator(40, 30, seed=11)
@@ -462,23 +455,24 @@ def test_mcmc_is_robust_to_its_temperature():
 
     rates = []
     for temperature in (0.3, 1.0, 10.0):
-        mcmc, log = McmcV2(), []
+        mcmc, log = Mcmc(), []
         mcmc.on_message = log.append
         mcmc.solve(objective, op.adjoint(objective.g),
                    {"max_iter": 100, "sigma": 0.03, "temperature": temperature, "K": 100})
         line = next(l for l in log if l.startswith("Accepted"))
         rates.append(float(line.split("(")[1].split("%")[0]))
     assert min(rates) > 50, f"a calibrated chain must move at any sensible temperature: {rates}"
-    assert "proposal_method" not in Mcmc.ui_params and "proposal_method" not in McmcV2.ui_params
-    print(f"  mcmcv2          acceptance {min(rates):.0f}-{max(rates):.0f}% for temperatures "
-          f"0.3-10; lambda_rr auto = s1; no proposal switch")
+    assert "proposal_method" not in Mcmc.ui_params
+    print(f"  mcmc            acceptance {min(rates):.0f}-{max(rates):.0f}% for temperatures "
+          f"0.3-10; lambda_rr auto = s1")
 
 
-def test_admm_v2_parameters_mean_what_they_say():
+def test_admm_mu_changes_the_solution():
     """
-    ADMMv2's two claims, checked against ADMM on a sparse toy problem: kappa = 1 empties the
-    image exactly (tau = max(H^T g)), and mu changes only the speed, not the solution —
-    while ADMM's mu changes the sparsity, and diverges well above the 1.618 bound.
+    ADMM's mu is not just a speed knob (unlike textbook ADMM): with the fixed threshold, mu is
+    also the prior weight (tau = mu*t) and the dual step, so it changes the sparsity of the
+    solution and diverges above the 1.618 dual-step bound. (The retired ADMMv2, in
+    solvers/old/, decoupled these — see docs/algorithms/admm.md.)
     """
     torch.manual_seed(0)
     op = _random_matrix_operator(40, 60, seed=4)
@@ -486,30 +480,25 @@ def test_admm_v2_parameters_mean_what_they_say():
     f_true[[3, 17, 40]] = torch.tensor([1.0, 0.5, 0.8], dtype=DTYPE)
     objective = Objective(op, op.apply(f_true) + 0.01 * torch.randn(40, dtype=DTYPE), _Gaussian())
 
-    assert float(AdmmV2().solve(objective, None, {"kappa": 1.0, "iter": 500}).norm()) == 0.0
-    slow = AdmmV2().solve(objective, None, {"kappa": 0.05, "mu": 0.3, "iter": 5000})
-    fast = AdmmV2().solve(objective, None, {"kappa": 0.05, "mu": 30.0, "iter": 5000})
-    assert float((slow - fast).norm() / slow.norm()) < 1e-4, "mu must not change the solution"
-
     start = op.adjoint(objective.g)
     sparse = [int((Admm().solve(objective, start, {"iter": 2000, "mu": mu,
                                                     "threshold_ratio": 0.3}) > 1e-8).sum())
               for mu in (0.3, 1.5)]
-    assert sparse[0] != sparse[1], "ADMM: mu changes the solution (the reason for ADMMv2)"
+    assert sparse[0] != sparse[1], "ADMM: mu changes the solution, not only the speed"
     diverged = Admm().solve(objective, start, {"iter": 2000, "mu": 2.5, "threshold_ratio": 0.3})
     assert not torch.isfinite(diverged).all(), "ADMM: mu = 2.5 is beyond its dual-step bound"
-    print(f"  admm v2         kappa = 1 empties; mu speed-only (ADMM: {sparse[0]} vs {sparse[1]} "
-          f"nonzeros for mu 0.3 / 1.5, NaN at 2.5)")
+    print(f"  admm            mu changes the sparsity ({sparse[0]} vs {sparse[1]} nonzeros for "
+          f"mu 0.3 / 1.5), NaN at 2.5")
 
 
-def test_pnp_v2_is_scale_free():
+def test_pnp_is_scale_free():
     """
-    PNPv2's central claim: its denoising does not depend on the image's intensity scale.
+    PnP's denoising does not depend on the image's intensity scale (it feeds 255*f/peak).
 
     The same 2D problem with H's gain multiplied by c has a solution divided by c. With the
-    data weight scaled consistently (lambda_kz x c^2, the eigenvalues of H^T H), PNPv2 with
-    an intensity-based denoiser (Wiener) returns exactly the reconstruction divided by c;
-    PnP, which assumes f in [0, 1], does not.
+    data weight scaled consistently (lambda_kz x c^2, the eigenvalues of H^T H), PnP with an
+    intensity-based denoiser (Wiener) returns exactly the reconstruction divided by c. (The
+    retired variant, solvers/old/pnp.py, assumed f in [0, 1] and did not.)
     """
     torch.manual_seed(1)
     n = 32
@@ -536,17 +525,10 @@ def test_pnp_v2_is_scale_free():
         return solver.solve(objective, solver.initial_guess(objective, params), params)
 
     c = 50.0
-    v2 = [run(PnpV2(), gain, {"lambda_kz": 0.05 * gain ** 2}) for gain in (1.0, c)]
-    v1 = [run(Pnp(), gain, {"lambda_kz": 0.05 * gain ** 2}) for gain in (1.0, c)]
-    gap_v2 = float((c * v2[1] - v2[0]).norm() / v2[0].norm())
-    gap_v1 = float((c * v1[1] - v1[0]).norm() / v1[0].norm())
-    assert gap_v2 < 1e-4, f"PNPv2 must be scale-free (gap {gap_v2:.1e})"
-    admm = [run(PnpAdmmV2(), gain, {"rho": 0.05 * gain ** 2, "iter": 10}) for gain in (1.0, c)]
-    gap_admm = float((c * admm[1] - admm[0]).norm() / admm[0].norm())
-    assert gap_admm < 1e-4, f"ADMM-PnPv2 must be scale-free (gap {gap_admm:.1e})"
-    assert gap_v1 > 1e-2, f"PnP is expected to depend on the scale (gap {gap_v1:.1e})"
-    print(f"  pnp v2          scale-free: gain x{c:g} gives the same image / {c:g} "
-          f"(PNPv2 {gap_v2:.0e}, ADMM-PnPv2 {gap_admm:.0e}; PnP: {gap_v1:.2f})")
+    v = [run(Pnp(), gain, {"lambda_kz": 0.05 * gain ** 2}) for gain in (1.0, c)]
+    gap = float((c * v[1] - v[0]).norm() / v[0].norm())
+    assert gap < 1e-4, f"PnP must be scale-free (gap {gap:.1e})"
+    print(f"  pnp             scale-free: gain x{c:g} gives the same image / {c:g} (gap {gap:.0e})")
 
 
 def main():
@@ -562,8 +544,8 @@ def main():
     test_fidelities_are_scaled_likelihoods()
     test_adam_and_ppxa_minimize_the_same_objective()
     test_mcmc_is_robust_to_its_temperature()
-    test_admm_v2_parameters_mean_what_they_say()
-    test_pnp_v2_is_scale_free()
+    test_admm_mu_changes_the_solution()
+    test_pnp_is_scale_free()
     print("\nAll solver contracts hold.")
 
 

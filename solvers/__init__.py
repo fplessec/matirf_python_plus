@@ -27,26 +27,20 @@ from .base import Solver
 from .adam import Adam
 from .ppxa import Ppxa
 from .admm import Admm
-from .admm_v2 import AdmmV2
 from .pnp import Pnp
-from .pnp_v2 import PnpV2
 from .pnp_admm import PnpAdmm
-from .pnp_admm_v2 import PnpAdmmV2
 from .mcmc import Mcmc
-from .mcmc_v2 import McmcV2
 
-## Registration order is the order the GUI lists them in.
+## One solver per algorithm — after the benchmark, the weaker of each v1/v2 pair was retired
+## to solvers/old/ (see docs/algorithms/): ADMM and ADMM-PnP kept their v1, PnP and MCMC their
+## calibrated (former "v2") version. Registration order is the order the GUI lists them in.
 SOLVERS = {cls.name: cls for cls in [
     Adam,
     Ppxa,
     Admm,
-    AdmmV2,
     Pnp,
-    PnpV2,
     PnpAdmm,
-    PnpAdmmV2,
     Mcmc,
-    McmcV2,
 ]}
 
 
@@ -55,5 +49,4 @@ def available_for(problem_features) -> dict:
     return {name: cls for name, cls in SOLVERS.items() if cls.supported_by(problem_features)}
 
 
-__all__ = ["Solver", "Adam", "Ppxa", "Admm", "AdmmV2", "Pnp", "PnpV2", "PnpAdmm", "PnpAdmmV2", "Mcmc", "McmcV2",
-           "SOLVERS", "available_for"]
+__all__ = ["Solver", "Adam", "Ppxa", "Admm", "Pnp", "PnpAdmm", "Mcmc", "SOLVERS", "available_for"]
