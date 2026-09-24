@@ -35,7 +35,7 @@ JSON_DECONV = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
 
 LAMBDAS = [0.02, 0.05, 0.1, 0.2, 0.35, 0.5]                  # Adam/PPXA λ (calibrated share)
 SHV_RHO = 0.6                                                # + TV and the no-prior case (λ = 0)
-ADAM_FIXED = {"max_iter": 3000, "K": 10, "EPS": 1e-8}        # EPS stops before the budget
+ADAM_FIXED = {"max_iter": 3000, "K": 10, "EPS": 1e-6}        # EPS stops before the budget
 
 ADMM_KAPPA = [3e-3, 1e-2, 3e-2, 1e-1, 3e-1]                  # threshold_ratio (log band)
 ADMM_MU = [0.3, 0.5, 1.0]
@@ -141,7 +141,7 @@ DECONV_SOLVERS = ["ADAM", "MCMC"]                                # + PPXA confir
 
 def _ppxa_confirmation():
     """~10 runs: verify Adam=PPXA on TV/SHV at λ=0.1, and sweep γ once."""
-    base = {"max_iter": 3000, "K": 10, "EPS": 1e-8, "lambda_relax": 1.5, "gamma": 0.01}
+    base = {"max_iter": 3000, "K": 10, "EPS": 1e-6, "lambda_relax": 1.5, "gamma": 0.01}
     out = []
     for truth in MATIRF_SYNTHETIC:                       # confirm on both truths, TV + SHV, λ=0.1, σ=0.02
         for reg, extra in (("tv", {}), ("shv", {"rho": SHV_RHO})):
@@ -282,7 +282,7 @@ def _minimal_deconv():
 
 def _ppxa_min():
     """Adam = PPXA confirmation: TV + SHV on the truth, one deconv point."""
-    base = {"max_iter": 3000, "K": 10, "EPS": 1e-8, "lambda_relax": 1.5, "gamma": 0.01}
+    base = {"max_iter": 3000, "K": 10, "EPS": 1e-6, "lambda_relax": 1.5, "gamma": 0.01}
     out = []
     for reg, extra in (("tv", {}), ("shv", {"rho": SHV_RHO})):
         ap = {"reg": reg, "lambda_reg": 0.1, **extra, **base}
