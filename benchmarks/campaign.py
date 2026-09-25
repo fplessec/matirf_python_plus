@@ -103,6 +103,7 @@ def _reg_grid():
         yield ({"reg": "tv", "lambda": lam}, {"reg": "tv", "lambda_reg": lam, **ADAM_FIXED})
         yield ({"reg": "shv", "lambda": lam},
                {"reg": "shv", "rho": SHV_RHO, "lambda_reg": lam, **ADAM_FIXED})
+        yield ({"reg": "l1", "lambda": lam}, {"reg": "l1", "lambda_reg": lam, **ADAM_FIXED})
 
 
 def _denoiser_grid(strength_name, strengths):
