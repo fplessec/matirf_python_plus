@@ -1,17 +1,13 @@
 """
 The benchmark, from the command line.
 
-    python -m benchmarks run           # start (or resume) the full-resolution campaign
-    python -m benchmarks run --minimal # the ~4h quick pass (one truth, tightened grids)
-    python -m benchmarks status        # how far it got, by status
-    python -m benchmarks stop          # ask it to stop cleanly before the next run
-    python -m benchmarks specs         # print the matrix without running anything
-    python -m benchmarks analyze       # write the report's tables + showcase from the results
+    python -m benchmarks run        # start (or resume) the curated campaign
+    python -m benchmarks status     # how far it got, by status
+    python -m benchmarks stop       # ask it to stop cleanly before the next run
+    python -m benchmarks specs      # print the curated run list without running anything
+    python -m benchmarks analyze    # write the report's tables + figures from the results
 
-Add --minimal to run / status / stop / specs to target the quick pass (dir defaults to
-benchmarks/results/minimal instead of .../main).
-
-Once installed (`pip install -e .`) the same commands are `benchmark run | status | stop`.
+Once installed (`pip install -e .`) the same commands are `benchmark run | status | stop | …`.
 
 Safe and resumable by construction (benchmarks/runner.py):
   > each run is an isolated process with a time limit; a crash/hang is contained.
@@ -28,7 +24,6 @@ import sys
 from pathlib import Path
 
 DEFAULT_DIR = Path("benchmarks/results/main")
-MINIMAL_DIR = Path("benchmarks/results/minimal")
 
 
 def _opt(args, name, cast=str, default=None):
@@ -37,31 +32,14 @@ def _opt(args, name, cast=str, default=None):
     return default
 
 
-def _select(args):
-    """(specs, summary, default_dir) for the full atlas or, with --minimal, the quick pass."""
-    from benchmarks.campaign import specs, summary, minimal_specs, minimal_summary
-    if "--minimal" in args:
-        return minimal_specs, minimal_summary, MINIMAL_DIR
-    return specs, summary, DEFAULT_DIR
-
-
-def _solver_filter(spec_list, args):
-    """With --solvers ADAM,PPXA keep only those solvers' specs (build the benchmark family by family)."""
-    names = _opt(args, "--solvers")
-    if not names:
-        return spec_list
-    wanted = {n.strip() for n in names.split(",")}
-    return [sp for sp in spec_list if sp.tags.get("solver") in wanted]
-
-
 def _cmd_run(args):
+    from benchmarks.campaign import specs, summary
     from benchmarks.runner import run_campaign, CampaignStopped
 
-    specs, summary, default_dir = _select(args)
-    directory = Path(_opt(args, "--dir", str, str(default_dir)))
+    directory = Path(_opt(args, "--dir", str, str(DEFAULT_DIR)))
     timeout = _opt(args, "--timeout", float, 3600.0)
-    ## atlas default: a realism-rejected run is a data point (method X unrealistic on
-    ## structure Y), so keep going and record it; --stop-on-reject halts to investigate.
+    ## a realism-rejected run is a data point (method X unrealistic on structure Y), so by
+    ## default keep going and record it; --stop-on-reject halts to investigate.
     stop_on_reject = "--stop-on-reject" in args
     accept_rejected = not stop_on_reject
     print(summary())
@@ -69,8 +47,8 @@ def _cmd_run(args):
           f"{'(stops on a rejected run)' if stop_on_reject else '(records rejected runs, keeps going)'}")
     print("Ctrl-C to interrupt, or `python -m benchmarks stop` from another terminal.\n")
     try:
-        counts = run_campaign(_solver_filter(specs(), args), directory, timeout=timeout,
-                              stop_on_reject=not accept_rejected, accept_rejected=accept_rejected)
+        counts = run_campaign(specs(), directory, timeout=timeout,
+                              stop_on_reject=stop_on_reject, accept_rejected=accept_rejected)
         print(f"\nDone this pass: {counts}")
     except CampaignStopped as stop:
         print(f"\n{stop}")
@@ -81,8 +59,7 @@ def _cmd_run(args):
 
 
 def _cmd_stop(args):
-    _, _, default_dir = _select(args)
-    directory = Path(_opt(args, "--dir", str, str(default_dir)))
+    directory = Path(_opt(args, "--dir", str, str(DEFAULT_DIR)))
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "STOP").write_text("stop requested\n")
     print(f"STOP written to {directory / 'STOP'}. The campaign will exit before its next run.\n"
@@ -90,11 +67,11 @@ def _cmd_stop(args):
 
 
 def _cmd_status(args):
+    from benchmarks.campaign import specs
     from benchmarks.runner import campaign_records
 
-    specs, _, default_dir = _select(args)
-    directory = Path(_opt(args, "--dir", str, str(default_dir)))
-    planned = {spec.run_id for spec in _solver_filter(specs(), args)}
+    directory = Path(_opt(args, "--dir", str, str(DEFAULT_DIR)))
+    planned = {spec.run_id for spec in specs()}
     records = campaign_records(directory)
     counts = {}
     for record in records:
@@ -109,15 +86,18 @@ def _cmd_status(args):
 
 
 def _cmd_specs(args):
-    _, summary, _ = _select(args)
+    from benchmarks.campaign import specs, summary
     print(summary())
+    if "--verbose" in args or "-v" in args:
+        print()
+        for spec in specs():
+            print(f"  {spec.run_id}  {spec.tags}")
 
 
 def _cmd_analyze(args):
     from benchmarks.analyze import analyze, DEFAULT_REPORT_DIR
 
-    _, _, default_dir = _select(args)
-    directory = Path(_opt(args, "--dir", str, str(default_dir)))
+    directory = Path(_opt(args, "--dir", str, str(DEFAULT_DIR)))
     report_dir = Path(_opt(args, "--report-dir", str, str(DEFAULT_REPORT_DIR)))
     analyze(directory, report_dir, with_pngs="--no-pngs" not in args)
 

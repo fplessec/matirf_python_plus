@@ -134,25 +134,94 @@ def cross_comparison(records: list, problem: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def effective_ranges(records: list, problem: str = "matirf") -> str:
-    """Per solver, per noise: the parameter setting that won (the effective best), by NMSE."""
-    usable = [r for r in records if r.get("tags", {}).get("problem") == problem
-              and _done(r) and r.get("tags", {}).get("noise") != "native"]
-    solvers = sorted({r["tags"]["solver"] for r in usable})
-    lines = [f"## Effective parameter ranges — {problem} (the atlas)", "",
-             "The setting that minimised NMSE at each noise level; compare to the predicted "
-             "ranges in `docs/algorithms/`.", ""]
-    for solver in solvers:
-        runs = [r for r in usable if r["tags"]["solver"] == solver]
-        noises = sorted({r["tags"]["noise"] for r in runs}, key=_noise_key)
-        lines += [f"### {solver}", "", "| noise | best params | NMSE | depth err (nm) |", "|---|---|---|---|"]
-        for noise in noises:
-            group = [r for r in runs if r["tags"]["noise"] == noise]
-            best = _best(group, "NMSE")
-            if best is None:
-                continue
-            lines.append(f"| {_fmt(noise)} | {_params(best)} | {_fmt_metric(best, 'NMSE')} | "
-                         f"{_fmt_metric(best, 'Depth Error (nm)')} |")
+## the report's algorithm chapters, in order (tag values → display used in the filenames)
+SOLVER_ORDER = ["ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"]
+
+
+DENOISER_SOLVERS = ["PNP", "ADMM-PnP", "MCMC"]
+
+
+def denoiser_comparison(records: list, solver: str) -> str:
+    """For a denoiser-using solver, which denoiser wins on each structure. Per (dataset, noise),
+    one row per denoiser (role='denoiser'), best NMSE bolded — the winner may depend on the object."""
+    runs = [r for r in records if r.get("tags", {}).get("solver") == solver
+            and r.get("tags", {}).get("role") == "denoiser" and _done(r)]
+    lines = [f"## {solver} — denoiser comparison (which denoiser wins per structure)", ""]
+    if not runs:
+        return "\n".join(lines + ["*(no completed runs yet)*", ""]) + "\n"
+    for problem in ("matirf", "deconv"):
+        here = [r for r in runs if r.get("tags", {}).get("problem") == problem]
+        if not here:
+            continue
+        metrics = MATIRF_METRICS if problem == "matirf" else DECONV_METRICS
+        header = "| structure | noise | denoiser | " + " | ".join(metrics) + " |"
+        lines += [f"### {problem}", "", header, "|" + "---|" * (3 + len(metrics))]
+        cells = sorted({_cell(r) for r in here}, key=lambda c: (str(c[1]), _noise_key(c[2])))
+        for _, dataset, noise in cells:
+            group = [r for r in here if _cell(r) == (problem, dataset, noise)]
+            winner = _best(group, "NMSE")
+            for r in sorted(group, key=lambda r: _metric(r, "NMSE") if _metric(r, "NMSE") is not None else 9):
+                den = r["tags"].get("denoiser", "?")
+                den = f"**{den}**" if r is winner else den
+                cols = " | ".join(_fmt_metric(r, m) for m in metrics)
+                lines.append(f"| {dataset} | {_fmt(noise)} | {den} | {cols} |")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def adam_shape(records: list) -> str:
+    """Adam's λ-shape at the reference condition (noise 0.02): NMSE and depth error vs λ, for the
+    sparse (L1) and the smooth (Tikhonov) prior — the illustration in the Adam chapter."""
+    runs = [r for r in records if r.get("tags", {}).get("solver") == "ADAM"
+            and r.get("tags", {}).get("role") == "shape" and _done(r)
+            and r.get("tags", {}).get("reg") in ("l1", "tikhonov")]
+    lines = ["## Adam λ-shape — reference structure, noise 0.02", "",
+             "| prior | lambda | NMSE | depth err (nm) |", "|---|---|---|---|"]
+    for reg in ("l1", "tikhonov"):
+        group = sorted((r for r in runs if r["tags"].get("reg") == reg),
+                       key=lambda r: r["tags"].get("lambda", 0))
+        for r in group:
+            lines.append(f"| {reg} | {_fmt(r['tags'].get('lambda'))} | "
+                         f"{_fmt_metric(r, 'NMSE')} | {_fmt_metric(r, 'Depth Error (nm)')} |")
+    return "\n".join(lines) + "\n"
+
+
+def per_algorithm(records: list, solver: str) -> str:
+    """One algorithm's `standard vs optimal` table — the core of its report chapter.
+
+    For each (dataset, noise) this solver was run at, the STANDARD (role='standard', the default
+    config) row and, when different, the OPTIMAL row (the best NMSE — or, on the real esoubies
+    data with no truth, the chi2_ratio closest to 1). Params and curated metrics come straight
+    from the run. Split per problem (MA-TIRF / deconv) so the metric columns match.
+    """
+    runs = [r for r in records if r.get("tags", {}).get("solver") == solver
+            and (_done(r) or r.get("tags", {}).get("noise") == "native")]
+    lines = [f"## {solver} — standard vs optimal", ""]
+    if not runs:
+        return "\n".join(lines + ["*(no completed runs yet)*", ""]) + "\n"
+
+    for problem in ("matirf", "deconv"):
+        here = [r for r in runs if r.get("tags", {}).get("problem") == problem]
+        if not here:
+            continue
+        metrics = MATIRF_METRICS if problem == "matirf" else DECONV_METRICS
+        header = "| use | dataset | noise | params | " + " | ".join(metrics) + " |"
+        sep = "|" + "---|" * (4 + len(metrics))
+        lines += [f"### {problem}", "", header, sep]
+        cells = sorted({_cell(r) for r in here}, key=lambda c: (str(c[1]), _noise_key(c[2])))
+        for _, dataset, noise in cells:
+            group = [r for r in here if _cell(r) == (problem, dataset, noise)]
+            native = noise == "native"
+            standard = next((r for r in group if r.get("tags", {}).get("role") == "standard"), None)
+            optimal = _best(group, "chi2_ratio" if native else "NMSE", target=1.0 if native else None)
+            emitted = []
+            for use, rec in (("standard", standard), ("optimal", optimal)):
+                if rec is None or rec["run_id"] in emitted:
+                    continue
+                emitted.append(rec["run_id"])
+                cols = " | ".join(_fmt_metric(rec, m) for m in metrics)
+                label = "standard / optimal" if (standard is optimal and use == "standard") else use
+                lines.append(f"| {label} | {dataset} | {_fmt(noise)} | {_params(rec)} | {cols} |")
         lines.append("")
     return "\n".join(lines) + "\n"
 
@@ -335,9 +404,14 @@ def analyze(campaign_dir: Path, report_dir: Path, with_pngs: bool = True) -> Non
     reports = {
         "cross_comparison_matirf": cross_comparison(records, "matirf"),
         "cross_comparison_deconv": cross_comparison(records, "deconv"),
-        "effective_ranges": effective_ranges(records, "matirf"),
         "rejects_and_cost": rejects_and_cost(records),
     }
+    ## one standard-vs-optimal table per algorithm — the core of each report chapter
+    for solver in SOLVER_ORDER:
+        reports[f"algo_{solver.replace('-', '_').lower()}"] = per_algorithm(records, solver)
+    reports["adam_shape"] = adam_shape(records)   # the Adam chapter's L1-vs-Tikhonov λ figure
+    for solver in DENOISER_SOLVERS:               # which denoiser wins per structure
+        reports[f"denoisers_{solver.replace('-', '_').lower()}"] = denoiser_comparison(records, solver)
     for name, md in reports.items():
         (summary / f"{name}.md").write_text(md)        # human-readable, committed synthesis
         (tables / f"{name}.tex").write_text(md_to_latex(md))   # \input by the report

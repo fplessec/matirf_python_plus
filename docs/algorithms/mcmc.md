@@ -165,6 +165,18 @@ dropped (§5).
 
 ## 5. The honest limit: MCMC on MA-TIRF (from the investigation, 2026-09)
 
+> **CORRECTION (benchmark, 2026-09): this section's headline was wrong.** A fresh, full-resolution
+> measurement shows **MCMC DOES beat the ridge start on MA-TIRF** — decisively. The error was a
+> **parameter**, not a structural wall: with the *default* `λ_rr = s1 = 38.9` (which sits ABOVE the
+> useful window `[s3², s2²] ≈ [0.3, 36]`, §3.4) the data-step barely pulls and the chain drifts;
+> bring `λ_rr` INTO the window (`λ_rr ≈ 5`) and add samples (iter 300→600) and MCMC + TV Bregman
+> reaches NMSE ≈ 0.22 on the composite truth, below the ridge start (0.64) and competitive with the
+> MAP methods. The claim below was synthesised from *lost* Phase-A data against the weak default,
+> so it over-generalised a mis-tuned run into a structural limit. The null-space argument is real
+> (the MH test is blind to D's null space), but the ridge PULL + the MMSE averaging still improve on
+> the start — the sampler is a genuine reconstructor here, just behind the plug-and-play family.
+> The paragraphs below are kept for the mechanism; read their *conclusion* as refuted.
+
 Measured, sweeping β, σ, λ_rr and the denoiser, on cropped MA-TIRF and deconvolution patches:
 
 - **On MA-TIRF, no setting beats the ridge start** (best NMSE ≈ the start's; usually worse).

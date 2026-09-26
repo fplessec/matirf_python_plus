@@ -70,6 +70,10 @@ class PnpAdmm(Solver):
         denoiser_fn = resolve(name)
 
         x = f0.clamp(min=0.0)
+        ## scale-free denoising, exactly as PnP (solvers/pnp.py): feed the denoiser at
+        ## 255*(x+u)/peak so a level `sigma` means the same at any data scale (on MA-TIRF f
+        ## peaks ~0.02, not 1). peak is fixed from the start, the stable scale reference.
+        peak = float(x.max()) or 1.0
         warn_if_slice_by_slice(self.report, name, x)
         v = x.clone()
         u = torch.zeros_like(x)
@@ -83,7 +87,7 @@ class PnpAdmm(Solver):
             self.report(f"[ADMM-PnP] iter {k + 1}/{n_iter} | rho={rho:.3g} | sigma={sigma:.3g}")
 
             x = operator.solve_normal(Htg + rho * (v - u), rho)   # data step
-            v = denoise(denoiser_fn, x + u, sigma, delta)         # prior step
+            v = peak * denoise(denoiser_fn, (x + u) / peak, sigma, delta)   # prior step (scale-free)
             if forced_pos:
                 v = v.clamp(min=0.0)
             u = u + (x - v)                                       # dual step

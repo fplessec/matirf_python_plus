@@ -109,9 +109,16 @@ scale while σ is read on 0–255, so a given σ is effectively ~40× too strong
 | peak 1 | 0.01 | 0.20 | 0.09 | 0.20 | 0.40 |
 
 So for **Bilateral, Wiener, DCT the same σ is a different prior on the two problems** —
-parameters tuned on one do not carry to the other, and it is why DCT was systematically
+parameters tuned on one do not carry to the other, and it is why DCT *used to be* systematically
 rejected on MA-TIRF. **Gaussian and TV Bregman are scale-free.** (PnPv2's ÷peak fix removes
 this, §5.)
+
+> **CORRECTION (benchmark, 2026-09): with the ÷peak fix in place (now applied in `pnp.py` and
+> `pnp_admm.py`), DCT is NO LONGER broken on MA-TIRF.** Fed `255·f/peak` at a low σ (≈5–15), DCT
+> reconstructs (NMSE ≈ 0.37–0.49 in PnP, viable though rarely the best). The old "DCT erases the
+> image / systematically rejected" verdict was a *scale artefact* of feeding an un-normalised image,
+> not a property of DCT. The only never-use denoiser rule that survives is: don't feed any
+> intensity-dependent denoiser (Bilateral/Wiener/DCT) without the ÷peak normalisation.
 
 ---
 
@@ -147,8 +154,17 @@ for the scale-dependent ones, on both problems to expose the shift).
 - `λ_kz ≫ s2² = 36` : even the determined directions follow the denoiser.
 
 **Predicted range on MA-TIRF: λ_kz ∈ [s4², s3²] ≈ [1e-3, 0.3]** (trust s1, s2, and s3 partly).
-The default 0.23 ≈ s3² is at the top of it. **Phase A:** `λ_kz ∈ {1e-3, 3e-3, 1e-2, 3e-2, 1e-1,
-3e-1}`.
+The default 0.23 is **DPIR's value (Kai Zhang et al.)**, a theoretically-established PnP constant —
+NOT `≈ s3²` (that resemblance is coincidental).
+
+> **CORRECTION (benchmark, 2026-09): the predicted range is wrong for MA-TIRF.** Measured, the
+> optimum is `λ_kz ≈ 12`, i.e. in the band `(s3², s2²) ≈ (0.3, 36)` — which hands `s3` and the
+> WHOLE null space to the denoiser (not "s3 partly"). The DPIR default 0.23 is tuned for
+> deconvolution's continuous spectrum, where many directions are trusted; on the 2–3-direction
+> MA-TIRF spectrum you want `λ_kz` an order of magnitude larger. With `λ_kz ≈ 12`, iter ≈ 40 and TV
+> Bregman, PnP-HQS reaches NMSE ≈ 0.27 on the composite truth (vs ≈ 0.9 at λ_kz = 1e-2). `iter` is
+> also a real lever here (it keeps improving past 30). **Phase A (historical):** `λ_kz ∈ {1e-3 …
+> 3e-1}` — too low; sweep up to ~16.
 
 ### 4.4 `iter` — number of annealing steps *(comfort, within limits)*
 

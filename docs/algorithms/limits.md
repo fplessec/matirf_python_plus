@@ -170,9 +170,16 @@ full real volumes (tiling / lower precision), which is currently the binding pra
 
 ## 4. MCMC — the MMSE estimator
 
-**Intrinsic limit: on MA-TIRF, no setting beats the ridge start — and this is structural, not a
-tuning failure. [structural, Phase A]** This is the sharpest, best-established limit in the whole
-benchmark, documented in full in `mcmc.md` §5.
+> **CORRECTION (benchmark, 2026-09): the limit below is REFUTED.** MCMC **does** beat the ridge
+> start on MA-TIRF once `λ_rr` is inside its window (`≈ 5`, not the default `s1 = 38.9` which
+> under-pulls): MCMC + TV Bregman reaches NMSE ≈ 0.22 on the composite truth (ridge start ≈ 0.64).
+> It was a mis-tuning (default `λ_rr` above the useful band), not a structural wall — see
+> `mcmc.md` §5. The text below is kept for its mechanism (the MH test is blind to D's null space,
+> which is true), but its *conclusion* — "no setting beats the ridge start" — is wrong.
+
+**~~Intrinsic limit: on MA-TIRF, no setting beats the ridge start — and this is structural, not a
+tuning failure.~~ [REFUTED — see the correction above]** This was thought to be the sharpest,
+best-established limit in the whole benchmark; the fresh measurement overturned it.
 
 The chain explores by perturbing `f` and accepting on the data term `D`. But the exploration
 that *matters* — the ~47 undetermined depth directions — lives in D's **null space**, which by
@@ -217,9 +224,10 @@ baseline it provides on the ill-posed one.
 | **ADMM (v1)** | L1 is the wrong prior for diffuse cells; `κ` unpredictable; `μ` coupled (>1.618 → NaN) | `κ` high → **empty**; `κ`≈0 → noisy; continuous `cell` → no band | no — the wall is the sparsity prior |
 | **PnP-HQS** | denoiser scale + collapse under noise; short schedule | collapse (noise) / over-smooth (σ big); OOM on `esoubies` | scale fixed by ÷peak; ceiling = the denoiser |
 | **ADMM-PnP** | same denoiser ceiling; `ρσ²` coupled; cost | OOM/timeout on full real volumes | needs tiling + a better 3D denoiser |
-| **MCMC** | MH test is **blind to the null space** on MA-TIRF | never beats the ridge start on MA-TIRF; freezes or saturates | **no** on MA-TIRF (structural); works on deconv |
+| **MCMC** | ~~never beats the ridge on MA-TIRF~~ **[REFUTED §4]**: it does, with `λ_rr≈5`. Real limit: behind the plug-and-play family | drifts only at the wrong `λ_rr` (the default `s1`) | yes — the fix is `λ_rr` in `[s3²,s2²]`; excels on deconv |
 
 **The one sentence.** On MA-TIRF every wall is the same wall seen from a different side — the
-~47-direction null space — and the only lever against it is the **prior**: which is why the
-MAP methods with a good denoiser (PnP family) are the ones with headroom, and why MCMC, whose
-only test is on the data, cannot win here at all.
+~47-direction null space — and the only lever against it is the **prior**: which is why the MAP
+methods with a good denoiser (PnP family) are the ones with the most headroom, and why the best
+choices are always about *matching the prior to the object and the algorithm* (and, for MCMC,
+pulling the data step with `λ_rr` inside its window so the sampler actually reconstructs).
