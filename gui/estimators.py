@@ -58,7 +58,7 @@ def _callback_for(param_key: str, spec, problem):
         if problems:
             _warn(widget, param_key,
                   "The following must be set first:\n\n"
-                  + "\n".join(f"  • {p}" for p in problems))
+                  + "\n".join(f"  > {p}" for p in problems))
             return
 
         # 2. build the operator and compute

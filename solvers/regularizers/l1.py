@@ -5,7 +5,7 @@ from .base import Regularization
 
 class L1Regularization(Regularization):
     """
-    L1 norm regularization: R(f) = ||f||₁ = sum(|f_ijk|)
+    L1 norm regularization: R(f) = ||f||1 = sum(|f_ijk|)
 
     Promotes sparsity in the image domain.
     """

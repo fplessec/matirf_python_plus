@@ -98,9 +98,9 @@ Design philosophy
 
 This layer defines the "application architecture contract":
 
-    base         → UI primitives
-    reusable     → ready-to-use UI sections
-    specializable → full application skeletons with hooks
+    base         -> UI primitives
+    reusable     -> ready-to-use UI sections
+    specializable -> full application skeletons with hooks
 
 Key principles:
     - enforce consistent GUI structure across all inverse problems

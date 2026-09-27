@@ -21,7 +21,7 @@ D is the negative log-likelihood of the noise, per pixel, parameterized by the n
 (solvers/fidelities/base.py); R is a mean over the voxels (solvers/regularizers/base.py).
 So L is, up to a constant factor, the negative log-POSTERIOR of the Bayesian model:
 
-    -log p(f | g)  ∝  (1 - lambda) D_theta(Hf, g)  +  lambda R(f)
+    -log p(f | g)  prop.  (1 - lambda) D_theta(Hf, g)  +  lambda R(f)
 
 The noise level theta = (a, b) lives in D, where it belongs — estimated from g, known in a
 simulation, or set by hand (the '[noise-model]' section). lambda_reg is left with a single

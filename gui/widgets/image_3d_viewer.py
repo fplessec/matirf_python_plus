@@ -56,7 +56,7 @@ class Image3DViewer(QWidget):
         self.slider.valueChanged.connect(self.on_slice_changed)
         # label to show size:
         self.slice_label = QLabel()
-        self.size_label = QLabel(f"Size: {self.w} × {self.h} pixels")
+        self.size_label = QLabel(f"Size: {self.w} x {self.h} pixels")
         size_label_color = self.palette().color(QPalette.PlaceholderText).name()  # depends on the palette
         self.size_label.setStyleSheet(f"color: {size_label_color}; font-style: italic; font-size: {settings.FontSize.SMALL}pt;")
         # label to show pixel value on mouse:
@@ -137,7 +137,7 @@ class Image3DViewer(QWidget):
         self.current_x = x
         self.current_y = y
         value = self.current_slice_raw[y, x]
-        self.pixel_label.setText(f"Pixel: (x={x}, y={y}) → value = {value:.3g}")
+        self.pixel_label.setText(f"Pixel: (x={x}, y={y}) -> value = {value:.3g}")
         if self.mouse_moved_callback is not None:
             self.mouse_moved_callback(x, y)
 

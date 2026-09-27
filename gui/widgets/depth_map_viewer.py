@@ -13,7 +13,7 @@ class DepthMapViewer(QWidget):
     """
     An object that renders a 2D depth map projection from a 3D image:
         > computes a color-coded projection along the Z axis using a colormap
-        > displays a horizontal colorbar mapping depth values (z0 → zN)
+        > displays a horizontal colorbar mapping depth values (z0 -> zN)
         > shows the estimated depth at each (x, y) position using a weighted average
         > displays depth values interactively in the matplotlib toolbar when hovering the image
     """

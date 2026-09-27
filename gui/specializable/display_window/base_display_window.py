@@ -214,7 +214,7 @@ class BaseDisplayWindow(QMainWindow):
         layout.addWidget(self.save_btn, alignment=Qt.AlignCenter)
         layout.addStretch()
         if self.pipeline.is_synthetic_data:
-            self.switch_btn = QPushButton("Go To Truth →")
+            self.switch_btn = QPushButton("Go To Truth ->")
             self.switch_btn.setEnabled(False)
             self.switch_btn.clicked.connect(self._change_right_column)
             self.switch_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
@@ -234,10 +234,10 @@ class BaseDisplayWindow(QMainWindow):
     def _change_right_column(self):
         if self.stack.currentIndex() == 0:
             self.stack.setCurrentIndex(1)
-            self.switch_btn.setText("← Go to Reconstruction")
+            self.switch_btn.setText("<- Go to Reconstruction")
         else:
             self.stack.setCurrentIndex(0)
-            self.switch_btn.setText("Go To Truth →")
+            self.switch_btn.setText("Go To Truth ->")
 
     def _save(self):
         save_dir = save_file(self, "Name the Save Directory", self.results_dir(), "Folder Selection (*.*)")

@@ -47,7 +47,7 @@ NOISE_MODEL_UI = {
         "param_info": {"dtype": float, "unit": "", "latex_name": "a", "default": 0.01},
     },
     "b": {
-        "title": "Read noise b = σ²",
+        "title": "Read noise b = sigma^2",
         "type": "value",
         "depends_on": {"fidelity": [_GAUSSIAN, _MIXED], "parameters": "manual"},
         "param_info": {"dtype": float, "unit": "", "latex_name": "b", "default": 1e-4},

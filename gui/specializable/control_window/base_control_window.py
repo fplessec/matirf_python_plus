@@ -103,14 +103,14 @@ class BaseControlWindow(QMainWindow):
                 config_path=self.cached_config_path,
                 formula=desc[3] if len(desc) == 4 else None,
             )
-            # Attribute name from toml_key: 'add-noise' → 'add_noise'
+            # Attribute name from toml_key: 'add-noise' -> 'add_noise'
             attr_name = toml_key.replace('-', '_')
             return section, attr_name
         # ── Class with extra kwargs: (Class, kwargs_dict) ──
         if isinstance(desc, tuple) and len(desc) == 2:
             cls, extra_kwargs = desc
             section = self._instantiate_section(cls, extra_kwargs)
-            # Attribute name from class name: AlgorithmSelectionSection → algorithm_selection_section
+            # Attribute name from class name: AlgorithmSelectionSection -> algorithm_selection_section
             attr_name = _camel_to_snake(cls.__name__)
             return section, attr_name
         # ── Plain class ──

@@ -92,10 +92,10 @@ consistent and more pleasant to use.
 
 Design summary:
 
-    base          → UI primitives
-    specializable → application skeletons with hooks
-    reusable      → feature-level UI modules
-    widgets       → visual and interaction components
+    base          -> UI primitives
+    specializable -> application skeletons with hooks
+    reusable      -> feature-level UI modules
+    widgets       -> visual and interaction components
 
 This structure makes it easy to:
     - add new inverse problems without rewriting the GUI

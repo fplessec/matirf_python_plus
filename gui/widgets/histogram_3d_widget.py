@@ -95,7 +95,7 @@ class Histogram3DWidget(QWidget):
             y1 = min(self.image_3d.shape[1], y + p + 1)
             # extract full patch volume
             patch = self.image_3d[:, y0:y1, x0:x1]  # shape: (nz, dy, dx)
-            # flatten EVERYTHING → all pixels in the column volume
+            # flatten EVERYTHING -> all pixels in the column volume
             return patch.reshape(-1)
         return None
 

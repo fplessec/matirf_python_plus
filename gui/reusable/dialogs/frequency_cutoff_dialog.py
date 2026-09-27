@@ -47,8 +47,8 @@ class FrequencyCutoffDialog(QDialog):
         layout.addWidget(info_label)
 
         stats_text = (
-            f"  |H_fft|² max  = {sq_max:.6e}\n"
-            f"  |H_fft|² min  = {sq_min:.6e}\n"
+            f"  |H_fft|^2 max  = {sq_max:.6e}\n"
+            f"  |H_fft|^2 min  = {sq_min:.6e}\n"
             f"  Total frequencies: {self._n_total}"
         )
         stats_label = QLabel(stats_text)
@@ -56,8 +56,8 @@ class FrequencyCutoffDialog(QDialog):
 
         explanation = QLabel(
             "Slide to set lambda_rr (log scale).\n"
-            "Frequencies with |H_fft|² >> lambda_rr are deconvolved,\n"
-            "frequencies with |H_fft|² << lambda_rr are suppressed."
+            "Frequencies with |H_fft|^2 >> lambda_rr are deconvolved,\n"
+            "frequencies with |H_fft|^2 << lambda_rr are suppressed."
         )
         layout.addWidget(explanation)
 

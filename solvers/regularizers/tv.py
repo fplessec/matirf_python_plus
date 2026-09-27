@@ -6,7 +6,7 @@ from .base import Regularization
 class TVRegularization(Regularization):
     """
     Total Variation regularization (L1 norm of the gradient):
-        R(f) = ||∇f||₁ = sum(|∂f/∂xi|)
+        R(f) = ||gradf||1 = sum(|df/dxi|)
 
     Promotes piecewise-constant solutions (edge-preserving).
     Works in 2D and 3D via diff_ops.

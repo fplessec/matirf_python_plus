@@ -45,7 +45,7 @@ class ImageAndHisto3DViewer(QGroupBox):
         self.patch_combo = QComboBox()
         patch_sizes = [1,3,5,7,9,11,13,15,17,19,21,25,31,25,41,51]
         self.patch_combo.addItems([str(s) for s in patch_sizes])
-        self.patch_combo.setCurrentText("5")  # default → p=2
+        self.patch_combo.setCurrentText("5")  # default -> p=2
         # assemble to controls line:
         controls_layout.addStretch()
         controls_layout.addWidget(self.mode_label)

@@ -35,7 +35,7 @@ from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
 ## three primitive structures — the denoiser winner depends on the object, so the benchmark
 ## sweeps them: point-like (vesicles), filaments (fibres), continuous membrane (cell).
 TRUTHS = ["vesicles", "fibres", "cell"]
-REF_TRUTH = "fibres"                     # the reference for the reference-condition studies (λ-shape)
+REF_TRUTH = "fibres"                     # the reference for the reference-condition studies (lambda-shape)
 DECONV_IMAGE = "img_001"                # the 2D deconvolution companion
 NOISES = [0.0, 0.02, 0.05]              # none, then two Gaussian levels
 JSON_MATIRF = str(MATIRF_SYNTHETIC_DIR / "measurement_parameters.json")
@@ -48,10 +48,10 @@ JSON_DECONV = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")
 ## lambda 491 nm, n 1.34): dz=6 nm, dxy~84 nm. It is the value the operator would estimate; we
 ## write it into every MA-TIRF config so a reader needs nothing outside the file to reproduce it.
 MATIRF_DELTA = 0.0714046275583453
-## Ridge-start weight for the MAP/denoiser solvers whose start is (HᵀH + λ_rr I)⁻¹Hᵀg with
-## λ_rr = s2² (second eigenvalue of HᵀH; same for the synthetic and esoubies geometries).
+## Ridge-start weight for the MAP/denoiser solvers whose start is (H^TH + lambda_rr I)^-1H^Tg with
+## lambda_rr = s2^2 (second eigenvalue of H^TH; same for the synthetic and esoubies geometries).
 MATIRF_RIDGE = 36.24
-## MCMC's ridge weight is its own automatic value s1 = √‖HᵀH‖ (the largest singular value),
+## MCMC's ridge weight is its own automatic value s1 = sqrt||H^TH|| (the largest singular value),
 ## pinned here so the config is explicit.
 MATIRF_S1 = 38.863
 DECONV_DELTA = 1.0                       # 2D deconvolution: isotropic grid (dz = dxy)
@@ -63,12 +63,12 @@ SHV_RHO = 0.6                            # SHV sparse/smooth balance (docs adam_
 ## start, a strict plateau stop with a big budget so EPS — not the budget — ends the run.
 ADAM_FIXED = {"max_iter": 5000, "K": 10, "EPS": 1e-8, "lr": 0.1, "init": "ridge"}
 PPXA_FIXED = {"max_iter": 5000, "K": 10, "EPS": 1e-8, "lambda_relax": 1.5, "gamma": 0.01,
-              "init": "ridge"}          # gamma inside [1/s1², 1/s2²] (docs adam_ppxa §3.2)
+              "init": "ridge"}          # gamma inside [1/s1^2, 1/s2^2] (docs adam_ppxa §3.2)
 
 # ── config builders (physical operator, g peak-normalized, normalize=False) ───
 
 def _noise_sections(noise):
-    """(add-noise, noise-model) for a synthetic run: none → estimated, else the oracle level."""
+    """(add-noise, noise-model) for a synthetic run: none -> estimated, else the oracle level."""
     if noise == 0.0:
         return {}, {}
     return {"gaussian_noise": True, "sigma": noise, "seed": 1}, {"parameters": "oracle"}
@@ -105,7 +105,7 @@ def deconv_config(solver, noise, algo_params):
 # ── per-solver COMPLETE algo-params (every parameter the solver reads) ─────────
 
 def _adam_matirf(reg, lam):
-    """Adam on MA-TIRF: prior `reg` at share `lam`, ridge s2² start, pinned anisotropy."""
+    """Adam on MA-TIRF: prior `reg` at share `lam`, ridge s2^2 start, pinned anisotropy."""
     params = {"reg": reg, "lambda_reg": lam, **ADAM_FIXED,
               "lambda_rr": MATIRF_RIDGE, "delta": MATIRF_DELTA}
     if reg == "shv":
@@ -175,14 +175,14 @@ ADAM_LAMBDAS = (0.05, 0.1, 0.2, 0.3, 0.5)          # the shape sweep (at the ref
 
 ## denoiser sweeps, each denoiser at its good regime (tuned on the composite; the benchmark
 ## reveals which one wins per structure). role="denoiser" — analysis picks the best per cell.
-PNP_DENOISERS = [("Gaussian", 25.0, 12.0), ("TV Bregman", 40.0, 12.0), ("DCT", 18.0, 6.0)]      # (den, σ, λ_kz), iter=40
-ADMMPNP_DENOISERS = [("Gaussian", 50.0, 0.03), ("TV Bregman", 40.0, 4.0), ("DCT", 22.0, 1.0)]   # (den, σ, ρ), iter=50
-MCMC_DENOISERS = [("TV Bregman", 0.01, 5.0), ("Gaussian", 0.01, 5.0), ("DCT", 0.01, 5.0)]       # (den, σ, λ_rr), iter=300
+PNP_DENOISERS = [("Gaussian", 25.0, 12.0), ("TV Bregman", 40.0, 12.0), ("DCT", 18.0, 6.0)]      # (den, sigma, lambda_kz), iter=40
+ADMMPNP_DENOISERS = [("Gaussian", 50.0, 0.03), ("TV Bregman", 40.0, 4.0), ("DCT", 22.0, 1.0)]   # (den, sigma, rho), iter=50
+MCMC_DENOISERS = [("TV Bregman", 0.01, 5.0), ("Gaussian", 0.01, 5.0), ("DCT", 0.01, 5.0)]       # (den, sigma, lambda_rr), iter=300
 
 
 def _adam():
     """Adam — sparsity (L1) vs smoothness (Tikhonov) on each of the three structures: standard
-    Tikhonov, optimal L1 (the prior winner may itself depend on the object). The λ-shape (why L1
+    Tikhonov, optimal L1 (the prior winner may itself depend on the object). The lambda-shape (why L1
     has an optimum) is drawn on the reference structure at noise 0.02."""
     out = []
     for truth in TRUTHS:
@@ -193,7 +193,7 @@ def _adam():
                              "ADAM", truth, noise, "alt", {"reg": "none", "lambda": 0.0}))
             out.append(_spec("matirf", matirf_config(truth, "ADAM", noise, _adam_matirf("l1", 0.2)),
                              "ADAM", truth, noise, "optimal", {"reg": "l1", "lambda": 0.2}))
-    for reg in ("l1", "tikhonov"):                             # the λ-shape at the reference truth
+    for reg in ("l1", "tikhonov"):                             # the lambda-shape at the reference truth
         for lam in ADAM_LAMBDAS:
             out.append(_spec("matirf", matirf_config(REF_TRUTH, "ADAM", 0.02, _adam_matirf(reg, lam)),
                              "ADAM", REF_TRUTH, 0.02, "shape", {"reg": reg, "lambda": lam}))
@@ -214,7 +214,7 @@ def _ppxa():
 
 
 def _admm_specs():
-    """ADMM — soft-threshold sparsity, on each structure. Standard κ=0.1; sparser κ=0.01 alt."""
+    """ADMM — soft-threshold sparsity, on each structure. Standard kappa=0.1; sparser kappa=0.01 alt."""
     out = []
     for truth in TRUTHS:
         for noise in NOISES:
@@ -225,8 +225,8 @@ def _admm_specs():
 
 
 def _pnp():
-    """PnP-HQS — annealing-schedule denoiser prior (iter=40, λ_kz=12: hands the null space to the
-    prior). Standard = the DPIR default (Gaussian σ=25, λ_kz=0.23, iter=16). Sweeps Gaussian / TV
+    """PnP-HQS — annealing-schedule denoiser prior (iter=40, lambda_kz=12: hands the null space to the
+    prior). Standard = the DPIR default (Gaussian sigma=25, lambda_kz=0.23, iter=16). Sweeps Gaussian / TV
     Bregman / DCT per structure — the winner (TV Bregman on the composite) may depend on the object."""
     out = []
     for truth in TRUTHS:
@@ -242,9 +242,9 @@ def _pnp():
 
 
 def _admm_pnp():
-    """ADMM-PnP — dual-variable denoiser prior (iter=50). Standard = Gaussian σ=25, ρ=0.1. Sweeps
+    """ADMM-PnP — dual-variable denoiser prior (iter=50). Standard = Gaussian sigma=25, rho=0.1. Sweeps
     Gaussian / TV Bregman / DCT per structure (Gaussian wins on the composite; the dual makes it
-    prefer a moderate ρ·σ² — opposite of PnP). + the real esoubies point with the best config."""
+    prefer a moderate rho*sigma^2 — opposite of PnP). + the real esoubies point with the best config."""
     out = []
     for truth in TRUTHS:
         for noise in NOISES:
@@ -282,9 +282,9 @@ def _esoubies():
 
 
 def _mcmc():
-    """MCMC — MMSE by sampling (a genuine reconstructor: it BEATS the ridge start, λ_rr≈5 not s1).
-    Standard = the old weak default (TV Bregman σ=0.02, λ_rr=s1, iter=300). Sweeps TV Bregman /
-    Gaussian / DCT per structure at the good regime (σ=0.01, λ_rr=5, iter=300). + deconv (excels)."""
+    """MCMC — MMSE by sampling (a genuine reconstructor: it BEATS the ridge start, lambda_rr~5 not s1).
+    Standard = the old weak default (TV Bregman sigma=0.02, lambda_rr=s1, iter=300). Sweeps TV Bregman /
+    Gaussian / DCT per structure at the good regime (sigma=0.01, lambda_rr=5, iter=300). + deconv (excels)."""
     out = []
     for truth in TRUTHS:
         for noise in NOISES:

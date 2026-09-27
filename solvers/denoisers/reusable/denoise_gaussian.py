@@ -21,10 +21,10 @@ class GaussianDenoiser(Denoiser):
         Applies a linear Gaussian filter (convolution) to smooth the image.
         In 3D, accounts for anisotropy using `delta`.
 
-        Each output pixel x̂(i) is a weighted average of its neighbors:
-            x̂(i) = [sum over j of] K(j) · y(i - j)
+        Each output pixel x_hat(i) is a weighted average of its neighbors:
+            x_hat(i) = [sum over j of] K(j) * y(i - j)
             where K is a normalized Gaussian kernel:
-                K(j) ∝ exp( -||j||^2 / (2 * sigma^2) )
+                K(j) prop. exp( -||j||^2 / (2 * sigma^2) )
                 sum_j K(j) = 1
 
         Note on `sigma`: it is a *noise level* on the [0, 255] scale (shared
@@ -37,7 +37,7 @@ class GaussianDenoiser(Denoiser):
         Args:
             y (Tensor): Input noisy image (1,Y,X) or (Z,Y,X)
             sigma (float): Noise standard deviation on the [0, 255] scale
-            delta (float): Anisotropy ratio (Δz/Δxy) for 3D data
+            delta (float): Anisotropy ratio (Deltaz/Deltaxy) for 3D data
         Returns:
             Tensor: Smoothed image with same shape as input
         """

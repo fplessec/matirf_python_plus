@@ -17,11 +17,11 @@ class WienerDenoiser(Denoiser):
         Estimates local mean and variance within a uniform window, and
         applies adaptive smoothing based on the noise variance.
 
-        Each output pixel x̂(i) is computed from the local statistics:
-            x̂(i) = μ(i) + g(i) · (y(i) - μ(i))
+        Each output pixel x_hat(i) is computed from the local statistics:
+            x_hat(i) = mu(i) + g(i) * (y(i) - mu(i))
             where:
-                μ(i) = [sum over j of] K(j) · y(i - j)  (local mean)
-                var(i) = [sum over j of] K(j) · y(i - j)^2 - μ(i)^2  (local variance)
+                mu(i) = [sum over j of] K(j) * y(i - j)  (local mean)
+                var(i) = [sum over j of] K(j) * y(i - j)^2 - mu(i)^2  (local variance)
                 g(i) = max(var(i) - sigma^2, 0) / var(i)  (Wiener gain)
             and K is a normalized uniform kernel:
                 K(j) = 1 / N   over the local window
@@ -52,8 +52,8 @@ class WienerDenoiser(Denoiser):
             K = torch.ones((window_size, window_size), device=settings.device, dtype=settings.dtype)
         # normalize uniform kernel:
         K /= K.numel()
-        mu = _conv_reflect_5d(y5d, K)  # μ(i): local mean
+        mu = _conv_reflect_5d(y5d, K)  # mu(i): local mean
         var = _conv_reflect_5d(y5d ** 2, K) - mu ** 2  # var(i): local variance
         gain = torch.clamp(var - sigma**2, min=0.0) / (var + 1e-12)  # Wiener gain g(i)
-        x5d = mu + gain * (y5d - mu)  # x̂(i) = μ(i) + g(i) · (y(i) - μ(i))
+        x5d = mu + gain * (y5d - mu)  # x_hat(i) = mu(i) + g(i) * (y(i) - mu(i))
         return _from_5d(x5d)

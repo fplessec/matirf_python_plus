@@ -7,9 +7,9 @@ class BaseSectionQGroup(QGroupBox):
     """
     Third level in the parameter UI hierarchy (see base_section_widget.py):
 
-        SimpleParameterWidget   1 parameter dict   →  1 line
-        BaseSectionWidget       1 ui dict           →  k lines
-        BaseSectionQGroup       1 ui dict           →  k lines in a titled QGroupBox frame
+        SimpleParameterWidget   1 parameter dict   ->  1 line
+        BaseSectionWidget       1 ui dict           ->  k lines
+        BaseSectionQGroup       1 ui dict           ->  k lines in a titled QGroupBox frame
 
     BaseSectionQGroup wraps a BaseSectionWidget inside a QGroupBox so the
     section is visually grouped with a border and a title.

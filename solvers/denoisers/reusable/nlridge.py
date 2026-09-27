@@ -337,9 +337,9 @@ class NLRidge(nn.Module):
             constraints (str): Type of constraints ('linear', 'affine', 'conical', or 'convex').
 
             Recommended parameters for additive white Gaussian noise:
-            - 0 < σ ≤ 15: p1=7, p2=7, k1=18, k2=55
-            - 15 < σ ≤ 35: p1=9, p2=9, k1=18, k2=90
-            - 35 < σ ≤ 50: p1=11, p2=9, k1=20, k2=120
+            - 0 < sigma <= 15: p1=7, p2=7, k1=18, k2=55
+            - 15 < sigma <= 35: p1=9, p2=9, k1=18, k2=90
+            - 35 < sigma <= 50: p1=11, p2=9, k1=20, k2=120
 
         Returns:
             torch.FloatTensor: Final denoised image, shape (N, C, H, W).

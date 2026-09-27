@@ -35,13 +35,13 @@ Adaptive behavior
 =====================================================================
 
 Each metric receives the problem's `features` set and adapts:
-    - "scale_ambiguous" in features → aligns scale before comparing
-    - "3d" in features → handles volumetric data appropriately
-    - "2d" in features → uses standard 2D implementations
+    - "scale_ambiguous" in features -> aligns scale before comparing
+    - "3d" in features -> handles volumetric data appropriately
+    - "2d" in features -> uses standard 2D implementations
 
 The `requires` set filters out metrics that don't apply:
-    - requires ⊆ features → metric is included
-    - otherwise → metric is skipped
+    - requires  subset  features -> metric is included
+    - otherwise -> metric is skipped
 
 =====================================================================
 Usage

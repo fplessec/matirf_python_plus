@@ -90,7 +90,7 @@ def _done(rec: dict) -> bool:
 
 
 def _best(records: list, key: str = "NMSE", target=None):
-    """The record optimizing `key` — smallest NMSE, or closest to `target` (chi2 → 1)."""
+    """The record optimizing `key` — smallest NMSE, or closest to `target` (chi2 -> 1)."""
     scored = [(r, _metric(r, key)) for r in records]
     scored = [(r, v) for r, v in scored if v is not None]
     if not scored:
@@ -134,7 +134,7 @@ def cross_comparison(records: list, problem: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-## the report's algorithm chapters, in order (tag values → display used in the filenames)
+## the report's algorithm chapters, in order (tag values -> display used in the filenames)
 SOLVER_ORDER = ["ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"]
 
 
@@ -273,12 +273,12 @@ def denoiser_winners(records: list) -> str:
 
 
 def adam_shape(records: list) -> str:
-    """Adam's λ-shape at the reference condition (noise 0.02): NMSE and depth error vs λ, for the
+    """Adam's lambda-shape at the reference condition (noise 0.02): NMSE and depth error vs lambda, for the
     sparse (L1) and the smooth (Tikhonov) prior — the illustration in the Adam chapter."""
     runs = [r for r in records if r.get("tags", {}).get("solver") == "ADAM"
             and r.get("tags", {}).get("role") == "shape" and _done(r)
             and r.get("tags", {}).get("reg") in ("l1", "tikhonov")]
-    lines = ["## Adam λ-shape — reference structure, noise 0.02", "",
+    lines = ["## Adam lambda-shape — reference structure, noise 0.02", "",
              "| prior | lambda | NMSE | depth err (nm) |", "|---|---|---|---|"]
     for reg in ("l1", "tikhonov"):
         group = sorted((r for r in runs if r["tags"].get("reg") == reg),
@@ -347,7 +347,7 @@ def rejects_and_cost(records: list) -> str:
         for r in runs:
             for f in r.get("findings", []):
                 findings[f] = findings.get(f, 0) + 1
-        top = ", ".join(f"{k}×{v}" for k, v in sorted(findings.items(), key=lambda kv: -kv[1])[:3])
+        top = ", ".join(f"{k} x{v}" for k, v in sorted(findings.items(), key=lambda kv: -kv[1])[:3])
         median = sorted(times)[len(times) // 2] if times else float("nan")
         lines.append(f"| {solver} | {n} | {rejected} ({100*rejected//max(n,1)}%) | {broken} | "
                      f"{median:.1f} | {max(mems) if mems else float('nan'):.0f} | {top or '—'} |")
@@ -444,7 +444,7 @@ def render_pngs(exported: list) -> int:
     return count
 
 
-# ── Markdown → LaTeX (pipe tables) ────────────────────────────────────────────
+# ── Markdown -> LaTeX (pipe tables) ────────────────────────────────────────────
 
 def _tex_escape(s: str) -> str:
     for a, b in (("\\", r"\textbackslash "), ("_", r"\_"), ("%", r"\%"),
@@ -517,7 +517,7 @@ def analyze(campaign_dir: Path, report_dir: Path, with_pngs: bool = True) -> Non
     ## one standard-vs-optimal table per algorithm — the core of each report chapter
     for solver in SOLVER_ORDER:
         reports[f"algo_{solver.replace('-', '_').lower()}"] = per_algorithm(records, solver)
-    reports["adam_shape"] = adam_shape(records)          # the Adam chapter's L1-vs-Tikhonov λ figure
+    reports["adam_shape"] = adam_shape(records)          # the Adam chapter's L1-vs-Tikhonov lambda figure
     reports["denoiser_winners"] = denoiser_winners(records)   # ONE combined denoiser table
     for solver in DENOISER_SOLVERS:                      # detailed per-algo denoiser tables (durable data)
         reports[f"denoisers_{solver.replace('-', '_').lower()}"] = denoiser_comparison(records, solver)

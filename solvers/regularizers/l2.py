@@ -3,7 +3,7 @@ from .base import Regularization
 
 class L2Regularization(Regularization):
     """
-    L2 norm regularization: R(f) = ||f||² = sum(f_ijk²)
+    L2 norm regularization: R(f) = ||f||^2 = sum(f_ijk^2)
 
     Penalizes large values uniformly.
     """

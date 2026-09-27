@@ -39,12 +39,12 @@ class DCTDenoiser(Denoiser):
         soft-thresholding in the transform domain, and reconstructs the image.
 
         The denoised signal is obtained as:
-            x̂ = IDCT(X̂)
+            x_hat = IDCT(X_hat)
         where each coefficient is shrunk independently:
-            X̂(k) = sign(X(k)) · max(|X(k)| - T, 0)
+            X_hat(k) = sign(X(k)) * max(|X(k)| - T, 0)
             with:
                 X = DCT(y)
-                T = sigma · sqrt(2 · log(N))   (universal threshold)
+                T = sigma * sqrt(2 * log(N))   (universal threshold)
                 N = total number of elements
 
         Args:

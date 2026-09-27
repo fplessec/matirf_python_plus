@@ -7,11 +7,11 @@ from .base import Regularization
 class TikhonovRegularization(Regularization):
     """
     Tikhonov regularization (squared L2 norm of the gradient):
-        R(f) = (1/N) sum_x ||∇f(x)||² = (1/N) sum_x sum_i (∂f/∂x_i)²
+        R(f) = (1/N) sum_x ||gradf(x)||^2 = (1/N) sum_x sum_i (df/dx_i)^2
 
     Promotes smooth solutions. Works in 2D and 3D via diff_ops.
 
-    CHANGE FROM V1: v1's loss was mean_x ||∇f(x)|| — the norm, not its square, which is the
+    CHANGE FROM V1: v1's loss was mean_x ||gradf(x)|| — the norm, not its square, which is the
     isotropic total variation — while its prox solved the squared problem. Adam and PPXA
     therefore minimized two different priors under one name. Both are now the square: the
     classical Tikhonov prior, and the one the prox below actually computes.

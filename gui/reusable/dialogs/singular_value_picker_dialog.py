@@ -1,6 +1,6 @@
 """
 Non-modal dialog that displays a spectrum of singular values (or Fourier
-magnitudes) and lets the user pick a cutoff.  lambda_rr = s_k².
+magnitudes) and lets the user pick a cutoff.  lambda_rr = s_k^2.
 
 Used by both MA-TIRF (SVD of H) and deconvolution (FFT spectrum of PSF).
 """
@@ -29,7 +29,7 @@ class SingularValuePickerDialog(QDialog):
         for i in range(n_show):
             spectrum_lines.append(
                 f"  {spectrum_label_prefix}_{i+1} = {S[i]:.6e}"
-                f"    {spectrum_label_prefix}_{i+1}² = {S[i]**2:.6e}"
+                f"    {spectrum_label_prefix}_{i+1}^2 = {S[i]**2:.6e}"
             )
         if n_show < len(S):
             spectrum_lines.append(f"  ... ({len(S)} total values)")
@@ -39,9 +39,9 @@ class SingularValuePickerDialog(QDialog):
         layout.addWidget(spectrum_label)
 
         explanation = QLabel(
-            "Choose the cutoff: lambda_rr = value².\n"
-            "Components with value² >> lambda_rr are inverted,\n"
-            "components with value² << lambda_rr are suppressed."
+            "Choose the cutoff: lambda_rr = value^2.\n"
+            "Components with value^2 >> lambda_rr are inverted,\n"
+            "components with value^2 << lambda_rr are suppressed."
         )
         layout.addWidget(explanation)
 
@@ -51,7 +51,7 @@ class SingularValuePickerDialog(QDialog):
         self._combo = QComboBox()
         for i in range(n_show):
             self._combo.addItem(
-                f"{spectrum_label_prefix}_{i+1}² = {S[i]**2:.6e}"
+                f"{spectrum_label_prefix}_{i+1}^2 = {S[i]**2:.6e}"
                 f"   ({spectrum_label_prefix}_{i+1} = {S[i]:.6f})"
             )
         self._combo.setCurrentIndex(min(1, n_show - 1))
