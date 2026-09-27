@@ -30,6 +30,26 @@ _PROF_TITLE = 34             # space above each profile for its title
 _PROF_LABEL = 62             # space below each profile for its x tick labels + x label
 
 
+def export_depth_only(depth_widget, filepath, dpi=DPI, size=760):
+    """Render only the depth map (square) + its colorbar to a compact square PNG — for galleries."""
+    _T, _CG, _CH, _CL, _M = 40, 14, 22, 30, 18   # title / cbar gap / cbar / labels / margin (px)
+    w = _M + size + _M
+    h = _M + _T + size + _CG + _CH + _CL + _M
+    facecolor = depth_widget.figure.get_facecolor()
+    fig = Figure(figsize=(w / dpi, h / dpi), dpi=dpi, facecolor=facecolor)
+    FigureCanvasAgg(fig)
+
+    def rect(x, y, ww, hh):
+        return [x / w, (h - y - hh) / h, ww / w, hh / h]
+
+    y0 = _M + _T
+    ax = fig.add_axes(rect(_M, y0, size, size))
+    cax = fig.add_axes(rect(_M, y0 + size + _CG, size, _CH))
+    depth_widget.render_depth(fig, ax, cax=cax)
+    ax.set_title(depth_widget.title, color=depth_widget.text1_color)
+    fig.savefig(filepath, dpi=dpi, facecolor=facecolor)
+
+
 def export_depth_and_profiles(depth_widget, profiles_widget, filepath, dpi=DPI):
     """
     Renders 'depth_widget' (a DepthMapViewer) and 'profiles_widget' (a ProfilesViewer)

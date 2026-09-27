@@ -156,7 +156,7 @@ def denoiser_comparison(records: list, solver: str) -> str:
         metrics = MATIRF_METRICS if problem == "matirf" else DECONV_METRICS
         header = "| structure | noise | denoiser | " + " | ".join(metrics) + " |"
         lines += [f"### {problem}", "", header, "|" + "---|" * (3 + len(metrics))]
-        cells = sorted({_cell(r) for r in here}, key=lambda c: (str(c[1]), _noise_key(c[2])))
+        cells = sorted({_cell(r) for r in here}, key=lambda c: (_noise_key(c[2]), str(c[1])))
         for _, dataset, noise in cells:
             group = [r for r in here if _cell(r) == (problem, dataset, noise)]
             winner = _best(group, "NMSE")
@@ -166,6 +166,108 @@ def denoiser_comparison(records: list, solver: str) -> str:
                 cols = " | ".join(_fmt_metric(r, m) for m in metrics)
                 lines.append(f"| {dataset} | {_fmt(noise)} | {den} | {cols} |")
         lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def gallery(records: list, solver: str) -> str:
+    """Per-algo gallery (raw LaTeX): the best reconstruction on each structure at noise 0.02, with
+    the run's parameters in each subcaption so any panel is reproducible."""
+    runs = [r for r in records if r.get("tags", {}).get("solver") == solver
+            and r.get("tags", {}).get("problem") == "matirf"
+            and r.get("tags", {}).get("noise") == 0.02 and _done(r)]
+    panels = []
+    for s in ("vesicles", "fibres", "cell"):
+        best = _best([r for r in runs if r["tags"].get("dataset") == s], "NMSE")
+        if best is not None:
+            panels.append((s, _figure_id(best), _tex_escape(_params(best)), _fmt_metric(best, "NMSE")))
+    if not panels:
+        return ""
+    ## full depth-map + yz/zx profiles, stacked one per row so the profiles stay legible
+    out = [r"\begin{figure}[H]\centering"]
+    for s, fid, params, nmse in panels:
+        out.append(r"\begin{subfigure}{0.56\linewidth}\centering")
+        out.append(r"\IfFileExists{figures/%s.png}{\includegraphics[width=\linewidth]{%s}}{}" % (fid, fid))
+        out.append(r"\caption*{\footnotesize\texttt{%s} --- %s (NMSE %s)}" % (s, params, nmse))
+        out.append(r"\end{subfigure}\par\smallskip")
+    out.append(r"\caption{\textbf{%s} --- best reconstruction on each structure at noise 0.02 "
+               r"(depth map + $yz/zx$ profiles; the parameters under each panel reproduce it).}" % solver)
+    out.append(r"\end{figure}")
+    return "\n".join(out) + "\n"
+
+
+def truth_gallery(records: list, campaign_dir: Path, report_dir: Path) -> str:
+    """Render each structure's ground truth (depth map + profiles) and emit a LaTeX figure of the
+    three, for the start of the report. f_true.TIF is saved in every run folder."""
+    try:
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt5.QtWidgets import QApplication
+        from fileio import load_tif
+        from gui.widgets.depth_map_viewer import DepthMapViewer
+        from gui.widgets.profiles_viewer import ProfilesViewer
+        from gui.widgets.figure_export import export_depth_and_profiles
+    except Exception as error:                                  # pragma: no cover - environment
+        print(f"  (truth render skipped — {type(error).__name__}: {error})")
+        return ""
+    figures = report_dir / "figures"
+    figures.mkdir(parents=True, exist_ok=True)
+    app = QApplication.instance() or QApplication([])
+    panels = []
+    for s in ("vesicles", "fibres", "cell"):
+        run = next((r for r in records if r.get("tags", {}).get("dataset") == s
+                    and (campaign_dir / "runs" / r.get("run_id", "") / "f_true.TIF").exists()), None)
+        if run is None:
+            continue
+        tif = campaign_dir / "runs" / run["run_id"] / "f_true.TIF"
+        oper = run.get("config", {}).get("oper-params", {})
+        z0, zN = float(oper.get("z0", 0.0)), float(oper.get("zN", 300.0))
+        try:
+            image = load_tif(tif)
+            depth = DepthMapViewer(image, z0, zN, title=s)
+            profiles = ProfilesViewer(image, z0, zN)
+            export_depth_and_profiles(depth, profiles, str(figures / f"truth_{s}.png"))
+            depth.deleteLater(); profiles.deleteLater()
+            panels.append(s)
+        except Exception as error:                              # pragma: no cover - rendering
+            print(f"  (truth PNG failed for {s} — {type(error).__name__}: {error})")
+    _ = app
+    if not panels:
+        return ""
+    out = [r"\begin{figure}[H]\centering"]
+    for s in panels:
+        out.append(r"\begin{subfigure}{0.56\linewidth}\centering")
+        out.append(r"\IfFileExists{figures/truth_%s.png}{\includegraphics[width=\linewidth]{truth_%s}}{}" % (s, s))
+        out.append(r"\caption*{\footnotesize\texttt{%s}}" % s)
+        out.append(r"\end{subfigure}\par\smallskip")
+    out.append(r"\caption{The three ground-truth structures --- \texttt{vesicles} (point-like), "
+               r"\texttt{fibres} (filaments), \texttt{cell} (continuous membrane) --- as depth map "
+               r"+ $yz/zx$ profiles.}")
+    out.append(r"\label{fig:truths}")
+    out.append(r"\end{figure}")
+    return "\n".join(out) + "\n"
+
+
+def denoiser_winners(records: list) -> str:
+    """ONE compact table: for each (structure, noise) the winning denoiser (best NMSE) of each
+    plug-and-play solver. Directly answers 'which denoiser', replacing the three per-algo tables."""
+    solvers = [("PNP", "PnP"), ("ADMM-PnP", "ADMM-PnP"), ("MCMC", "MCMC")]
+    runs = [r for r in records if r.get("tags", {}).get("role") == "denoiser"
+            and r.get("tags", {}).get("problem") == "matirf" and _done(r)]
+    lines = ["## Denoiser winner per structure and algorithm (best NMSE)", ""]
+    if not runs:
+        return "\n".join(lines + ["*(no completed runs yet)*", ""]) + "\n"
+    header = "| structure | noise | " + " | ".join(disp for _, disp in solvers) + " |"
+    lines += [header, "|" + "---|" * (2 + len(solvers))]
+    cells = sorted({(r["tags"]["dataset"], r["tags"]["noise"]) for r in runs},
+                   key=lambda c: (_noise_key(c[1]), str(c[0])))
+    for dataset, noise in cells:
+        row = [str(dataset), _fmt(noise)]
+        for tag, _ in solvers:
+            grp = [r for r in runs if r["tags"]["solver"] == tag
+                   and r["tags"]["dataset"] == dataset and r["tags"]["noise"] == noise]
+            best = _best(grp, "NMSE")
+            row.append(f"{best['tags'].get('denoiser')} ({_fmt_metric(best, 'NMSE')})" if best else "—")
+        lines.append("| " + " | ".join(row) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -205,23 +307,24 @@ def per_algorithm(records: list, solver: str) -> str:
         if not here:
             continue
         metrics = MATIRF_METRICS if problem == "matirf" else DECONV_METRICS
-        header = "| use | dataset | noise | params | " + " | ".join(metrics) + " |"
-        sep = "|" + "---|" * (4 + len(metrics))
+        ## the standard (default) config and the optimal (best) one; the params column tells them
+        ## apart (a 'use' label is redundant with it). Rows sorted by noise, esoubies (native) last.
+        header = "| dataset | noise | params | " + " | ".join(metrics) + " |"
+        sep = "|" + "---|" * (3 + len(metrics))
         lines += [f"### {problem}", "", header, sep]
-        cells = sorted({_cell(r) for r in here}, key=lambda c: (str(c[1]), _noise_key(c[2])))
+        cells = sorted({_cell(r) for r in here}, key=lambda c: (_noise_key(c[2]), str(c[1])))
         for _, dataset, noise in cells:
             group = [r for r in here if _cell(r) == (problem, dataset, noise)]
             native = noise == "native"
             standard = next((r for r in group if r.get("tags", {}).get("role") == "standard"), None)
             optimal = _best(group, "chi2_ratio" if native else "NMSE", target=1.0 if native else None)
             emitted = []
-            for use, rec in (("standard", standard), ("optimal", optimal)):
+            for rec in (standard, optimal):
                 if rec is None or rec["run_id"] in emitted:
                     continue
                 emitted.append(rec["run_id"])
                 cols = " | ".join(_fmt_metric(rec, m) for m in metrics)
-                label = "standard / optimal" if (standard is optimal and use == "standard") else use
-                lines.append(f"| {label} | {dataset} | {_fmt(noise)} | {_params(rec)} | {cols} |")
+                lines.append(f"| {dataset} | {_fmt(noise)} | {_params(rec)} | {cols} |")
         lines.append("")
     return "\n".join(lines) + "\n"
 
@@ -306,7 +409,7 @@ def render_pngs(exported: list) -> int:
         from fileio import load_tif
         from gui.widgets.depth_map_viewer import DepthMapViewer
         from gui.widgets.profiles_viewer import ProfilesViewer
-        from gui.widgets.figure_export import export_depth_and_profiles
+        from gui.widgets.figure_export import export_depth_and_profiles, export_depth_only
     except Exception as error:                              # pragma: no cover - environment
         print(f"  (PNG export skipped — {type(error).__name__}: {error})")
         return 0
@@ -409,16 +512,26 @@ def analyze(campaign_dir: Path, report_dir: Path, with_pngs: bool = True) -> Non
     ## one standard-vs-optimal table per algorithm — the core of each report chapter
     for solver in SOLVER_ORDER:
         reports[f"algo_{solver.replace('-', '_').lower()}"] = per_algorithm(records, solver)
-    reports["adam_shape"] = adam_shape(records)   # the Adam chapter's L1-vs-Tikhonov λ figure
-    for solver in DENOISER_SOLVERS:               # which denoiser wins per structure
+    reports["adam_shape"] = adam_shape(records)          # the Adam chapter's L1-vs-Tikhonov λ figure
+    reports["denoiser_winners"] = denoiser_winners(records)   # ONE combined denoiser table
+    for solver in DENOISER_SOLVERS:                      # detailed per-algo denoiser tables (durable data)
         reports[f"denoisers_{solver.replace('-', '_').lower()}"] = denoiser_comparison(records, solver)
     for name, md in reports.items():
         (summary / f"{name}.md").write_text(md)        # human-readable, committed synthesis
         (tables / f"{name}.tex").write_text(md_to_latex(md))   # \input by the report
-    print(f"  wrote {len(reports)} tables (.md in {summary.name}/, .tex in {tables.name}/)")
+    ## per-algo galleries are already LaTeX (subfigures + params captions) — written as-is
+    for solver in SOLVER_ORDER:
+        tex = gallery(records, solver)
+        if tex:
+            (tables / f"gallery_{solver.replace('-', '_').lower()}.tex").write_text(tex)
+    print(f"  wrote {len(reports)} tables + galleries (.md in {summary.name}/, .tex in {tables.name}/)")
 
     exported = export_showcase(records, campaign_dir, report_dir)
     print(f"  exported {len(exported)} showcase runs (config.toml + metrics.json)")
     if with_pngs:
         n = render_pngs(exported)                          # writes straight into figures/
         print(f"  rendered {n} depth-map/profile PNGs into figures/")
+        truth_tex = truth_gallery(records, campaign_dir, report_dir)   # the 3 ground truths, for the intro
+        if truth_tex:
+            (tables / "truth_gallery.tex").write_text(truth_tex)
+            print("  rendered the 3 ground-truth figures")
