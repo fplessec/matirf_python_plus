@@ -2,10 +2,10 @@
 Abstract base class for the synthetic truth section of any inverse problem.
 
 Provides:
-    - A metrics table (Metric / Value) with adaptive display:
+    > A metrics table (Metric / Value) with adaptive display:
         * scalar metrics: displayed as a number
         * curve metrics: displayed as summary value + a button to open a plot
-    - A "Visualize difference" button that opens a viewer window
+    > A "Visualize difference" button that opens a viewer window
 
 Declarative model: a concrete section just declares the viewer class used for the
 "difference" popup:

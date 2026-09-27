@@ -2,8 +2,8 @@
 Structural Similarity Index (SSIM).
 
 Adapts to:
-    - scale_ambiguous: aligns scale before computing
-    - 3d: computes slice-by-slice along Z axis and averages
+    > scale_ambiguous: aligns scale before computing
+    > 3d: computes slice-by-slice along Z axis and averages
 """
 
 import numpy as np

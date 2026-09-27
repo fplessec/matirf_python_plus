@@ -10,9 +10,9 @@ quality metrics for inverse problem reconstruction evaluation.
 Abstract base class for all quality metrics.
 
 It is responsible for:
-    - declaring the metric name and required features
-    - computing a scalar value from (f, f_true, features)
-    - adapting behavior based on problem features
+    > declaring the metric name and required features
+    > computing a scalar value from (f, f_true, features)
+    > adapting behavior based on problem features
 
 This is the atomic metric unit of the system.
 
@@ -22,9 +22,9 @@ This is the atomic metric unit of the system.
 Shared mathematical utilities used by multiple metrics.
 
 Provides:
-    - optimal_scale: computes the best scalar alignment
-    - align_scale: aligns f to f_true by scale
-    - to_numpy: tensor to numpy conversion
+    > optimal_scale: computes the best scalar alignment
+    > align_scale: aligns f to f_true by scale
+    > to_numpy: tensor to numpy conversion
 
 ---------------------------------------------------------------------
 

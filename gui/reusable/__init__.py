@@ -23,20 +23,20 @@ What belongs here
 
 This layer includes prebuilt GUI modules such as:
 
-- AddNoiseSection
+> AddNoiseSection
     The simulated Poisson-Gaussian noise (photons N, read noise sigma), with its formula
 
-- NoiseModelSection
+> NoiseModelSection
     The noise model the reconstruction assumes: data fidelity and noise level (a, b)
 
-- AlgorithmSelectionSection
+> AlgorithmSelectionSection
     Full algorithm selector with:
         * algorithm registry integration
         * parameter panels per algorithm
         * dynamic switching of parameter sets
         * reset and persistence logic
 
-- MessageSection
+> MessageSection
     Simple logging / message display panel for UI feedback
 
 ---------------------------------------------------------------------
@@ -44,25 +44,25 @@ Design role
 ---------------------------------------------------------------------
 
 Reusable components:
-    - compose BaseSectionWidget / BaseSectionQGroup
-    - integrate application-level GUI logic (selection, state handling)
-    - remain independent of specific inverse problem implementations
-    - are safe to reuse across matirf, deconv, and future modules
+    > compose BaseSectionWidget / BaseSectionQGroup
+    > integrate application-level GUI logic (selection, state handling)
+    > remain independent of specific inverse problem implementations
+    > are safe to reuse across matirf, deconv, and future modules
 
 ---------------------------------------------------------------------
 Key distinction
 ---------------------------------------------------------------------
 
-- base/:
+> base/:
     low-level UI primitives (parameter rendering, layout, sync)
 
-- reusable/:
+> reusable/:
     high-level prebuilt GUI sections (feature-complete building blocks)
 
-- specializable/:
+> specializable/:
     abstract or extensible components requiring problem-specific override
 
-- widgets/:
+> widgets/:
     low-level visual enhancements and presentation utilities
 """
 

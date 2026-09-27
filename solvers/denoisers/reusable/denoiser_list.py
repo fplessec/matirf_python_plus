@@ -5,8 +5,8 @@ Each denoiser is registered with a display name and a callable with a common
 interface:  denoiser_fn(image, sigma) -> denoised_image
 
 This registry is the single source of truth for:
-    - DENOISER_LIST (used in UI dicts for the option widget)
-    - DENOISER_REGISTRY (used at runtime to dispatch by name)
+    > DENOISER_LIST (used in UI dicts for the option widget)
+    > DENOISER_REGISTRY (used at runtime to dispatch by name)
 
 To add a new denoiser, just add an entry to DENOISER_REGISTRY below.
 """

@@ -18,13 +18,13 @@ to ready-to-use implementations.
 Low-level building blocks for image denoising.
 
 This layer defines:
-    - Denoiser (abstract base class with __call__ normalization logic)
-    - utils (shared tensor helpers: kernel construction, convolution)
+    > Denoiser (abstract base class with __call__ normalization logic)
+    > utils (shared tensor helpers: kernel construction, convolution)
 
 It is responsible for:
-    - defining the denoiser contract: denoise(y, sigma, delta)
-    - normalizing 2D/3D input formats
-    - handling slice-by-slice fallback for 2D-only denoisers on 3D data
+    > defining the denoiser contract: denoise(y, sigma, delta)
+    > normalizing 2D/3D input formats
+    > handling slice-by-slice fallback for 2D-only denoisers on 3D data
 
 This layer is intentionally independent of any specific denoiser or problem.
 
@@ -36,7 +36,7 @@ Prebuilt denoising algorithms at the signal processing level.
 
 This layer contains ready-to-use denoisers that can be plugged into
 any algorithm without modification:
-    - Gaussian, Bilateral, Wiener, DCT, TV Bregman, Non-Local Ridge
+    > Gaussian, Bilateral, Wiener, DCT, TV Bregman, Non-Local Ridge
 
 It also provides the denoiser registry (DENOISER_REGISTRY, DENOISER_LIST)
 used by algorithm ui_params and at runtime for dispatch by name.
@@ -53,9 +53,9 @@ specializable/ layer. All denoisers are complete implementations that
 do not need to be subclassed by specific inverse problems.
 
 This structure makes it easy to:
-    - add new denoisers without modifying algorithms
-    - reuse denoisers across all inverse problem modules
-    - keep a clean separation between denoising and optimization
+    > add new denoisers without modifying algorithms
+    > reuse denoisers across all inverse problem modules
+    > keep a clean separation between denoising and optimization
 """
 
 from .base import Denoiser

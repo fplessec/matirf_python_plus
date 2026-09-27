@@ -5,12 +5,12 @@ Reused by any inverse problem whose input-paths section needs a parameters edito
 (matirf's measurement parameters, deconv's PSF parameters, ...). It carries the whole
 common body:
     > Create vs Modify mode, deduced from the owning selector (parent.is_file_selected):
-        - Modify: values are pre-filled from the selected JSON, button "Save modifications"
-        - Create: values start at their UI-dict defaults, button "Create file" (asks a path,
+        > Modify: values are pre-filled from the selected JSON, button "Save modifications"
+        > Create: values start at their UI-dict defaults, button "Create file" (asks a path,
                   then registers it on the selector via parent.update_selected_file)
     > one widget per entry of a params UI dict:
-        - types 'value' / 'bool' / 'option' -> a SimpleParameterWidget (one line)
-        - type  'list'                      -> a free-text box, one element per line, parsed
+        > types 'value' / 'bool' / 'option' -> a SimpleParameterWidget (one line)
+        > type  'list'                      -> a free-text box, one element per line, parsed
                                                to a list of param_info['dtype'] (float/int/...)
     > parameter collection with a sentinel: an unset ('None') value, or an unparsable list
       line, shows a QMessageBox and aborts the save (collect returns the string 'error')

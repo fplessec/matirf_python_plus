@@ -8,9 +8,9 @@ These metrics are built on top of the BASE layer and implement
 the Metric interface with concrete computation logic.
 
 Each metric adapts its behavior based on the problem's features:
-    - "scale_ambiguous": aligns scale before comparing
-    - "3d": handles volumetric data (slice-by-slice SSIM, etc.)
-    - "2d": uses standard 2D implementations
+    > "scale_ambiguous": aligns scale before comparing
+    > "3d": handles volumetric data (slice-by-slice SSIM, etc.)
+    > "2d": uses standard 2D implementations
 
 The requires set filters metrics that only make sense in certain
 contexts (e.g. FSC requires 3D data).

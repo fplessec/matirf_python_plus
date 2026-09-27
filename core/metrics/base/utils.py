@@ -2,9 +2,9 @@
 Utility functions shared across metrics.
 
 Provides:
-    - optimal_scale(f, f_true): computes alpha* = argmin ||f_true - alpha * f||^2
-    - align_scale(f, f_true): returns (alpha * f, alpha)
-    - to_numpy(x): detaches and converts a tensor to numpy
+    > optimal_scale(f, f_true): computes alpha* = argmin ||f_true - alpha * f||^2
+    > align_scale(f, f_true): returns (alpha * f, alpha)
+    > to_numpy(x): detaches and converts a tensor to numpy
 """
 
 import torch

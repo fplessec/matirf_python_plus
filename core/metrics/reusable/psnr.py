@@ -2,8 +2,8 @@
 Peak Signal-to-Noise Ratio (dB).
 
 Adapts to:
-    - scale_ambiguous: aligns scale before computing
-    - 2d/3d: uses scikit-image for 2D, manual computation for 3D
+    > scale_ambiguous: aligns scale before computing
+    > 2d/3d: uses scikit-image for 2D, manual computation for 3D
 """
 
 import torch

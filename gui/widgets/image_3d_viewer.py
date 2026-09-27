@@ -18,8 +18,8 @@ class Image3DViewer(QWidget):
         > displays a 2D slice along Z with a slider to navigate through slices
         > shows pixel intensity under the mouse cursor in real time
         > provides callbacks:
-            - slice_changed_callback(slice_index): triggered when the slice changes
-            - mouse_moved_callback(x, y): triggered when the mouse moves over a valid pixel
+            > slice_changed_callback(slice_index): triggered when the slice changes
+            > mouse_moved_callback(x, y): triggered when the mouse moves over a valid pixel
         > supports mouse wheel (middle mouse) scrolling to navigate through slices
     """
     def __init__(self, image: torch.Tensor, parent=None, cmap='gray'):

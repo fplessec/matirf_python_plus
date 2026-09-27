@@ -14,14 +14,14 @@ to full application skeletons.
 Low-level building blocks for parameter UIs.
 
 This layer defines the core widgets used everywhere in the framework:
-    - SimpleParameterWidget
-    - BaseSectionWidget
-    - BaseSectionQGroup
+    > SimpleParameterWidget
+    > BaseSectionWidget
+    > BaseSectionQGroup
 
 It is responsible for:
-    - constructing parameter UIs from dictionaries
-    - handling TOML synchronization
-    - providing minimal reusable UI behavior
+    > constructing parameter UIs from dictionaries
+    > handling TOML synchronization
+    > providing minimal reusable UI behavior
 
 This layer is intentionally independent of any inverse problem logic.
 It is the foundation everything else builds on.
@@ -36,15 +36,15 @@ This layer defines full GUI structures (control windows, display windows)
 that are meant to be subclassed by specific inverse problems.
 
 It handles the heavy lifting:
-    - window layout and menus
-    - pipeline lifecycle integration
-    - config loading/saving flow
-    - signal wiring between UI and backend
+    > window layout and menus
+    > pipeline lifecycle integration
+    > config loading/saving flow
+    > signal wiring between UI and backend
 
 What it does not define:
-    - problem-specific parameters
-    - algorithm details
-    - visualization logic
+    > problem-specific parameters
+    > algorithm details
+    > visualization logic
 
 Instead, it exposes hooks where subclasses plug in their behavior.
 
@@ -61,10 +61,10 @@ This layer contains ready-to-use UI modules that can be dropped into
 any application without modification.
 
 Typical examples include:
-    - noise configuration sections
-    - algorithm selection + parameter panels
-    - logging / message panels
-    - standard composite UI blocks
+    > noise configuration sections
+    > algorithm selection + parameter panels
+    > logging / message panels
+    > standard composite UI blocks
 
 These components are built on top of `base/` and are designed to be
 independent of any specific inverse problem.
@@ -81,9 +81,9 @@ This layer contains visual building blocks that improve usability and
 appearance but do not implement application logic.
 
 Examples:
-    - custom buttons and separators
-    - text editors and display widgets
-    - small interaction helpers
+    > custom buttons and separators
+    > text editors and display widgets
+    > small interaction helpers
 
 These widgets are used throughout the other layers to keep the UI
 consistent and more pleasant to use.
@@ -98,8 +98,8 @@ Design summary:
     widgets       -> visual and interaction components
 
 This structure makes it easy to:
-    - add new inverse problems without rewriting the GUI
-    - reuse full UI sections across projects
-    - keep a consistent architecture across modules
-    - avoid duplication of UI logic
+    > add new inverse problems without rewriting the GUI
+    > reuse full UI sections across projects
+    > keep a consistent architecture across modules
+    > avoid duplication of UI logic
 """

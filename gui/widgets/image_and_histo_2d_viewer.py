@@ -13,11 +13,11 @@ class ImageAndHisto2DViewer(QGroupBox):
     An object that combines a 2D image viewer and a histogram viewer:
         > top: Image2DViewer for inspecting the 2D image
         > middle: controls to select:
-            - histogram mode ('Full', 'XY-patch')
-            - scale type ('Logarithmic', 'Linear')
-            - patch size for XY-patch mode
+            > histogram mode ('Full', 'XY-patch')
+            > scale type ('Logarithmic', 'Linear')
+            > patch size for XY-patch mode
         > bottom: Histogram2DWidget synchronized with the viewer:
-            - updates histogram when mouse moves (XY-patch mode)
+            > updates histogram when mouse moves (XY-patch mode)
         > acts as a high-level widget to couple visualization and statistical analysis of 2D data
     """
     def __init__(self, image, title='title', parent=None):

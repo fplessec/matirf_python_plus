@@ -16,8 +16,8 @@ The system is organized into two layers:
 
 Low-level building blocks for quality metrics.
 
-    - Metric: abstract base class with name, requires, compute()
-    - utils: optimal_scale, align_scale, to_numpy
+    > Metric: abstract base class with name, requires, compute()
+    > utils: optimal_scale, align_scale, to_numpy
 
 =====================================================================
 2. reusable/
@@ -25,23 +25,23 @@ Low-level building blocks for quality metrics.
 
 Concrete metric implementations and registry.
 
-    - Universal: MSE, MAE, NMSE, Correlation, cosine similarity,
+    > Universal: MSE, MAE, NMSE, Correlation, cosine similarity,
                  angular distance, PSNR, SSIM
-    - 3D-only (requires={"3d"}): Sinkhorn Wasserstein, FSC
-    - Scale-ambiguous only (requires={"scale_ambiguous"}): Scale_alpha
+    > 3D-only (requires={"3d"}): Sinkhorn Wasserstein, FSC
+    > Scale-ambiguous only (requires={"scale_ambiguous"}): Scale_alpha
 
 =====================================================================
 Adaptive behavior
 =====================================================================
 
 Each metric receives the problem's `features` set and adapts:
-    - "scale_ambiguous" in features -> aligns scale before comparing
-    - "3d" in features -> handles volumetric data appropriately
-    - "2d" in features -> uses standard 2D implementations
+    > "scale_ambiguous" in features -> aligns scale before comparing
+    > "3d" in features -> handles volumetric data appropriately
+    > "2d" in features -> uses standard 2D implementations
 
 The `requires` set filters out metrics that don't apply:
-    - requires  subset  features -> metric is included
-    - otherwise -> metric is skipped
+    > requires  subset  features -> metric is included
+    > otherwise -> metric is skipped
 
 =====================================================================
 Usage
@@ -75,8 +75,8 @@ def compute_all_metrics(f, f_true, features=set(), only=None, **kw):
 
     Returns:
         dict mapping metric name -> value, where value is:
-            - a float for scalar metrics
-            - a dict {"summary", "x", "y", "xlabel", "ylabel"} for curve metrics
+            > a float for scalar metrics
+            > a dict {"summary", "x", "y", "xlabel", "ylabel"} for curve metrics
     """
     wanted = None if only is None else set(only)
     results = {}

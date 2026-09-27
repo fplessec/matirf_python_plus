@@ -21,27 +21,27 @@ What belongs here
 
 This layer includes prebuilt denoisers such as:
 
-- GaussianDenoiser
+> GaussianDenoiser
     Linear smoothing via Gaussian convolution.
     Supports 3D anisotropy.
 
-- BilateralDenoiser
+> BilateralDenoiser
     Edge-preserving smoothing combining spatial and intensity weighting.
     Supports 3D anisotropy.
 
-- WienerDenoiser
+> WienerDenoiser
     Adaptive smoothing using local statistics (Wiener filter).
     Supports 3D.
 
-- DCTDenoiser
+> DCTDenoiser
     Transform-domain denoising via soft-thresholding in DCT space.
     Supports 3D.
 
-- TVBregmanDenoiser
+> TVBregmanDenoiser
     Total variation denoising via split-Bregman optimization.
     2D only (applied slice-by-slice on 3D data).
 
-- NLRidgeDenoiser
+> NLRidgeDenoiser
     Non-local ridge regression denoising (patch-based).
     2D only (applied slice-by-slice on 3D data).
 
@@ -51,29 +51,29 @@ Registry
 
 This layer also provides the denoiser registry, which is the single
 source of truth for:
-    - DENOISER_REGISTRY: maps display name -> callable denoiser instance
-    - DENOISER_LIST: list of display names for UI option widgets
-    - ANISOTROPIC_DENOISERS: denoisers supporting the delta parameter
-    - SLICE_BY_SLICE_DENOISERS: 2D-only denoisers (fallback on 3D)
+    > DENOISER_REGISTRY: maps display name -> callable denoiser instance
+    > DENOISER_LIST: list of display names for UI option widgets
+    > ANISOTROPIC_DENOISERS: denoisers supporting the delta parameter
+    > SLICE_BY_SLICE_DENOISERS: 2D-only denoisers (fallback on 3D)
 
 ---------------------------------------------------------------------
 Design role
 ---------------------------------------------------------------------
 
 Reusable denoisers:
-    - implement the Denoiser interface from base/
-    - provide denoise(y, sigma, delta) -> denoised tensor
-    - remain independent of specific inverse problem implementations
-    - are safe to reuse across matirf, deconv, and future modules
+    > implement the Denoiser interface from base/
+    > provide denoise(y, sigma, delta) -> denoised tensor
+    > remain independent of specific inverse problem implementations
+    > are safe to reuse across matirf, deconv, and future modules
 
 ---------------------------------------------------------------------
 Key distinction
 ---------------------------------------------------------------------
 
-- base/:
+> base/:
     abstract denoising primitive (Denoiser) and shared utilities
 
-- reusable/:
+> reusable/:
     concrete denoising algorithms (Gaussian, Bilateral, Wiener, DCT, ...)
 """
 

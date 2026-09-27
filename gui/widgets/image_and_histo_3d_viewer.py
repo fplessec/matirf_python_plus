@@ -13,12 +13,12 @@ class ImageAndHisto3DViewer(QGroupBox):
     An object that combines a 3D image viewer and a histogram viewer:
         > top: Image3DViewer for navigating and inspecting the 3D image
         > middle: controls to select:
-            - histogram mode ('3D', 'Z-slice', 'XY-depth-column')
-            - scale type ('Logarithmic', 'Linear')
-            - patch size for XY-depth-column mode
+            > histogram mode ('3D', 'Z-slice', 'XY-depth-column')
+            > scale type ('Logarithmic', 'Linear')
+            > patch size for XY-depth-column mode
         > bottom: Histogram3DWidget synchronized with the viewer:
-            - updates histogram when slice changes (Z-slice mode)
-            - updates histogram when mouse moves (XY-depth-column mode)
+            > updates histogram when slice changes (Z-slice mode)
+            > updates histogram when mouse moves (XY-depth-column mode)
         > acts as a high-level widget to couple visualization and statistical analysis of 3D data
     """
     def __init__(self, image, title='title', parent=None):

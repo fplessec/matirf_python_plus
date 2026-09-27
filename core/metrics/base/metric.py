@@ -8,11 +8,11 @@ class Metric:
     Base class for quality metrics comparing a reconstruction f to a ground truth f_true.
 
     Each subclass provides:
-        - name:        display name for the metric (used as registry key)
-        - requires:    set of features needed for this metric to be meaningful
+        > name:        display name for the metric (used as registry key)
+        > requires:    set of features needed for this metric to be meaningful
                        (e.g. {"3d"} for metrics that only make sense on volumes)
-        - result_type: "scalar" or "curve"
-        - compute(f, f_true, features, **kw): the metric value
+        > result_type: "scalar" or "curve"
+        > compute(f, f_true, features, **kw): the metric value
 
     The `features` argument is passed at call time so each metric can adapt
     its behavior (e.g. align scale if "scale_ambiguous" is in features,
@@ -22,8 +22,8 @@ class Metric:
     if requires is a subset of the problem's features.
 
     Return format:
-        - scalar metrics return a float
-        - curve metrics return a dict:
+        > scalar metrics return a float
+        > curve metrics return a dict:
             {"summary": float, "x": list, "y": list,
              "xlabel": str, "ylabel": str}
     """

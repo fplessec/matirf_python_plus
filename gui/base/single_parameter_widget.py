@@ -40,9 +40,9 @@ class SimpleParameterWidget(QWidget):
 
     >> type : str
         One of 'value', 'bool', or 'option'.
-            - 'value': the parameter is a number (renders a QLineEdit + QLatexLabel).
-            - 'bool':  the parameter is True/False (renders a QCheckBox).
-            - 'option': the parameter is chosen from a list (renders a QComboBox).
+            > 'value': the parameter is a number (renders a QLineEdit + QLatexLabel).
+            > 'bool':  the parameter is True/False (renders a QCheckBox).
+            > 'option': the parameter is chosen from a list (renders a QComboBox).
 
     >> param_info : dict
         Type-specific configuration (see below).

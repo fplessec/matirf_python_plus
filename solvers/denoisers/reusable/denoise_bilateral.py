@@ -31,8 +31,8 @@ class BilateralDenoiser(Denoiser):
         """
         Bilateral denoising of a 2D or 3D image with additive Gaussian noise.
         Applies a non-linear filter combining:
-        - spatial Gaussian weighting (sigma_s ~ 2.5*sigma)
-        - intensity similarity weighting (sigma_r ~ 2*sigma)
+        > spatial Gaussian weighting (sigma_s ~ 2.5*sigma)
+        > intensity similarity weighting (sigma_r ~ 2*sigma)
         Preserves edges while reducing noise by averaging nearby pixels
         with similar intensities. Supports anisotropic 3D data via `delta`.
 

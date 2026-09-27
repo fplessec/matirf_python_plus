@@ -19,7 +19,7 @@ class Image2DViewer(QWidget):
         > displays the image with imshow
         > shows pixel intensity under the mouse cursor in real time
         > provides a callback:
-            - mouse_moved_callback(x, y): triggered when the mouse moves over a valid pixel
+            > mouse_moved_callback(x, y): triggered when the mouse moves over a valid pixel
         > adapts dynamically when set_image() is called with a new tensor
     """
     def __init__(self, image: torch.Tensor, parent=None, cmap='gray'):
