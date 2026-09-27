@@ -151,8 +151,8 @@ class JsonParametersEditor(QWidget):
             if param_config["type"] == "list":
                 layout.addWidget(self._build_list_field(param_name, param_config))
             else:
-                # copy param_info so we never mutate the shared, module-level UI dict when we
-                # inject the current file's value as the default in Modify mode:
+                ## copy param_info so we never mutate the shared, module-level UI dict when we
+                ## inject the current file's value as the default in Modify mode:
                 param_info = dict(param_config["param_info"])
                 if self.is_modify:
                     param_info["default"] = self.json_file[param_name]

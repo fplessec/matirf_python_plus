@@ -279,8 +279,8 @@ def test_end_to_end():
     prepared = TOY_PROBLEM.prepare(config)
     objective = Objective(prepared.operator, prepared.g, _Gaussian(), _L2(), lambda_reg=1e-6)
 
-    # a plain gradient descent — note it never mentions the problem, only the objective.
-    # This is the whole point: this loop is a solver, and it works for ANY problem.
+    ## a plain gradient descent — note it never mentions the problem, only the objective.
+    ## This is the whole point: this loop is a solver, and it works for ANY problem.
     step = 1.0 / objective.operator.lipschitz(prepared.f_true)
     f = torch.zeros_like(prepared.f_true)
     for _ in range(4000):
@@ -334,8 +334,8 @@ def test_noise():
         signal, {"poisson_noise": True, "photons": photons, "gaussian_noise": True, "sigma": sigma})
     assert abs(float(both[n:].var()) / (1.0 / photons + sigma ** 2) - 1) < 0.03
 
-    # the v1 failure: Poisson on a [0, 1] image without a photon count was binary speckle.
-    # With a photon count, the noisy image stays a faithful, graded version of the signal.
+    ## the v1 failure: Poisson on a [0, 1] image without a photon count was binary speckle.
+    ## With a photon count, the noisy image stays a faithful, graded version of the signal.
     assert float(out.unique().numel()) > 20, "photon noise must not collapse to 0/1 values"
 
     # reproducibility: same seed, same draw; another seed, another draw
@@ -364,8 +364,8 @@ def test_noise():
                                     "gaussian_noise": True, "sigma": 0.05})
     assert both_model.a == 1 / 50.0 and abs(both_model.b - 0.0025) < 1e-15
 
-    # g >= 0 always: read noise on a dark pixel is clipped (option A), photon noise never
-    # needs it
+    ## g >= 0 always: read noise on a dark pixel is clipped (option A), photon noise never
+    ## needs it
     dark = noise.add_noise_to_measurement(flat(0.0), {"gaussian_noise": True, "sigma": 0.05})
     assert float(dark.min()) >= 0.0, "the noisy measurement must stay non-negative"
     assert 0.3 * 0.05 < float(dark.mean()) < 0.5 * 0.05, "the documented ~0.4 sigma bias"

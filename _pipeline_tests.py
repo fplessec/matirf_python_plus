@@ -117,8 +117,8 @@ def test_build_objective():
     assert regularized.data_weight == 0.8, "the v1 blend convention is applied"
     assert "L1 norm of the gradient" in regularized.describe()
 
-    # D1 (B with C2): a regularized objective is calibrated by reg_scale = 1 / R(f_init)
-    # (the ridge s2^2 start; the iterative ridge_inverse is deterministic only to ~0.1 %)
+    ## D1 (B with C2): a regularized objective is calibrated by reg_scale = 1 / R(f_init)
+    ## (the ridge s2^2 start; the iterative ridge_inverse is deterministic only to ~0.1 %)
     from math import isclose
 
     from solvers.base import ridge_start
@@ -189,8 +189,8 @@ def test_noise_model():
     empty = {**config, "noise-model": {"fidelity": "Poisson-Gaussian", "parameters": "manual"}}
     assert len(validate_noise_model(empty)) == 2, "both a and b are required"
 
-    # a negligible noise is treated as noiseless: the unscaled D of v1 (a = b = 1), so that
-    # lambda_reg stays felt — by estimation (clean simulation) and in the oracle values
+    ## a negligible noise is treated as noiseless: the unscaled D of v1 (a = b = 1), so that
+    ## lambda_reg stays felt — by estimation (clean simulation) and in the oracle values
     clean = {**_deconv_config(), "noise-model": {"fidelity": "L2 (Gaussian noise)",
                                                  "parameters": "estimated"}}
     clean_prepared = DECONV.prepare(clean)

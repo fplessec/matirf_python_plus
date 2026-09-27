@@ -47,8 +47,8 @@ def test_reproducible():
     save_truth(f, out, scene)
     assert torch.equal(regenerate(out), f), "the record alone reproduces the truth"
 
-    # the benchmark truths shipped in data/measurements/synthetic ARE their presets: each
-    # regenerates from its record, and that record's scene is the current preset
+    ## the benchmark truths shipped in data/measurements/synthetic ARE their presets: each
+    ## regenerates from its record, and that record's scene is the current preset
     from fileio import load_tif
     for name in presets():
         tif = MATIRF_SYNTHETIC_DIR / f"{name}.TIF"

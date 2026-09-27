@@ -39,8 +39,8 @@ class ProfilesViewer(QWidget):
         ### creation of the widgets one after another:
         # a canvas to render the depth map:
         qgroupbox_color = self.palette().color(QPalette.Mid).name()  # depends on the palette
-        # constrained layout reserves room for the y-axis labels and re-flows on resize,
-        # so the vertical-axis unit labels are never clipped against the neighbouring viewer:
+        ## constrained layout reserves room for the y-axis labels and re-flows on resize,
+        ## so the vertical-axis unit labels are never clipped against the neighbouring viewer:
         self.figure = Figure(facecolor=qgroupbox_color, layout='constrained')
         self.canvas = FigureCanvas(self.figure)
         # the matplotlib toolbar:

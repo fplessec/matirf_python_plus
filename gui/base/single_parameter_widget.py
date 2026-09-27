@@ -151,9 +151,9 @@ class SimpleParameterWidget(QWidget):
         elif self.type == 'option':
             self.param_value = self.param_info['options_list'][0]
             self.setup_option_widget()
-        # Optional extra button defined in the UI dict (e.g. "Estimate" for delta)
-        # The callback receives (widget, update_cache_fn, load_toml_fn, config_path)
-        # so it can read/write the config without problem-specific imports:
+        ## Optional extra button defined in the UI dict (e.g. "Estimate" for delta)
+        ## The callback receives (widget, update_cache_fn, load_toml_fn, config_path)
+        ## so it can read/write the config without problem-specific imports:
         if self._extra_button:
             btn = QPushButton(self._extra_button['label'])
             if 'tooltip' in self._extra_button:
@@ -171,8 +171,8 @@ class SimpleParameterWidget(QWidget):
         self.layout.addWidget(self.input_widget)
         # a QLatexLabel is used to display the current value:
         self.value_display = QLatexLabel('', fontsize=self.fontsize, dpi=65)
-        # a callback that update the display of the current parameter value and
-        # keeps track of the value in the memory of the object:
+        ## a callback that update the display of the current parameter value and
+        ## keeps track of the value in the memory of the object:
         def update_value():
             try:
                 value = param_info['dtype'](self.input_widget.text())  # <- forced casting data-type
@@ -205,8 +205,8 @@ class SimpleParameterWidget(QWidget):
         # a QLabel is used to display the current value:
         self.value_label = QLabel()
         self.value_label.setFont(self.font)
-        # a callback that update the display of the current parameter value
-        # keeps track of the value in the memory of the object:
+        ## a callback that update the display of the current parameter value
+        ## keeps track of the value in the memory of the object:
         def update_bool():
             value = self.checkbox.isChecked()
             self.value_label.setText("true" if value else "false")
@@ -247,9 +247,9 @@ class SimpleParameterWidget(QWidget):
             if isinstance(node, dict) and key in node:
                 node = node[key]
             else:
-                # key path absent from the config -> leave the widget unchanged
-                # (this is what lets a pruned '[section]' keep only some keys without
-                #  the missing ones being rewritten as "None")
+                ## key path absent from the config -> leave the widget unchanged
+                ## (this is what lets a pruned '[section]' keep only some keys without
+                ##  the missing ones being rewritten as "None")
                 return
         new_param_value = node if node != "null" else None
         if new_param_value == {}:

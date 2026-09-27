@@ -55,8 +55,8 @@ def _denoise_tv_bregman(image, weight, max_iter=100, eps=1e-3, lam=0.1):
     dims = img_shape[2]
     total = rows * cols * dims
     shape_extend = (rows2, cols2, dims)
-    # out is firstly created as zeros-like tensor with size as shape_extend, on the input's
-    # device and dtype (never the default CPU/float32 — that breaks on GPU/MPS and downcasts)
+    ## out is firstly created as zeros-like tensor with size as shape_extend, on the input's
+    ## device and dtype (never the default CPU/float32 — that breaks on GPU/MPS and downcasts)
     out = torch.zeros(shape_extend, dtype=image.dtype, device=image.device)
 
     dx = out.clone().detach()

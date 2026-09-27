@@ -117,8 +117,8 @@ def test_registry():
     assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"}
     assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["PNP"] is Pnp
 
-    # no solver requires any feature any more, so every problem gets all of them — that is the
-    # whole promise of the layer, and it is checked rather than asserted in prose:
+    ## no solver requires any feature any more, so every problem gets all of them — that is the
+    ## whole promise of the layer, and it is checked rather than asserted in prose:
     for feats in (features(Feature.TWO_D),
                   features(Feature.THREE_D, Feature.ANISOTROPIC, Feature.SCALE_AMBIGUOUS)):
         assert len(available_for(feats)) == 6, f"every solver must serve {feats}"
@@ -139,8 +139,8 @@ def test_ui_params():
     isotropic = Adam.get_ui_params(features(Feature.TWO_D))
     assert {"max_iter", "reg", "lambda_reg"} <= set(isotropic)
 
-    # `delta` requires ANISOTROPIC: present on MA-TIRF-like problems, absent on 2D ones,
-    # with no conditional anywhere in the solver
+    ## `delta` requires ANISOTROPIC: present on MA-TIRF-like problems, absent on 2D ones,
+    ## with no conditional anywhere in the solver
     assert "delta" not in isotropic
     anisotropic = Adam.get_ui_params(features(Feature.THREE_D, Feature.ANISOTROPIC))
     assert "delta" in anisotropic
@@ -151,8 +151,8 @@ def test_ui_params():
     for solver in (Mcmc, Admm, Pnp, PnpAdmm):
         assert "lambda_reg" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
 
-    # the noise model is NOT an algorithm parameter any more: it belongs to the measurement
-    # ('[noise-model]'), and each solver only declares which models it can minimize
+    ## the noise model is NOT an algorithm parameter any more: it belongs to the measurement
+    ## ('[noise-model]'), and each solver only declares which models it can minimize
     for solver in SOLVERS.values():
         assert "data_fidelity" not in solver.get_ui_params(features(Feature.TWO_D)), solver.name
     assert Adam.supported_noise_models == {"gaussian", "poisson", "poisson-gaussian"}
@@ -382,8 +382,8 @@ def test_fidelities_are_scaled_likelihoods():
     # the floor: a noiseless measurement does not make D infinite
     assert GaussianFidelity(b=0.0).b > 0 and PoissonFidelity(a=0.0).a > 0
 
-    # nothing depends on the number of pixels: every D is a mean, so an image and the same
-    # image repeated give the same value
+    ## nothing depends on the number of pixels: every D is a mean, so an image and the same
+    ## image repeated give the same value
     residual, data = torch.rand(40, 40, dtype=DTYPE), torch.rand(40, 40, dtype=DTYPE)
     for cls in (GaussianFidelity, PoissonFidelity, PoissonGaussianFidelity):
         D = cls.from_noise(0.01, 0.001)

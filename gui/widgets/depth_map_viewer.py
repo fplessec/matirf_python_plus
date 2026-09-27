@@ -41,8 +41,8 @@ class DepthMapViewer(QWidget):
         ### creation of the widgets one after another:
         # a canvas to render the depth map:
         qgroupbox_color = self.palette().color(QPalette.Mid).name()  # depends on the palette
-        # constrained layout keeps the image + colorbar within the widget bounds and
-        # re-flows on resize (no overflow onto the neighbouring profiles viewer):
+        ## constrained layout keeps the image + colorbar within the widget bounds and
+        ## re-flows on resize (no overflow onto the neighbouring profiles viewer):
         self.figure = Figure(facecolor=qgroupbox_color, layout='constrained')
         self.canvas = FigureCanvas(self.figure)
         # the matplotlib toolbar:
@@ -125,8 +125,8 @@ class DepthMapViewer(QWidget):
         nz, ny, nx = self.image.shape
         self._imshow_obj, self.depth_map = self.render_depth(self.figure, ax, num_ticks)
         ### show the depth value in the matplotlib toolbar:
-        # this attribute is used to show (in the matplolib toolbar) the depth value of the pixel where the mouse is
-        # currently on, instead of the RGB value of the pixel:
+        ## this attribute is used to show (in the matplolib toolbar) the depth value of the pixel where the mouse is
+        ## currently on, instead of the RGB value of the pixel:
         self._imshow_obj.format_cursor_data = lambda _: ""  # <- don't show the '[R, G, B]'
         def format_coord(x, y):  # overwrite the format_coord function of the ax object (mouse event related)
             ix, iy = int(x), int(y)

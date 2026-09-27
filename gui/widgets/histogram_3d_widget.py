@@ -30,8 +30,8 @@ class Histogram3DWidget(QWidget):
         self.current_x = None
         self.current_y = None
         self.patch_radius = patch_radius  # <- radius p (patch size = 2p+1)
-        # attributes in order to store Z-slice histograms and their parameters to gain fluidity
-        # if current_slide changes rapidly:
+        ## attributes in order to store Z-slice histograms and their parameters to gain fluidity
+        ## if current_slide changes rapidly:
         self.precomputed_hist = None
         self.hist_bins = None
         self.hist_range = None

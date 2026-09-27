@@ -38,10 +38,10 @@ UTILITY_COMMANDS = {"cli", "list", "help", "settings", "inverse-problems", "__ma
 SYNTH_COMMANDS = {"synth", "synthetic", "gt", "ground-truth"}
 
 
-# Auto-discover inverse problems: every package under problems/ that declares one.
-# A problem package is recognised by its problem.py — the file holding its InverseProblem.
-# Dropping a directory there is the ONLY step needed for it to appear in the CLI: it needs
-# no launcher, no window class and no entry in this file.
+## Auto-discover inverse problems: every package under problems/ that declares one.
+## A problem package is recognised by its problem.py — the file holding its InverseProblem.
+## Dropping a directory there is the ONLY step needed for it to appear in the CLI: it needs
+## no launcher, no window class and no entry in this file.
 def _discover_problems():
     problems = {}
     if not PROBLEMS_DIR.is_dir():
@@ -198,8 +198,8 @@ def main():
         importlib.import_module(f"problems.{cmd}.synthetic.gui").main()
         return
 
-    # "matirf gui" / "matirf cli -c ... -o ..." — the SAME launcher for every problem.
-    # It reads the problem's own ui declaration, so no problem contributes launcher code.
+    ## "matirf gui" / "matirf cli -c ... -o ..." — the SAME launcher for every problem.
+    ## It reads the problem's own ui declaration, so no problem contributes launcher code.
     from gui.app import run
     problem = importlib.import_module(f"problems.{cmd}").PROBLEM
     run(problem, args)

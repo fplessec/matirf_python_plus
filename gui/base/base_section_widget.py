@@ -66,9 +66,9 @@ class BaseSectionWidget(QWidget):
                 toml_key_list=[self.toml_section_key, param_name],
                 update_cache_fn=self._update_cache,
                 load_toml_fn=self._load_toml,
-                # config_path and extra_button are forwarded to SimpleParameterWidget
-                # so that extra buttons (defined in the UI dict) can read/write the
-                # config without needing problem-specific imports.
+                ## config_path and extra_button are forwarded to SimpleParameterWidget
+                ## so that extra buttons (defined in the UI dict) can read/write the
+                ## config without needing problem-specific imports.
                 config_path=self._config_path,
                 extra_button=param_config.get("extra_button"),
             )

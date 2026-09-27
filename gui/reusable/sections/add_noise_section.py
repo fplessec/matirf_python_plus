@@ -92,8 +92,8 @@ if __name__=="__main__":  # test
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create(settings.app_style))
 
-    # a throwaway TOML so the section's cache-sync path is exercised without touching
-    # any real app cache:
+    ## a throwaway TOML so the section's cache-sync path is exercised without touching
+    ## any real app cache:
     default_config = {'add-noise': {'poisson_noise': False, 'gaussian_noise': False}}
     tmp_toml = Path(tempfile.mkdtemp()) / "demo_cache.toml"
 

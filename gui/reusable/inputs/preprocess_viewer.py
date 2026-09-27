@@ -69,8 +69,8 @@ class PreprocessViewer(QWidget):
         self.parent = parent
         config = load_or_create_toml(config_path, default_config)
         self.mode = DataMode.from_config(config)
-        # the preview computation may raise (inconsistent files, missing params, ...);
-        # the caller wraps this constructor to report problem-specific errors:
+        ## the preview computation may raise (inconsistent files, missing params, ...);
+        ## the caller wraps this constructor to report problem-specific errors:
         self.left, self.right = compute_preview(config, self.mode)
         is_real = self.mode == DataMode.REAL
         self.setWindowTitle("Preview - Real measurement preprocessing" if is_real

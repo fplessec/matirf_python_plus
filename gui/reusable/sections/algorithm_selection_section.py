@@ -126,9 +126,9 @@ if __name__=="__main__":  # test
     from fileio import load_or_create_toml, save_toml
     from fileio.cache import make_update_cache
 
-    # a minimal fake algorithm registry: each class only needs get_ui_params(features),
-    # exactly like a real Algorithm subclass. This keeps the test independent of any
-    # inverse problem (matirf / deconv), as the reusable/ layer is meant to be.
+    ## a minimal fake algorithm registry: each class only needs get_ui_params(features),
+    ## exactly like a real Algorithm subclass. This keeps the test independent of any
+    ## inverse problem (matirf / deconv), as the reusable/ layer is meant to be.
     class _FakeAlgo:
         _ui = {}
         @classmethod

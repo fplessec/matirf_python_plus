@@ -119,8 +119,8 @@ def test_frobenius_is_the_standard_definition():
     expected = (4 * a * a + 4 * b * b + 2 * c * c) ** 0.5
     assert abs(float(frob.loss(quadratic, ops)) - expected) < 1e-6
 
-    # v1's definition summed the SIGNED entries: on a saddle x^2 - y^2 they cancel to 0,
-    # although the image is curved everywhere. The standard norm sees it.
+    ## v1's definition summed the SIGNED entries: on a saddle x^2 - y^2 they cancel to 0,
+    ## although the image is curved everywhere. The standard norm sees it.
     saddle = x * x - y * y
     v1_value = float(ops.hessian(saddle)[:, :, 2:-2, 2:-2].sum(dim=(0, 1)).mean())
     ours = float(frob.loss(saddle, ops))
@@ -226,8 +226,8 @@ def test_every_prox_matches_its_loss():
             assert worst >= J(u) - 1e-3 * max(gain, 1e-12), \
                 f"{cls.__name__} {len(shape)}D: a random perturbation beats the prox"
 
-    # R is a mean: the same image mirrored onto itself (no seam) gives the same value, up to
-    # the one-voxel border the difference operators see
+    ## R is a mean: the same image mirrored onto itself (no seam) gives the same value, up to
+    ## the one-voxel border the difference operators see
     f = torch.rand(32, 32, dtype=torch.float64)
     doubled = torch.cat([f, f.flip(0)])
     for cls in classes:

@@ -127,8 +127,8 @@ def test_preprocessing_matches_v1():
     _assert_fingerprint(_fingerprint(g), reference["preprocessed_g"], "preprocessed measurement")
     assert params["angles_deg"] == reference["angles_after_preprocessing"]
 
-    # this file has no background stack; fabricate one to exercise that branch, which is
-    # what makes the angle list (and so the operator's shape) change
+    ## this file has no background stack; fabricate one to exercise that branch, which is
+    ## what makes the angle list (and so the operator's shape) change
     measurement = load_json(JSON)
     _, theta_max = physics.angle_bounds(measurement)
     measurement["angles_deg"] = measurement["angles_deg"][:-1] + [theta_max + 5.0]
@@ -153,17 +153,17 @@ def test_operator_contract():
     assert operator.apply(f).shape == (13, 8, 8)
     assert operator.adjoint(y).shape == (12, 8, 8)
 
-    # the check that catches the most expensive class of bug in this codebase.
-    # the tolerance is the operator's own default, sized for float32 (settings.dtype):
-    # in float64 this operator lands at 3e-16, in float32 at ~1e-7.
+    ## the check that catches the most expensive class of bug in this codebase.
+    ## the tolerance is the operator's own default, sized for float32 (settings.dtype):
+    ## in float64 this operator lands at 3e-16, in float32 at ~1e-7.
     assert operator.check_adjoint(f, y) < 1e-4, "adjoint must be the true transpose"
 
-    # The closed-form override must agree with the base class's conjugate gradient.
-    # Tolerance is relative and loose on purpose: H^T H here has a smallest eigenvalue of
-    # about -4e-6 — it is numerically singular, which is the physics, not a bug (thirteen
-    # exponential decay profiles are very nearly linearly dependent). Adding lam = 0.5
-    # brings the condition number to ~550, and float32 CG then agrees to ~1e-5 absolute.
-    # This ill-conditioning is exactly why a ridge term or a regularizer is not optional here.
+    ## The closed-form override must agree with the base class's conjugate gradient.
+    ## Tolerance is relative and loose on purpose: H^T H here has a smallest eigenvalue of
+    ## about -4e-6 — it is numerically singular, which is the physics, not a bug (thirteen
+    ## exponential decay profiles are very nearly linearly dependent). Adding lam = 0.5
+    ## brings the condition number to ~550, and float32 CG then agrees to ~1e-5 absolute.
+    ## This ill-conditioning is exactly why a ridge term or a regularizer is not optional here.
     from core.operator import ForwardOperator
     b = torch.rand(12, 4, 4, dtype=operator.H.dtype)
     closed = operator.solve_normal(b, 0.5)
@@ -206,8 +206,8 @@ def test_prepare_both_modes():
     assert real.operator.H.shape == (13, 10)
     assert "_measurement" in real.config, "the refined config is carried forward"
 
-    # the truth has 150 planes: nz = 50 divides it -> reconstructed on 50 planes, g simulated
-    # from the fine truth; nz = 99 does not -> the truth's own 150 planes are used
+    ## the truth has 150 planes: nz = 50 divides it -> reconstructed on 50 planes, g simulated
+    ## from the fine truth; nz = 99 does not -> the truth's own 150 planes are used
     synthetic = MATIRF.prepare(_config(DataMode.SYNTHETIC, nz=50))
     assert synthetic.mode is DataMode.SYNTHETIC and synthetic.has_truth
     assert synthetic.f_true.shape == (50, 128, 128) and synthetic.operator.H.shape == (13, 50)

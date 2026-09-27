@@ -43,8 +43,8 @@ REGULARIZATION_UI_PARAMS = {
             "default": 0.10,
         },
     },
-    # shown only on anisotropic problems, and only for regularizations that weight the
-    # axial derivative — the framework hides it everywhere else with no code in the solver:
+    ## shown only on anisotropic problems, and only for regularizations that weight the
+    ## axial derivative — the framework hides it everywhere else with no code in the solver:
     "delta": {
         "title": "Anisotropy ratio coefficient",
         "type": "value",
