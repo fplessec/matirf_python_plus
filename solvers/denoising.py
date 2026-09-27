@@ -26,8 +26,7 @@ result ever produced, so the v1 behaviour is preserved deliberately. See `Mcmc`.
 import torch
 
 from core.features import Feature
-from solvers.denoisers import DENOISER_REGISTRY, DENOISER_LIST, ANISOTROPIC_DENOISERS
-
+from solvers.denoisers import ANISOTROPIC_DENOISERS, DENOISER_LIST, DENOISER_REGISTRY
 
 ## denoisers are calibrated for the [0, 255] intensity convention:
 DENOISER_SCALE = 255.0

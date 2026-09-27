@@ -51,15 +51,15 @@ authors = [
 # -----------------------------------------------------------------------------
 dependencies = [
     "torch>=2.7.1",            # tensors, CPU/GPU computations (used everywhere)
-    "numpy>=2.0",              # nlridge.py, abstract_algo.py, viewers, etc.
+    "numpy>=2.0",              # solvers/denoisers, viewers, etc.
     "matplotlib>=3.10.3",      # GUI viewers, qlatexlabel
     "PyQt5>=5.15.11",          # graphical interface
     "tifffile>=2025.5.10",     # fileio/tif_file.py
     "tomli>=2.2.1",            # fileio/toml_file.py (reading)
     "tomli_w>=1.2.0",          # fileio/toml_file.py + the pipeline (writing)
-    "Pillow>=10.0",            # algorithms/denoisers/tests/__init__.py + denoise_tv_bregman.py
-    "scikit-image>=0.22",      # reconstruction_metrics (SSIM), pnp_algo, nlridge, denoise_tv_bregman (estimate_sigma)
-    "einops>=0.7",             # algorithms/denoisers/nlridge.py (rearrange, repeat)
+    "Pillow>=10.0",            # solvers/denoisers/reusable/denoise_tv_bregman.py
+    "scikit-image>=0.22",      # core/metrics (SSIM), solvers/denoisers (estimate_sigma)
+    "einops>=0.7",             # solvers/denoisers/reusable/nlridge.py (rearrange, repeat)
 ]
 
 
@@ -113,7 +113,6 @@ include = [
 ]
 exclude = [
     "env*",
-    "old*",         # the superseded v1, kept for reference only — never installed
     "*.data*",
     "__pycache__*",
 ]
@@ -126,3 +125,16 @@ exclude = [
 # -----------------------------------------------------------------------------
 [tool.setuptools]
 py-modules = ["cli", "pipeline"]
+
+
+# -----------------------------------------------------------------------------
+# Import ordering (isort) — a single, coherent order in every file:
+#   1. standard library   2. third-party   3. this project (first-party)
+# each group alphabetised, separated by a blank line. Run:  isort .
+# -----------------------------------------------------------------------------
+[tool.isort]
+profile = "black"
+known_first_party = [
+    "core", "solvers", "problems", "gui", "fileio", "settings", "pipeline",
+    "cli", "benchmarks",
+]

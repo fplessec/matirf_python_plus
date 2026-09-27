@@ -9,8 +9,9 @@ __author__ = "Yi-Tang Wang"
 __email__ = "yitang.wang@uq.net.au"
 __reference__ = ["skimage.restoration.denoise_tv_bregman"]
 
-import torch
 import math
+
+import torch
 
 from solvers.denoisers.base import Denoiser
 

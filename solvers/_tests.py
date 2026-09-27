@@ -25,8 +25,8 @@ import time
 
 import torch
 
-from core import Feature, features, ForwardOperator, Objective
-from solvers import SOLVERS, available_for, Adam, Ppxa, Admm, Pnp, PnpAdmm, Mcmc
+from core import Feature, ForwardOperator, Objective, features
+from solvers import SOLVERS, Adam, Admm, Mcmc, Pnp, PnpAdmm, Ppxa, available_for
 
 DTYPE = torch.float64
 
@@ -113,7 +113,7 @@ def _step_signal(n: int) -> torch.Tensor:
 
 def test_registry():
     """The registry answers which solvers a given problem can run."""
-    ## one solver per algorithm — the weaker of each v1/v2 pair was retired to solvers/old/
+    ## one solver per algorithm — the weaker of each v1/v2 pair was removed
     assert set(SOLVERS) == {"ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"}
     assert SOLVERS["ADAM"] is Adam and SOLVERS["MCMC"] is Mcmc and SOLVERS["PNP"] is Pnp
 
@@ -355,7 +355,11 @@ def test_fidelities_are_scaled_likelihoods():
     The second is what makes lambda_reg mean the same thing with any noise model.
     """
     from core import noise
-    from solvers.fidelities import GaussianFidelity, PoissonFidelity, PoissonGaussianFidelity
+    from solvers.fidelities import (
+        GaussianFidelity,
+        PoissonFidelity,
+        PoissonGaussianFidelity,
+    )
 
     clean = 0.05 + 0.95 * torch.rand(200_000, dtype=DTYPE)
     cases = [
@@ -471,8 +475,8 @@ def test_admm_mu_changes_the_solution():
     """
     ADMM's mu is not just a speed knob (unlike textbook ADMM): with the fixed threshold, mu is
     also the prior weight (tau = mu*t) and the dual step, so it changes the sparsity of the
-    solution and diverges above the 1.618 dual-step bound. (The retired ADMMv2, in
-    solvers/old/, decoupled these — see docs/algorithms/admm.md.)
+    solution and diverges above the 1.618 dual-step bound. (The retired ADMMv2 decoupled
+    these — see docs/algorithms/admm.md.)
     """
     torch.manual_seed(0)
     op = _random_matrix_operator(40, 60, seed=4)
@@ -498,7 +502,7 @@ def test_pnp_is_scale_free():
     The same 2D problem with H's gain multiplied by c has a solution divided by c. With the
     data weight scaled consistently (lambda_kz x c^2, the eigenvalues of H^T H), PnP with an
     intensity-based denoiser (Wiener) returns exactly the reconstruction divided by c. (The
-    retired variant, solvers/old/pnp.py, assumed f in [0, 1] and did not.)
+    retired PnP variant assumed f in [0, 1] and did not.)
     """
     torch.manual_seed(1)
     n = 32

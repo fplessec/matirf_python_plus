@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QComboBox
+from PyQt5.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout
 
-from gui.widgets.image_2d_viewer import Image2DViewer
 from gui.widgets.histogram_2d_widget import Histogram2DWidget
+from gui.widgets.image_2d_viewer import Image2DViewer
 
 
 class ImageAndHisto2DViewer(QGroupBox):
@@ -103,8 +103,8 @@ if __name__=="__main__":  # test
 
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 
-    from fileio import load_tif
     import settings as settings
+    from fileio import load_tif
 
 
     app = QApplication(sys.argv)

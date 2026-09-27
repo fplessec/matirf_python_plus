@@ -22,8 +22,15 @@ from core import DataMode
 from core.diagnostics import depth_profile
 from problems.matirf import MATIRF, MATIRF_SYNTHETIC_DIR
 from problems.matirf.synthetic import (
-    presets, load_preset, generate, save_truth, read_record, regenerate, downsample_z,
-    OBJECTS, Grid,
+    OBJECTS,
+    Grid,
+    downsample_z,
+    generate,
+    load_preset,
+    presets,
+    read_record,
+    regenerate,
+    save_truth,
 )
 from problems.matirf.synthetic.generator import build_objects
 from problems.matirf.synthetic.scene import complete

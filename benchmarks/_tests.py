@@ -16,9 +16,9 @@ import json
 import tempfile
 from pathlib import Path
 
+from benchmarks.runner import CampaignStopped, RunSpec, read_status, run_campaign
 from core import DataMode
 from problems.deconv import DECONV_MEASUREMENTS_DIR
-from benchmarks.runner import RunSpec, run_campaign, CampaignStopped, read_status
 
 
 def _spec(iterations=40, algorithm="ADAM", png="img_001.png", **extra):

@@ -10,8 +10,8 @@ import torch
 from skimage.metrics import peak_signal_noise_ratio as skimage_psnr
 
 import settings as settings
-from core.metrics.base import Metric, to_numpy
 from core.features import Feature
+from core.metrics.base import Metric, to_numpy
 
 
 class PSNR(Metric):

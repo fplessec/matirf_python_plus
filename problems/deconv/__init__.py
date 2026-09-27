@@ -32,8 +32,8 @@ DEFAULT_DECONV_CONFIG = {
     "algo-params": {},
 }
 
-from .operator import DeconvOperator      # noqa: E402
-from .problem import DECONV               # noqa: E402
+from .operator import DeconvOperator  # noqa: E402
+from .problem import DECONV  # noqa: E402
 
 ## the generic name cli.py and the tools look for, whatever the problem is called:
 PROBLEM = DECONV

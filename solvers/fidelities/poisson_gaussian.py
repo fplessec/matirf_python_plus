@@ -1,6 +1,6 @@
 import torch
 
-from .base import DataFidelity, NOISE_FLOOR, floored
+from .base import NOISE_FLOOR, DataFidelity, floored
 
 
 class PoissonGaussianFidelity(DataFidelity):

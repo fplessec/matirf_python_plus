@@ -9,13 +9,16 @@ to carry machinery it does not need.
 
 import torch
 
-from core import InverseProblem
-from problems.deconv import (  # paths defined before this module is imported
-    DECONV_CONFIG_PATH, DEFAULT_DECONV_CONFIG, DECONV_RESULTS_DIR, DECONV_MEASUREMENTS_DIR,
-)
-from core import noise, normalization
+from core import InverseProblem, noise, normalization
 from core.normalization import normalize_and_add_noise
 from fileio import load_png, save_png
+from problems.deconv import (  # paths defined before this module is imported
+    DECONV_CONFIG_PATH,
+    DECONV_MEASUREMENTS_DIR,
+    DECONV_RESULTS_DIR,
+    DEFAULT_DECONV_CONFIG,
+)
+
 from .operator import DeconvOperator
 from .ui import DECONV_UI
 

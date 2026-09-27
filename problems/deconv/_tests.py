@@ -14,14 +14,12 @@ from pathlib import Path
 
 import torch
 
-from fileio import load_json, load_png
-from core import DataMode, Feature, features, Objective
+from core import DataMode, Feature, Objective, features
 from core.operator import ForwardOperator
-from problems.deconv import DECONV_MEASUREMENTS_DIR
-from solvers import SOLVERS, Adam
-
-from problems.deconv import DECONV, DeconvOperator
+from fileio import load_json, load_png
+from problems.deconv import DECONV, DECONV_MEASUREMENTS_DIR, DeconvOperator
 from problems.deconv.operator import gaussian_psf
+from solvers import SOLVERS, Adam
 
 PNG = str(DECONV_MEASUREMENTS_DIR / "img_001.png")
 JSON = str(DECONV_MEASUREMENTS_DIR / "psf_params_example.json")

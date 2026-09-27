@@ -1,6 +1,12 @@
 import settings as settings
 from solvers.denoisers.base import Denoiser
-from solvers.denoisers.base.utils import _from_5d, _to_5d, _is_3d, _kernel_gaussian, _conv_reflect_5d
+from solvers.denoisers.base.utils import (
+    _conv_reflect_5d,
+    _from_5d,
+    _is_3d,
+    _kernel_gaussian,
+    _to_5d,
+)
 
 
 class GaussianDenoiser(Denoiser):

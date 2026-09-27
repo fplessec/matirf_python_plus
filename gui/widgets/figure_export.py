@@ -16,9 +16,8 @@ axes so it does not steal width from that square box.
 Only the images and their legends are drawn (no matplotlib toolbar, no Qt chrome).
 """
 
-from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
-
+from matplotlib.figure import Figure
 
 DPI = 150
 _W = 1800                    # fixed output width in px

@@ -118,6 +118,7 @@ def read_status(run_dir: Path) -> dict:
 def execute(problem_name: str, config: dict, run_dir: str) -> dict:
     """Run one reconstruction headless, save it into run_dir, and summarize it."""
     import importlib
+
     from pipeline import Pipeline
 
     problem = importlib.import_module(f"problems.{problem_name}").PROBLEM
@@ -147,6 +148,7 @@ def execute(problem_name: str, config: dict, run_dir: str) -> dict:
                   if line.startswith("Noise model")), "")
     import resource
     import sys
+
     ## peak resident memory of this (isolated) run — ru_maxrss is bytes on macOS, KiB on Linux
     maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     peak_mem_mb = round(maxrss / (1024 ** 2 if sys.platform == "darwin" else 1024), 1)

@@ -14,7 +14,15 @@ class QSeparator(QFrame):
 
 if __name__=="__main__":  # test
     import sys
-    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, QStyleFactory
+
+    from PyQt5.QtWidgets import (
+        QApplication,
+        QGroupBox,
+        QHBoxLayout,
+        QLabel,
+        QStyleFactory,
+        QVBoxLayout,
+    )
 
     import settings as settings
 

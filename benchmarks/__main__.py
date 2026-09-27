@@ -34,7 +34,7 @@ def _opt(args, name, cast=str, default=None):
 
 def _cmd_run(args):
     from benchmarks.campaign import specs, summary
-    from benchmarks.runner import run_campaign, CampaignStopped
+    from benchmarks.runner import CampaignStopped, run_campaign
 
     directory = Path(_opt(args, "--dir", str, str(DEFAULT_DIR)))
     timeout = _opt(args, "--timeout", float, 3600.0)
@@ -95,7 +95,7 @@ def _cmd_specs(args):
 
 
 def _cmd_analyze(args):
-    from benchmarks.analyze import analyze, DEFAULT_REPORT_DIR
+    from benchmarks.analyze import DEFAULT_REPORT_DIR, analyze
 
     directory = Path(_opt(args, "--dir", str, str(DEFAULT_DIR)))
     report_dir = Path(_opt(args, "--report-dir", str, str(DEFAULT_REPORT_DIR)))

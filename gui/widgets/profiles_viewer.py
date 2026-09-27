@@ -1,9 +1,9 @@
-from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-import numpy as np
+from PyQt5.QtGui import QPalette
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 
 class ProfilesViewer(QWidget):
@@ -117,10 +117,10 @@ if __name__=="__main__":  # test
     import sys
     from pathlib import Path
 
-    from PyQt5.QtWidgets import QApplication, QStyleFactory, QGroupBox
+    from PyQt5.QtWidgets import QApplication, QGroupBox, QStyleFactory
 
-    from fileio import load_tif
     import settings as settings
+    from fileio import load_tif
 
 
     app = QApplication(sys.argv)

@@ -23,17 +23,17 @@ MCMC only because its data-consistency step needed a ridge inverse. One primitiv
 operator removed every one of those subclasses.
 """
 
-from .base import Solver
 from .adam import Adam
-from .ppxa import Ppxa
 from .admm import Admm
+from .base import Solver
+from .mcmc import Mcmc
 from .pnp import Pnp
 from .pnp_admm import PnpAdmm
-from .mcmc import Mcmc
+from .ppxa import Ppxa
 
-## One solver per algorithm — after the benchmark, the weaker of each v1/v2 pair was retired
-## to solvers/old/ (see docs/algorithms/): ADMM and ADMM-PnP kept their v1, PnP and MCMC their
-## calibrated (former "v2") version. Registration order is the order the GUI lists them in.
+## One solver per algorithm — the weaker of each v1/v2 pair was removed (rationale in
+## docs/algorithms/): ADMM and ADMM-PnP kept their v1, PnP and MCMC their calibrated (former
+## "v2") version. Registration order is the order the GUI lists them in.
 SOLVERS = {cls.name: cls for cls in [
     Adam,
     Ppxa,

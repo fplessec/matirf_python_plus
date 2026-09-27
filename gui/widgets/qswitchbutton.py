@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QGridLayout
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QGridLayout, QHBoxLayout, QPushButton, QWidget
 
 
 class QSwitchButton(QWidget):
@@ -91,7 +91,15 @@ class QSwitchButton(QWidget):
 
 if __name__=="__main__":  # test
     import sys
-    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QLabel, QGroupBox, QPushButton, QStyleFactory
+
+    from PyQt5.QtWidgets import (
+        QApplication,
+        QGroupBox,
+        QLabel,
+        QPushButton,
+        QStyleFactory,
+        QVBoxLayout,
+    )
 
     import settings as settings
 

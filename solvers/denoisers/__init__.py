@@ -60,8 +60,14 @@ This structure makes it easy to:
 
 from .base import Denoiser
 from .reusable import (
-    DENOISER_LIST, DENOISER_REGISTRY,
-    ANISOTROPIC_DENOISERS, SLICE_BY_SLICE_DENOISERS,
-    GaussianDenoiser, BilateralDenoiser, WienerDenoiser,
-    DCTDenoiser, TVBregmanDenoiser, NLRidgeDenoiser,
+    ANISOTROPIC_DENOISERS,
+    DENOISER_LIST,
+    DENOISER_REGISTRY,
+    SLICE_BY_SLICE_DENOISERS,
+    BilateralDenoiser,
+    DCTDenoiser,
+    GaussianDenoiser,
+    NLRidgeDenoiser,
+    TVBregmanDenoiser,
+    WienerDenoiser,
 )

@@ -32,17 +32,21 @@ import tempfile
 from pathlib import Path
 
 from PyQt5.QtWidgets import (
-    QApplication, QStyleFactory, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame,
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QStyleFactory,
+    QVBoxLayout,
+    QWidget,
 )
 
 import settings as settings
-from fileio.cache import make_update_cache
 from fileio import load_or_create_toml
-
-from gui.base.single_parameter_widget import SimpleParameterWidget
-from gui.base.base_section_widget import BaseSectionWidget
+from fileio.cache import make_update_cache
 from gui.base.base_section_qgroup import BaseSectionQGroup
-
+from gui.base.base_section_widget import BaseSectionWidget
+from gui.base.single_parameter_widget import SimpleParameterWidget
 
 # ── the demo section (test data, deliberately kept here and not in the library files) ──
 # It exercises every parameter type AND a callable 'depends_on' ('size' is shown only

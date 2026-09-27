@@ -26,11 +26,10 @@ ADDING ONE: write a class deriving from `DataFidelity` with `name`, `display_nam
 appears in the interface's noise-model section with no other change anywhere.
 """
 
-from .base import DataFidelity, NOISE_FLOOR
+from .base import NOISE_FLOOR, DataFidelity
 from .gaussian import GaussianFidelity
 from .poisson import PoissonFidelity
 from .poisson_gaussian import PoissonGaussianFidelity
-
 
 _ALL_DATA_FIDELITIES = [
     GaussianFidelity,

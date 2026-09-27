@@ -41,7 +41,6 @@ import torch
 from solvers.base import Solver
 from solvers.objective_params import INIT_UI_PARAM
 
-
 PPXA_UI_PARAMS = {
     "max_iter": {
         "title": "Maximum iteration number",

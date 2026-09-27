@@ -13,13 +13,21 @@ refreshed, what each Estimate button computes), then MATIRF_UI, which assembles 
 import torch
 
 from gui.reusable import SingularValuePickerDialog
-from gui.spec import Editor, Estimator, FileSlot, Panel, Preview, ProblemUI, View, image_panel
+from gui.spec import (
+    Editor,
+    Estimator,
+    FileSlot,
+    Panel,
+    Preview,
+    ProblemUI,
+    View,
+    image_panel,
+)
 from gui.widgets import DepthMapViewer, ImageAndHisto3DViewer, ProfilesViewer
 from gui.widgets.figure_export import export_depth_and_profiles
 
-from .parameters import MEASUREMENT_PARAMETERS_UI
 from .operator_parameters import OPERATOR_PARAMETERS_UI
-
+from .parameters import MEASUREMENT_PARAMETERS_UI
 
 # ── the preprocessing preview ─────────────────────────────────────────────────
 

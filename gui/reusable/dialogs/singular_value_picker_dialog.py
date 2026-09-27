@@ -5,8 +5,8 @@ magnitudes) and lets the user pick a cutoff.  lambda_rr = s_k².
 Used by both MA-TIRF (SVD of H) and deconvolution (FFT spectrum of PSF).
 """
 
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QComboBox, QDialogButtonBox
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QVBoxLayout
 
 
 class SingularValuePickerDialog(QDialog):
@@ -80,6 +80,7 @@ class SingularValuePickerDialog(QDialog):
 
 if __name__=="__main__":  # test
     import sys
+
     import torch
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 

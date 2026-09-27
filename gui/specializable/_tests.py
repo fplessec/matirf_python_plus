@@ -41,19 +41,23 @@ from pathlib import Path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-    QApplication, QStyleFactory, QWidget, QLabel, QVBoxLayout,
+    QApplication,
+    QLabel,
+    QStyleFactory,
+    QVBoxLayout,
+    QWidget,
 )
 
 import settings as settings
 from core import DataMode
 from core.enums import PipelineState
-
 from gui.reusable import AddNoiseSection, AlgorithmSelectionSection
 from gui.specializable.control_window import BaseControlWindow, BaseInputFilesSection
 from gui.specializable.display_window import (
-    BaseDisplayWindow, BaseDisplayWindowManager, BaseFiguresSection,
+    BaseDisplayWindow,
+    BaseDisplayWindowManager,
+    BaseFiguresSection,
 )
-
 
 # ── throwaway config location (never touches the real app caches) ─────────────
 TMP_DIR = Path(tempfile.mkdtemp())

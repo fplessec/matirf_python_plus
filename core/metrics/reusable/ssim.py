@@ -11,8 +11,8 @@ import torch
 from skimage.metrics import structural_similarity as skimage_ssim
 
 import settings as settings
-from core.metrics.base import Metric, to_numpy
 from core.features import Feature
+from core.metrics.base import Metric, to_numpy
 
 
 class SSIM(Metric):

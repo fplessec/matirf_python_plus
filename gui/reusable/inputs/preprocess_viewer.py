@@ -15,7 +15,7 @@ side, for the current REAL / SYNTHETIC mode. Only problem-specific bits are pass
 It closes back to the owning FileSelector (parent.sub_window = None).
 """
 
-from PyQt5.QtWidgets import QWidget, QHBoxLayout
+from PyQt5.QtWidgets import QHBoxLayout, QWidget
 
 from core import DataMode
 from fileio import load_or_create_toml

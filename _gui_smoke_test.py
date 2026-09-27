@@ -44,13 +44,13 @@ import sys
 import tempfile
 import time
 import traceback
+from pathlib import Path
 
 import torch
-from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import QApplication, QMessageBox, QPushButton
 
@@ -59,6 +59,7 @@ app = QApplication(sys.argv)
 # ── an exception inside a Qt callback is a FAILURE of the current check, not a crash ──
 ## (without this, PyQt aborts the process and the summary line never prints)
 from gui.errors import install_error_handlers
+
 UNCAUGHT = []
 install_error_handlers(show_dialog=False, on_error=lambda *error: UNCAUGHT.append(error))
 
@@ -78,13 +79,19 @@ from core.enums import PipelineState
 from fileio import load_or_create_toml, save_toml
 from gui.factory import control_window_class, display_window_class
 from pipeline import Pipeline, pipeline_for
-from solvers.objective_params import OBJECTIVE_UI_PARAMS
 from problems.deconv import (
-    DECONV, DECONV_CONFIG_PATH, DECONV_MEASUREMENTS_DIR, DEFAULT_DECONV_CONFIG,
+    DECONV,
+    DECONV_CONFIG_PATH,
+    DECONV_MEASUREMENTS_DIR,
+    DEFAULT_DECONV_CONFIG,
 )
 from problems.matirf import (
-    MATIRF, MATIRF_CONFIG_PATH, MATIRF_MEASUREMENTS_DIR, DEFAULT_MATIRF_CONFIG,
+    DEFAULT_MATIRF_CONFIG,
+    MATIRF,
+    MATIRF_CONFIG_PATH,
+    MATIRF_MEASUREMENTS_DIR,
 )
+from solvers.objective_params import OBJECTIVE_UI_PARAMS
 
 TIF = str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF")
 MJSON = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")

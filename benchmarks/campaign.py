@@ -25,8 +25,8 @@ from the PSF) — they are documented where they occur.
     from benchmarks.runner import run_campaign
     run_campaign(specs(), "benchmarks/results/main")
 """
-from core import DataMode
 from benchmarks.runner import RunSpec
+from core import DataMode
 from problems.deconv import DECONV_MEASUREMENTS_DIR
 from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
 

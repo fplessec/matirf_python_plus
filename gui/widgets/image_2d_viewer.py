@@ -1,10 +1,10 @@
-import torch
 import numpy as np
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout
+import torch
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 import settings as settings
 
@@ -124,10 +124,10 @@ if __name__=="__main__":  # test
     import sys
     from pathlib import Path
 
-    from PyQt5.QtWidgets import QApplication, QStyleFactory, QGroupBox
+    from PyQt5.QtWidgets import QApplication, QGroupBox, QStyleFactory
 
-    from fileio import load_tif
     import settings as settings
+    from fileio import load_tif
 
 
     app = QApplication(sys.argv)

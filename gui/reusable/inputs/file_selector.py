@@ -25,7 +25,7 @@ from typing import Callable, Optional, Union
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from gui.file_dialog import open_file
 from gui.widgets import QCrossButton
@@ -242,11 +242,11 @@ if __name__=="__main__":  # test
     import tempfile
     from pathlib import Path
 
-    from PyQt5.QtWidgets import QApplication, QStyleFactory, QGroupBox, QHBoxLayout
+    from PyQt5.QtWidgets import QApplication, QGroupBox, QHBoxLayout, QStyleFactory
 
     import settings as settings
-    from fileio.cache import make_update_cache
     from fileio import load_or_create_toml
+    from fileio.cache import make_update_cache
 
 
     class _DemoSection(QGroupBox):

@@ -28,6 +28,7 @@ class MessageSection(QGroupBox):
 
 if __name__=="__main__":  # test
     import sys
+
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 
     import settings as settings

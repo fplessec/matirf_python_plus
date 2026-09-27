@@ -7,16 +7,22 @@ pipeline bridge) and delegates problem-specific parts to hooks.
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QStackedWidget, QSizePolicy, QAction,
+    QAction,
+    QHBoxLayout,
+    QMainWindow,
+    QPushButton,
+    QSizePolicy,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
-from gui.file_dialog import save_file
 from tomli_w import dumps
 
-from gui.utils import close_active_window
-from core.enums import PipelineState
-from gui.specializable.display_window.pipeline_qt_bridge import PipelineQtBridge
 import settings as settings
+from core.enums import PipelineState
+from gui.file_dialog import save_file
+from gui.specializable.display_window.pipeline_qt_bridge import PipelineQtBridge
+from gui.utils import close_active_window
 
 
 class BaseDisplayWindow(QMainWindow):

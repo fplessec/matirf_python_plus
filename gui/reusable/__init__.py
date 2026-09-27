@@ -67,11 +67,18 @@ Key distinction
 """
 
 
+from .dialogs import FrequencyCutoffDialog, SingularValuePickerDialog
+from .inputs import FileSelector, JsonParametersEditor, PreprocessViewer, SelectorButton
+
 # reusable components are grouped by kind (see the three sub-packages):
 from .sections import (
-    AddNoiseSection, ADD_NOISE_PARAMETERS_UI, add_noise_formula, AlgorithmSelectionSection,
-    NoiseModelSection, NOISE_MODEL_UI, noise_model_formula,
-    with_extra_buttons, MessageSection,
+    ADD_NOISE_PARAMETERS_UI,
+    NOISE_MODEL_UI,
+    AddNoiseSection,
+    AlgorithmSelectionSection,
+    MessageSection,
+    NoiseModelSection,
+    add_noise_formula,
+    noise_model_formula,
+    with_extra_buttons,
 )
-from .inputs import FileSelector, SelectorButton, JsonParametersEditor, PreprocessViewer
-from .dialogs import FrequencyCutoffDialog, SingularValuePickerDialog

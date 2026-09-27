@@ -37,12 +37,12 @@ obey a spatial logic in depth, as they do in a cell, instead of floating indepen
 
 import math
 
-
 import torch
 
 import settings as settings
-from ..rng import uniform, random_flat_rotation
-from .base import SyntheticObject, REACH, value_param, count_param
+
+from ..rng import random_flat_rotation, uniform
+from .base import REACH, SyntheticObject, count_param, value_param
 
 
 class Ellipsoid(SyntheticObject):

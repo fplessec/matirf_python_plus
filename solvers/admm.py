@@ -29,7 +29,6 @@ import torch
 
 from solvers.base import Solver
 
-
 ADMM_UI_PARAMS = {
     "iter": {
         "title": "Number of iterations",

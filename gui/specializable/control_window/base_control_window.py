@@ -12,22 +12,26 @@ Section descriptor formats:
     (SomeClass, extra_kwargs)   — same, with extra kwargs merged in
 """
 
-import re
 import inspect
+import re
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QAction,
+    QAction,
+    QHBoxLayout,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
-from gui.file_dialog import open_file, save_file, open_directory
-from gui.utils import close_active_window
-from gui.base.base_section_qgroup import BaseSectionQGroup
+import settings as settings
 from fileio import load_or_create_toml, save_toml
 from fileio.cache import make_update_cache
-import settings as settings
+from gui.base.base_section_qgroup import BaseSectionQGroup
+from gui.file_dialog import open_directory, open_file, save_file
+from gui.utils import close_active_window
 
 
 def _camel_to_snake(name):

@@ -193,7 +193,7 @@ Measured, sweeping β, σ, λ_rr and the denoiser, on cropped MA-TIRF and deconv
 **Consequence for the benchmark:** MCMC is worth running as the **MMSE reference on
 deconvolution** and as an honest negative on MA-TIRF (report that it does not beat the ridge
 start there). MCMCv3 (a paper-faithful reproject + target-acceptance β) was built, measured to
-give no MA-TIRF gain and to still saturate, and **abandoned** — kept only in `docs/old` history.
+give no MA-TIRF gain and to still saturate, and **abandoned** (preserved under the `v1.0` tag).
 
 ---
 

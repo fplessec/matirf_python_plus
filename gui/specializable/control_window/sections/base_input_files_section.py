@@ -26,13 +26,13 @@ from typing import Callable, Iterable
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox
+from PyQt5.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout
 
-from gui.widgets import QSwitchButton, QSeparator
-from gui.reusable import FileSelector, SelectorButton
 from core import DataMode, normalization
-from fileio import load_or_create_toml, load_json
+from fileio import load_json, load_or_create_toml
 from gui.base.base_section_widget import BaseSectionWidget
+from gui.reusable import FileSelector, SelectorButton
+from gui.widgets import QSeparator, QSwitchButton
 from settings import FontSize
 
 

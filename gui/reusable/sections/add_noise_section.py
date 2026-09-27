@@ -1,7 +1,6 @@
 from core import noise
 from gui.base.base_section_qgroup import BaseSectionQGroup
 
-
 ## The Poisson-Gaussian noise model of core/noise.py, as two independent switches:
 ##     photon noise only -> 100% Poisson,   read noise only -> 100% Gaussian,
 ##     both -> Poisson-Gaussian,            neither -> no noise.
@@ -82,8 +81,8 @@ if __name__=="__main__":  # test
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 
     import settings as settings
-    from fileio.cache import make_update_cache
     from fileio import load_or_create_toml
+    from fileio.cache import make_update_cache
 
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create(settings.app_style))

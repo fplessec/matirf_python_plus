@@ -30,6 +30,7 @@ class Metric:
     def _prepare(self, f, f_true, features):
         """Handle scale alignment for scale-ambiguous problems. Returns (f_prepared, f_true)."""
         from core.features import Feature
+
         from .utils import align_scale
         if Feature.SCALE_AMBIGUOUS in features:
             f, _ = align_scale(f, f_true)

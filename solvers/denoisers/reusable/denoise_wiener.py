@@ -2,7 +2,7 @@ import torch
 
 import settings as settings
 from solvers.denoisers.base import Denoiser
-from solvers.denoisers.base.utils import _from_5d, _to_5d, _is_3d, _conv_reflect_5d
+from solvers.denoisers.base.utils import _conv_reflect_5d, _from_5d, _is_3d, _to_5d
 
 
 class WienerDenoiser(Denoiser):

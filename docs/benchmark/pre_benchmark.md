@@ -17,7 +17,7 @@
 The pre-benchmark ran the full v1+v2 set: ADAM, PPXA, ADMM, **ADMMv2**, PnP, **PnPv2**,
 ADMM-PnP, **ADMM-PnPv2**, MCMC, **MCMCv2**. On MA-TIRF (two synthetic truths
 `cell_fibres_vesicles`, `vesicles` at noise 0 / 0.02 / 0.05, plus the real `esoubies`) and one
-deconvolution image. Since then the losers were retired to `solvers/old/` (commit `09b89cc`),
+deconvolution image. Since then the losers were removed (commit `09b89cc`; preserved under the `v1.0` tag),
 so the surviving six are **ADAM, PPXA, ADMM, PnP (=former v2), ADMM-PnP, MCMC (=former v2)**.
 
 ---
@@ -129,10 +129,9 @@ gets re-tuned, not deleted.
 - **ADMM ↔ ADMMv2 → the delicate one.** ADMMv2 is unusable as-is (rejected everywhere; κ∈[0.02,
   0.5] empties the image) — but that is a *bad default band*, not a design flaw (its scale-free
   κ is cleaner than v1's entangled threshold; it needs κ≪0.02 on MA-TIRF). Options were
-  (a) re-tune it, or (b) keep the proven v1. **[decided: kept v1 (`09b89cc`); ADMMv2 retired to
-  `solvers/old/`.]**
+  (a) re-tune it, or (b) keep the proven v1. **[decided: kept v1 (`09b89cc`); ADMMv2 removed.]**
 
-**Outcome (executed in `09b89cc`):** one solver per algorithm. Retired to `solvers/old/`:
+**Outcome (executed in `09b89cc`):** one solver per algorithm. Removed (preserved under the `v1.0` tag):
 MCMC v1, PnP v1, ADMM-PnPv2, ADMMv2. The `v1.0` tag preserves every v1 reference.
 
 ---

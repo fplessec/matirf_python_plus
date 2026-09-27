@@ -113,7 +113,7 @@ threshold. Then:
 **Continuous truths (`cell`) are essentially out of reach for ADMM**: L1 is the wrong model, so
 there is little-to-no `κ` band. Concentrated truths (`vesicles`, `fibres`) have a band, but a
 narrow one. **For a successor:** ADMM's wall is its prior (sparsity), not its solver. The
-coupled `μ` is a genuine design defect — ADMMv2 (`solvers/old/`) fixed the *interpretability*
+coupled `μ` is a genuine design defect — ADMMv2 (an earlier variant, since removed) fixed the *interpretability*
 of `κ` and freed `μ` to be speed-only, but did **not** change the underlying limit that L1 is a
 poor prior for cells; it also **empties the image at `κ → 1` by construction**
 (`κ = 1` returns exactly zero — lasso optimality at `f = 0`, `admm.md` §4.1) [structural],

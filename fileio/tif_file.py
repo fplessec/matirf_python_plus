@@ -1,8 +1,9 @@
-import torch
 import tifffile
+import torch
+
+import settings as settings
 
 from .utils import _fetch
-import settings as settings
 
 
 def load_tif(filepath) -> torch.Tensor:

@@ -2,8 +2,8 @@ import numpy as np
 import torch
 from PIL import Image
 
-from fileio.utils import _fetch
 import settings as settings
+from fileio.utils import _fetch
 
 
 def load_png(filepath) -> torch.Tensor:

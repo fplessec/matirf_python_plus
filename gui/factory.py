@@ -25,14 +25,15 @@ added to, and the run would linger forever.
 
 from functools import partial
 
+from gui.estimators import attach
 from gui.reusable import AddNoiseSection, AlgorithmSelectionSection  # noqa: F401
 from gui.specializable.control_window import BaseControlWindow, BaseInputFilesSection
 from gui.specializable.display_window import (
-    BaseDisplayWindow, BaseDisplayWindowManager, BaseFiguresSection,
+    BaseDisplayWindow,
+    BaseDisplayWindowManager,
+    BaseFiguresSection,
 )
 from gui.specializable.display_window.sections import BaseSyntheticTruthSection
-from gui.estimators import attach
-
 
 _CACHE = {}
 
@@ -166,8 +167,12 @@ def control_window_class(problem) -> type:
         ## A problem opts out simply by having no '[add-noise]' section in its default config.
         ## The noise model is added for every problem: each reconstruction needs a data
         ## fidelity, chosen with the measurement, not with the algorithm.
-        from gui.reusable import (ADD_NOISE_PARAMETERS_UI, add_noise_formula,
-                                  NOISE_MODEL_UI, noise_model_formula)
+        from gui.reusable import (
+            ADD_NOISE_PARAMETERS_UI,
+            NOISE_MODEL_UI,
+            add_noise_formula,
+            noise_model_formula,
+        )
         sections_left = [inputs] + list(ui.parameters)
         if "add-noise" in (problem.default_config or {}):
             sections_left.append(("Add noise to measurement", ADD_NOISE_PARAMETERS_UI,

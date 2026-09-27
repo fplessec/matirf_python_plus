@@ -26,12 +26,18 @@ from dataclasses import dataclass
 from typing import Callable, List
 
 from PyQt5.QtWidgets import (
-    QGroupBox, QHBoxLayout, QLabel, QStackedLayout, QWidget, QVBoxLayout, QPushButton,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QStackedLayout,
+    QVBoxLayout,
+    QWidget,
 )
 
-from gui.widgets import QSwitchButton
-from gui.file_dialog import save_file
 import settings as settings
+from gui.file_dialog import save_file
+from gui.widgets import QSwitchButton
 
 
 @dataclass

@@ -37,11 +37,11 @@ import torch
 from core import DataMode, Objective
 from core.metrics import optimal_scale
 from core.normalization import normalize_and_add_noise
-from pipeline import resolve_noise_model, noise_parameters
-from problems.matirf import MATIRF, MATIRF_SYNTHETIC_DIR
+from pipeline import noise_parameters, resolve_noise_model
 from problems.deconv import DECONV, DECONV_MEASUREMENTS_DIR
+from problems.matirf import MATIRF, MATIRF_SYNTHETIC_DIR
 from solvers import Adam
-from solvers.base import ridge_start, second_eigenvalue, ridge_weight
+from solvers.base import ridge_start, ridge_weight, second_eigenvalue
 from solvers.differential_operators import DifferentialOperators
 from solvers.regularizers import REGULARIZATION_REGISTRY
 

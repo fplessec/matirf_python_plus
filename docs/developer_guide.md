@@ -214,4 +214,4 @@ from `pipeline._evaluate`. The benchmark records a curated subset (`benchmarks/r
 - **Layering:** `core/` imports neither `gui/` nor `solvers/`; a solver never imports a problem.
 - **Docstrings** explain *why*, not just *what*; math is written in plain text/Unicode so it
   reads without a renderer (see `docs/algorithms/`).
-- One solver per algorithm; superseded variants live in `solvers/old/` (kept for reference).
+- One solver per algorithm; the superseded variants were removed after the benchmark (the `v1.0` tag preserves them).

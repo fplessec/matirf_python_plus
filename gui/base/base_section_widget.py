@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from gui.base.single_parameter_widget import SimpleParameterWidget
 from gui.widgets import QSeparator

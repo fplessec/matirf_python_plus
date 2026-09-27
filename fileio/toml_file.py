@@ -1,8 +1,8 @@
-import tomli_w
-import tomli
-
 from os.path import isfile
 from pathlib import Path
+
+import tomli
+import tomli_w
 
 
 def load_or_create_toml(filepath, default_config=None) -> dict:

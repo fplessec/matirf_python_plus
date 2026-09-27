@@ -7,10 +7,10 @@ PnP — Plug-and-Play Half-Quadratic Splitting with the annealing schedule of Zh
 
 This is the scale-free version: the denoiser sees 255*f/peak (so a level sigma means the same
 at any data scale), sigma_final is tied to the measurement's noise, and the start is the ridge
-s2^2 estimate. It replaced an earlier variant that assumed f in [0,1] and started from H^T g
-(kept for reference in solvers/old/pnp.py). Rationale in docs/algorithms/pnp.md.
+s2^2 estimate. It replaced an earlier variant that assumed f in [0,1] and started from H^T g.
+Rationale in docs/algorithms/pnp.md.
 
-Design choices (vs the earlier variant in solvers/old/):
+Design choices (vs that earlier variant):
     > SCALE-FREE DENOISING. PnP feeds the denoisers 255 f, which assumes f in [0, 1] — true
       for a photograph, false for MA-TIRF (peak ~0.02). Measured at sigma = 5: Wiener changes
       the image by 84 % at MA-TIRF's scale and 20 % at a photograph's, DCT erases it. Here f
@@ -47,8 +47,13 @@ import torch
 
 from core.features import Feature
 from solvers.base import Solver, ridge_start
-from solvers.denoising import resolve, denoise, warn_if_slice_by_slice, relative_noise_level
-from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
+from solvers.denoisers import ANISOTROPIC_DENOISERS, DENOISER_LIST
+from solvers.denoising import (
+    denoise,
+    relative_noise_level,
+    resolve,
+    warn_if_slice_by_slice,
+)
 
 PNP_UI_PARAMS = {
     "denoiser": {

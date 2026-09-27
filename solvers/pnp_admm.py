@@ -22,8 +22,12 @@ import time
 import torch
 
 from solvers.base import Solver
-from solvers.denoising import resolve, denoise, warn_if_slice_by_slice, DENOISER_UI_PARAMS
-
+from solvers.denoising import (
+    DENOISER_UI_PARAMS,
+    denoise,
+    resolve,
+    warn_if_slice_by_slice,
+)
 
 PNP_ADMM_UI_PARAMS = {
     "iter": {

@@ -23,9 +23,14 @@ Contents:
 import torch
 
 from core import (
-    Feature, features, supports, catalogue,
-    ForwardOperator, Objective,
-    InverseProblem, DataMode,
+    DataMode,
+    Feature,
+    ForwardOperator,
+    InverseProblem,
+    Objective,
+    catalogue,
+    features,
+    supports,
 )
 
 ## float64 so conjugate gradient and the closed forms agree to tight tolerances:

@@ -56,6 +56,6 @@ inverse problems: it only defines generic parameter UI primitives.
 """
 
 
-from .single_parameter_widget import SimpleParameterWidget
-from .base_section_widget import BaseSectionWidget
 from .base_section_qgroup import BaseSectionQGroup
+from .base_section_widget import BaseSectionWidget
+from .single_parameter_widget import SimpleParameterWidget

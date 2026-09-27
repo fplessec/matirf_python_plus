@@ -56,8 +56,8 @@ Usage
     metrics = compute_all_metrics(f, f_true, features={"2d"})
 """
 
-from .base import Metric, optimal_scale, align_scale
-from .reusable import METRIC_REGISTRY, METRIC_LIST
+from .base import Metric, align_scale, optimal_scale
+from .reusable import METRIC_LIST, METRIC_REGISTRY
 
 
 def compute_all_metrics(f, f_true, features=set(), only=None, **kw):

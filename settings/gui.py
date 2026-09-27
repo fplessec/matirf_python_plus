@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-from .settings import Settings, _DEFAULTS
+from .settings import _DEFAULTS, Settings
 
 
 class SettingsDialog(QDialog):

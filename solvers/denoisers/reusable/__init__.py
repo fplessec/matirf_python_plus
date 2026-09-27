@@ -77,13 +77,15 @@ Key distinction
     concrete denoising algorithms (Gaussian, Bilateral, Wiener, DCT, ...)
 """
 
-from .denoiser_list import (
-    DENOISER_LIST, DENOISER_REGISTRY,
-    ANISOTROPIC_DENOISERS, SLICE_BY_SLICE_DENOISERS,
-)
-from .denoise_gaussian import GaussianDenoiser
 from .denoise_bilateral import BilateralDenoiser
-from .denoise_wiener import WienerDenoiser
 from .denoise_dct import DCTDenoiser
+from .denoise_gaussian import GaussianDenoiser
 from .denoise_tv_bregman import TVBregmanDenoiser
+from .denoise_wiener import WienerDenoiser
+from .denoiser_list import (
+    ANISOTROPIC_DENOISERS,
+    DENOISER_LIST,
+    DENOISER_REGISTRY,
+    SLICE_BY_SLICE_DENOISERS,
+)
 from .nlridge import NLRidgeDenoiser

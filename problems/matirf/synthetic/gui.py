@@ -20,25 +20,39 @@ Every edit is written to the scene file at once, as in the control window.
 import sys
 
 from PyQt5.QtWidgets import (
-    QApplication, QStyleFactory, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QScrollArea, QMessageBox,
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QStyleFactory,
+    QVBoxLayout,
+    QWidget,
 )
 
 import settings as settings
 from fileio import load_or_create_toml
 from gui.base.base_section_qgroup import BaseSectionQGroup
 from gui.errors import install_error_handlers
-from gui.file_dialog import open_file, save_file
 from gui.factory import figures_section_class
+from gui.file_dialog import open_file, save_file
 from problems.matirf import MATIRF_SYNTHETIC_DIR
 from problems.matirf.cache import update_cache as update_matirf_cache
-from .grid import GRID_UI, GRID_TOML_KEY
+
+from .generator import generate, save_truth
+from .grid import GRID_TOML_KEY, GRID_UI
 from .objects import OBJECTS, gate_by_count
 from .scene import (
-    SCENE_PATH, PRESETS_DIR, DEFAULT_SCENE, SAMPLING_UI, SAMPLING_TOML_KEY,
-    load_scene, save_scene, update_scene_cache,
+    DEFAULT_SCENE,
+    PRESETS_DIR,
+    SAMPLING_TOML_KEY,
+    SAMPLING_UI,
+    SCENE_PATH,
+    load_scene,
+    save_scene,
+    update_scene_cache,
 )
-from .generator import generate, save_truth
 
 
 def _figures_section():

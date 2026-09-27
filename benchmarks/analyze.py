@@ -202,10 +202,11 @@ def truth_gallery(records: list, campaign_dir: Path, report_dir: Path) -> str:
         import os
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt5.QtWidgets import QApplication
+
         from fileio import load_tif
         from gui.widgets.depth_map_viewer import DepthMapViewer
-        from gui.widgets.profiles_viewer import ProfilesViewer
         from gui.widgets.figure_export import export_depth_and_profiles
+        from gui.widgets.profiles_viewer import ProfilesViewer
     except Exception as error:                                  # pragma: no cover - environment
         print(f"  (truth render skipped — {type(error).__name__}: {error})")
         return ""
@@ -406,10 +407,14 @@ def render_pngs(exported: list) -> int:
         import os
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PyQt5.QtWidgets import QApplication
+
         from fileio import load_tif
         from gui.widgets.depth_map_viewer import DepthMapViewer
+        from gui.widgets.figure_export import (
+            export_depth_and_profiles,
+            export_depth_only,
+        )
         from gui.widgets.profiles_viewer import ProfilesViewer
-        from gui.widgets.figure_export import export_depth_and_profiles, export_depth_only
     except Exception as error:                              # pragma: no cover - environment
         print(f"  (PNG export skipped — {type(error).__name__}: {error})")
         return 0

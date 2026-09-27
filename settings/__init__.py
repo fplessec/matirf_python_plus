@@ -18,7 +18,7 @@ The module-level ``__getattr__`` delegates to the singleton so that
 import torch
 
 from .custom_palette import dark_palette, light_palette  # noqa: F401
-from .settings import Settings, _DEFAULTS  # noqa: F401
+from .settings import _DEFAULTS, Settings  # noqa: F401
 
 _settings = Settings()
 

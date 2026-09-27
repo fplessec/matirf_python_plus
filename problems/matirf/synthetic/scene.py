@@ -19,7 +19,8 @@ from pathlib import Path
 
 from fileio import load_or_create_toml, save_toml
 from fileio.cache import make_update_cache
-from .grid import GRID_UI, GRID_TOML_KEY
+
+from .grid import GRID_TOML_KEY, GRID_UI
 from .objects import OBJECTS
 from .objects.base import _default_of, value_param
 

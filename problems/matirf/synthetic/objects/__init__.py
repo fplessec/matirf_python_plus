@@ -13,7 +13,7 @@ of what makes a scene reproducible. Add a new kind at the END, never in the midd
 ADDING ONE: write a SyntheticObject subclass (see base.py) and append it below.
 """
 
-from .base import SyntheticObject, value_param, count_param, gate_by_count
+from .base import SyntheticObject, count_param, gate_by_count, value_param
 from .ellipsoid import Ellipsoid
 from .filament import Filament
 from .membrane import Membrane

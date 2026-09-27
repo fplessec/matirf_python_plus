@@ -24,13 +24,20 @@ For anything beyond these types, two hooks remain for genuinely custom fields:
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox
+from PyQt5.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-from gui.file_dialog import save_file
-from gui.base import SimpleParameterWidget
-from gui.widgets import QSeparator, QTextEditTab2Switch
-from fileio import load_json, save_json
 import settings as settings
+from fileio import load_json, save_json
+from gui.base import SimpleParameterWidget
+from gui.file_dialog import save_file
+from gui.widgets import QSeparator, QTextEditTab2Switch
 
 
 class JsonParametersEditor(QWidget):

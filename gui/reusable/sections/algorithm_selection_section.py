@@ -1,6 +1,11 @@
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QGroupBox, QComboBox, QStackedWidget,
+    QComboBox,
+    QGroupBox,
+    QHBoxLayout,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from .algo_parameters_widget import AlgoParamsWidget, NoneAlgoWidget
@@ -114,9 +119,8 @@ if __name__=="__main__":  # test
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 
     import settings as settings
-    from fileio.cache import make_update_cache
     from fileio import load_or_create_toml, save_toml
-
+    from fileio.cache import make_update_cache
 
     # a minimal fake algorithm registry: each class only needs get_ui_params(features),
     # exactly like a real Algorithm subclass. This keeps the test independent of any

@@ -1,9 +1,9 @@
 import torch
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QSlider, QHBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSlider, QVBoxLayout, QWidget
 
 import settings as settings
 
@@ -161,8 +161,10 @@ class Image3DViewer(QWidget):
 if __name__=="__main__":
     import sys
     from pathlib import Path
-    from fileio import load_tif
+
     from PyQt5.QtWidgets import QApplication
+
+    from fileio import load_tif
 
     app = QApplication(sys.argv)
     app.setStyle("macintosh")  # <- force the style for any OS to macintosh

@@ -19,13 +19,16 @@ from pathlib import Path
 
 import torch
 
-from core.enums import PipelineState
 from core import DataMode
-from problems.deconv import DECONV_MEASUREMENTS_DIR
-from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
-from pipeline import Pipeline, build_objective, resolve_noise_model, validate_noise_model
-from problems.deconv import DECONV
-from problems.matirf import MATIRF
+from core.enums import PipelineState
+from pipeline import (
+    Pipeline,
+    build_objective,
+    resolve_noise_model,
+    validate_noise_model,
+)
+from problems.deconv import DECONV, DECONV_MEASUREMENTS_DIR
+from problems.matirf import MATIRF, MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
 
 
 def _deconv_config(algorithm="ADAM", **algo_params):
@@ -117,6 +120,7 @@ def test_build_objective():
     # D1 (B with C2): a regularized objective is calibrated by reg_scale = 1 / R(f_init)
     # (the ridge s2^2 start; the iterative ridge_inverse is deterministic only to ~0.1 %)
     from math import isclose
+
     from solvers.base import ridge_start
     r_ref = float(regularized.regularization.loss(
         ridge_start(regularized, {"init": "ridge"}), regularized.diff_ops))

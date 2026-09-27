@@ -14,11 +14,11 @@ The regularizations themselves live under `solvers/regularizers/` — they descr
 objective, not any problem, so this is where they belong.
 """
 
-from solvers.regularizers import (
-    REGULARIZATION_LIST, ANISOTROPIC_REGULARIZATIONS,
-)
 from core.features import Feature
-
+from solvers.regularizers import (
+    ANISOTROPIC_REGULARIZATIONS,
+    REGULARIZATION_LIST,
+)
 
 ## The noise model is NOT here: it describes the measurement, not what any algorithm does
 ## with it, and has its own '[noise-model]' section (gui/reusable/sections/noise_model_section.py).

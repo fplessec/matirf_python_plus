@@ -23,14 +23,17 @@ from pathlib import Path
 
 import torch
 
+from core import DataMode, Feature, Objective, features
 from fileio import load_json, load_tif
-from core import DataMode, Feature, features
-from problems.matirf import MATIRF_MEASUREMENTS_DIR, MATIRF_SYNTHETIC_DIR
+from problems.matirf import (
+    MATIRF,
+    MATIRF_MEASUREMENTS_DIR,
+    MATIRF_SYNTHETIC_DIR,
+    MatirfOperator,
+    physics,
+)
+from problems.matirf import problem as matirf_problem
 from solvers import Adam
-from core import Objective
-
-from problems.matirf import MATIRF, MatirfOperator
-from problems.matirf import physics, problem as matirf_problem
 
 TIF = str(MATIRF_MEASUREMENTS_DIR / "esoubies.TIF")
 JSON = str(MATIRF_MEASUREMENTS_DIR / "esoubies.json")
@@ -316,7 +319,9 @@ def test_v1_reconstructions_reproduce():
     """
     import tempfile
     import time
+
     import tomli
+
     from pipeline import Pipeline
     from problems.matirf.synthetic import generate, save_truth
     truth = save_truth(generate(V1_TRUTH0_SCENE), Path(tempfile.mkdtemp()) / "synthetic_truth0.TIF",

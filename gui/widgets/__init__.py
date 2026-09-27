@@ -23,19 +23,21 @@ I can describe the objects in this module along those three main categories:
         - ProfilesViewer: orthogonal projections (yz, zx) to analyze structural profiles
 """
 
+# 3d visualisation specific widgets:
+from .depth_map_viewer import DepthMapViewer
+from .histogram_2d_widget import Histogram2DWidget
+from .histogram_3d_widget import Histogram3DWidget
+
+# 2d visualisation specific widgets:
+from .image_2d_viewer import Image2DViewer
+from .image_3d_viewer import Image3DViewer
+from .image_and_histo_2d_viewer import ImageAndHisto2DViewer
+from .image_and_histo_3d_viewer import ImageAndHisto3DViewer
+from .profiles_viewer import ProfilesViewer
+from .qcrossbutton import QCrossButton
+
 # user interface specific widgets:
 from .qlatexlabel import QLatexLabel
 from .qseparator import QSeparator
-from .qtextedit_tab2switch import QTextEditTab2Switch
 from .qswitchbutton import QSwitchButton
-from .qcrossbutton import QCrossButton
-# 2d visualisation specific widgets:
-from .image_2d_viewer import Image2DViewer
-from .histogram_2d_widget import Histogram2DWidget
-from .image_and_histo_2d_viewer import ImageAndHisto2DViewer
-# 3d visualisation specific widgets:
-from .depth_map_viewer import DepthMapViewer
-from .profiles_viewer import ProfilesViewer
-from .histogram_3d_widget import Histogram3DWidget
-from .image_3d_viewer import Image3DViewer
-from .image_and_histo_3d_viewer import ImageAndHisto3DViewer
+from .qtextedit_tab2switch import QTextEditTab2Switch

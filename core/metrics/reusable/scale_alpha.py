@@ -5,8 +5,8 @@ Only meaningful for scale-ambiguous inverse problems where the
 reconstruction is defined up to a multiplicative constant.
 """
 
-from core.metrics.base import Metric, optimal_scale
 from core.features import Feature
+from core.metrics.base import Metric, optimal_scale
 
 
 class ScaleAlpha(Metric):

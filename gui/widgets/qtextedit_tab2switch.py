@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QTextEdit, QLabel
+from PyQt5.QtWidgets import QLabel, QTextEdit
 
 
 class QTextEditTab2Switch(QTextEdit):
@@ -18,7 +18,14 @@ class QTextEditTab2Switch(QTextEdit):
 
 if __name__=="__main__":  # test
     import sys
-    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QLineEdit, QGroupBox, QStyleFactory
+
+    from PyQt5.QtWidgets import (
+        QApplication,
+        QGroupBox,
+        QLineEdit,
+        QStyleFactory,
+        QVBoxLayout,
+    )
 
     import settings as settings
 

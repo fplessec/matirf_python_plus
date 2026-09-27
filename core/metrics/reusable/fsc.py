@@ -10,8 +10,8 @@ plus the mean as a scalar summary.
 import torch
 
 import settings as settings
-from core.metrics.base import Metric
 from core.features import Feature
+from core.metrics.base import Metric
 
 
 class FSC(Metric):

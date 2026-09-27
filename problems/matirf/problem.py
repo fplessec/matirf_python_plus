@@ -12,17 +12,19 @@ problem because it provides a ForwardOperator, and for no other reason.
 
 import torch
 
-from core import InverseProblem
-from problems.matirf import (  # paths defined before this module is imported
-    MATIRF_CONFIG_PATH, DEFAULT_MATIRF_CONFIG, MATIRF_RESULTS_DIR, MATIRF_MEASUREMENTS_DIR,
-)
-from core import noise, normalization
+from core import InverseProblem, noise, normalization
 from core.normalization import normalize_and_add_noise
-from fileio import load_tif, save_tif, load_json
+from fileio import load_json, load_tif, save_tif
+from problems.matirf import (  # paths defined before this module is imported
+    DEFAULT_MATIRF_CONFIG,
+    MATIRF_CONFIG_PATH,
+    MATIRF_MEASUREMENTS_DIR,
+    MATIRF_RESULTS_DIR,
+)
+
+from . import physics
 from .operator import MatirfOperator
 from .ui import MATIRF_UI
-from . import physics
-
 
 # ── loading and preprocessing the measurement ─────────────────────────────────
 

@@ -32,9 +32,10 @@ import torch
 
 import settings as settings
 from fileio import save_tif
-from .grid import Grid, GRID_TOML_KEY
+
+from .grid import GRID_TOML_KEY, Grid
 from .objects import OBJECTS
-from .scene import complete, SAMPLING_TOML_KEY
+from .scene import SAMPLING_TOML_KEY, complete
 
 RECORD_FORMAT = "matirf-synthetic-truth/2"
 

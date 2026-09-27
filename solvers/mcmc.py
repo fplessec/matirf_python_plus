@@ -3,7 +3,7 @@ MCMC — an MMSE estimator: the mean of a Markov chain of plausible reconstructi
 
 This is the calibrated version (relative, scale-free parameters). It replaced an earlier
 variant whose beta and sigma were raw absolute numbers that had to be hand-matched to the
-noise level (kept for reference in solvers/old/mcmc.py). Rationale in docs/algorithms/mcmc.md.
+noise level. Rationale in docs/algorithms/mcmc.md.
 
 Every other solver here returns a MAP estimate, the single most probable f. This one runs a
 Metropolis-Hastings chain and returns the MEAN of its states after a burn-in: an average of
@@ -69,13 +69,12 @@ import time
 
 import torch
 
-from solvers.base import Solver, ridge_weight
-from solvers.fidelities import NOISE_MODEL_NAMES
-from solvers.denoising import resolve, warn_if_slice_by_slice, NO_DENOISER
-from solvers.objective_params import INIT_UI_PARAM
-from solvers.denoisers import DENOISER_LIST, ANISOTROPIC_DENOISERS
 from core.features import Feature
-
+from solvers.base import Solver, ridge_weight
+from solvers.denoisers import ANISOTROPIC_DENOISERS, DENOISER_LIST
+from solvers.denoising import NO_DENOISER, resolve, warn_if_slice_by_slice
+from solvers.fidelities import NOISE_MODEL_NAMES
+from solvers.objective_params import INIT_UI_PARAM
 
 ## proposals used to calibrate beta, and the fraction of the chain discarded as burn-in
 _CALIBRATION_PROPOSALS = 5

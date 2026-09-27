@@ -11,13 +11,12 @@ This registry is the single source of truth for:
 To add a new denoiser, just add an entry to DENOISER_REGISTRY below.
 """
 
-from .denoise_tv_bregman import TVBregmanDenoiser
-from .nlridge import NLRidgeDenoiser
-from .denoise_gaussian import GaussianDenoiser
 from .denoise_bilateral import BilateralDenoiser
-from .denoise_wiener import WienerDenoiser
 from .denoise_dct import DCTDenoiser
-
+from .denoise_gaussian import GaussianDenoiser
+from .denoise_tv_bregman import TVBregmanDenoiser
+from .denoise_wiener import WienerDenoiser
+from .nlridge import NLRidgeDenoiser
 
 _ALL_DENOISERS = [
     NLRidgeDenoiser(),

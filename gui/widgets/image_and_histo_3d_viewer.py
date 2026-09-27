@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QComboBox
+from PyQt5.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout
 
-from gui.widgets.image_3d_viewer import Image3DViewer
 from gui.widgets.histogram_3d_widget import Histogram3DWidget
+from gui.widgets.image_3d_viewer import Image3DViewer
 
 
 class ImageAndHisto3DViewer(QGroupBox):
@@ -118,8 +118,8 @@ if __name__=="__main__":  # test
 
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 
-    from fileio import load_tif
     import settings as settings
+    from fileio import load_tif
 
 
     app = QApplication(sys.argv)

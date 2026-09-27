@@ -1,8 +1,16 @@
-from PyQt5.QtWidgets import QHBoxLayout, QWidget, QLabel, QLineEdit, QComboBox, QCheckBox, QPushButton
 from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QWidget,
+)
 
-from settings import FontSize
 from gui.widgets import QLatexLabel
+from settings import FontSize
 
 
 class SimpleParameterWidget(QWidget):

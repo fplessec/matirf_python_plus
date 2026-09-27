@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QPushButton
-from PyQt5.QtGui import QPainter, QPen, QPalette
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPainter, QPalette, QPen
+from PyQt5.QtWidgets import QPushButton
 
 
 class QCrossButton(QPushButton):
@@ -36,7 +36,14 @@ class QCrossButton(QPushButton):
 
 if __name__=="__main__":  # test
     import sys
-    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QGroupBox, QLabel, QStyleFactory
+
+    from PyQt5.QtWidgets import (
+        QApplication,
+        QGroupBox,
+        QLabel,
+        QStyleFactory,
+        QVBoxLayout,
+    )
 
     import settings as settings
 

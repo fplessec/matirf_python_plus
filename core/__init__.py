@@ -23,10 +23,10 @@ Read `core/problem.py` first: it states what an inverse problem is in one object
 other three files explain the pieces it refers to.
 """
 
-from .features import Feature, NO_FEATURES, features, supports, catalogue
-from .operator import ForwardOperator
+from .features import NO_FEATURES, Feature, catalogue, features, supports
 from .objective import Objective
-from .problem import InverseProblem, PreparedProblem, DataMode
+from .operator import ForwardOperator
+from .problem import DataMode, InverseProblem, PreparedProblem
 
 __all__ = [
     "Feature", "NO_FEATURES", "features", "supports", "catalogue",

@@ -41,8 +41,8 @@ DEFAULT_MATIRF_CONFIG = {
     "algo-params": {},
 }
 
-from .operator import MatirfOperator      # noqa: E402
-from .problem import MATIRF               # noqa: E402
+from .operator import MatirfOperator  # noqa: E402
+from .problem import MATIRF  # noqa: E402
 
 ## the generic name cli.py and the tools look for, whatever the problem is called:
 PROBLEM = MATIRF

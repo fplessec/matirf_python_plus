@@ -1,9 +1,9 @@
-from PyQt5.QtWidgets import QLabel, QWidget, QVBoxLayout
-from PyQt5.QtGui import QPixmap, QPalette
-import matplotlib.pyplot as plt
-
-from io import BytesIO
 import re
+from io import BytesIO
+
+import matplotlib.pyplot as plt
+from PyQt5.QtGui import QPalette, QPixmap
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 def format_scientific_notation(text):
@@ -103,7 +103,14 @@ class QLatexLabel(QWidget):
 
 if __name__=="__main__":  # test
     import sys
-    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QGroupBox, QPushButton, QStyleFactory
+
+    from PyQt5.QtWidgets import (
+        QApplication,
+        QGroupBox,
+        QPushButton,
+        QStyleFactory,
+        QVBoxLayout,
+    )
 
     import settings as settings
 

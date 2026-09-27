@@ -11,7 +11,6 @@ from pathlib import Path
 
 import tomli
 
-
 ## settings/settings.py -> settings/ -> the project root (v1 lived one level deeper, in
 ## common/settings/, and the extra .parent had silently moved the file OUT of the project)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

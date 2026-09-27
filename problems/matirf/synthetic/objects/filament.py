@@ -29,8 +29,9 @@ import math
 import torch
 
 import settings as settings
-from ..rng import uniform, signed_uniform
-from .base import SyntheticObject, REACH, value_param, count_param
+
+from ..rng import signed_uniform, uniform
+from .base import REACH, SyntheticObject, count_param, value_param
 
 ## distance matrices are computed by chunks of this many points, to bound memory
 _CHUNK = 16384

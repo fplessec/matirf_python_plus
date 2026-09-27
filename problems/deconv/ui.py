@@ -16,7 +16,6 @@ from gui.widgets import ImageAndHisto2DViewer
 
 from .parameters import PSF_PARAMETERS_UI
 
-
 # ── the preprocessing preview ─────────────────────────────────────────────────
 
 PREVIEW_TITLES = {

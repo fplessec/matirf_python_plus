@@ -23,8 +23,11 @@ Three kinds of check:
 import torch
 
 from solvers.differential_operators import DifferentialOperators
-from solvers.regularizers import HessianFrobeniusRegularization, SHVRegularization
-from solvers.regularizers import _hessian
+from solvers.regularizers import (
+    HessianFrobeniusRegularization,
+    SHVRegularization,
+    _hessian,
+)
 
 DTYPE = torch.float64
 torch.manual_seed(0)

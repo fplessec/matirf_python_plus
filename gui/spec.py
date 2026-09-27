@@ -43,10 +43,14 @@ from typing import Callable, Optional
 ## the per-part specs already used by the generic sections — re-exported so a problem's
 ## ui.py imports everything it needs from this one module:
 from gui.specializable.control_window.sections.base_input_files_section import (  # noqa: F401
-    FileSlot, Preview, Editor,
+    Editor,
+    FileSlot,
+    Preview,
 )
 from gui.specializable.display_window.sections.base_figures_section import (  # noqa: F401
-    View, Panel, image_panel,
+    Panel,
+    View,
+    image_panel,
 )
 
 

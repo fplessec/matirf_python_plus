@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QVBoxLayout, QGroupBox
+from PyQt5.QtWidgets import QGroupBox, QVBoxLayout
 
 from gui.base.base_section_widget import BaseSectionWidget
 

@@ -1,6 +1,4 @@
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel
-)
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from gui.base.base_section_widget import BaseSectionWidget
 from settings import FontSize

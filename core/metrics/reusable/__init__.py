@@ -23,19 +23,18 @@ METRIC_REGISTRY: maps display name -> Metric instance
 METRIC_LIST: ordered list of display names
 """
 
-from .scale_alpha import ScaleAlpha
-from .mse import MSE
-from .mae import MAE
-from .nmse import NMSE
 from .angular_distance import AngularDistance
-from .cosine_similarity import CosineSimilarity
 from .correlation import Correlation
-from .psnr import PSNR
-from .ssim import SSIM
-from .sinkhorn_wasserstein import SinkhornWasserstein
-from .fsc import FSC
+from .cosine_similarity import CosineSimilarity
 from .depth import DepthError, StackRecovery
-
+from .fsc import FSC
+from .mae import MAE
+from .mse import MSE
+from .nmse import NMSE
+from .psnr import PSNR
+from .scale_alpha import ScaleAlpha
+from .sinkhorn_wasserstein import SinkhornWasserstein
+from .ssim import SSIM
 
 _ALL_METRICS = [
     ScaleAlpha(),

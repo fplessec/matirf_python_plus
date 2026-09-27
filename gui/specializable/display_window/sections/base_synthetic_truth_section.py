@@ -14,9 +14,14 @@ The difference popup itself is generic (DifferenceViewer below).
 """
 
 from PyQt5.QtWidgets import (
-    QGroupBox, QVBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QWidget, QHBoxLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from core.metrics import METRIC_REGISTRY

@@ -24,10 +24,9 @@ containing a problem.py, and it appears here with no change to this file — no
 launcher, no window class, nothing else to register.
 """
 
-import sys
 import importlib
+import sys
 from pathlib import Path
-
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 PROBLEMS_DIR = PROJECT_ROOT / "problems"

@@ -33,4 +33,4 @@ it only defines generic metric primitives.
 """
 
 from .metric import Metric
-from .utils import optimal_scale, align_scale, to_numpy
+from .utils import align_scale, optimal_scale, to_numpy

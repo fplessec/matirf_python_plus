@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 import settings as settings
 from solvers.denoisers.base import Denoiser
-from solvers.denoisers.base.utils import _from_5d, _to_5d, _is_3d, _kernel_gaussian
+from solvers.denoisers.base.utils import _from_5d, _is_3d, _kernel_gaussian, _to_5d
 
 
 def _shift_tensor(x5d, dz, dy, dx):

@@ -36,14 +36,13 @@ line makes it available in the GUI and to every solver.
 """
 
 from .base import Regularization
-from .no_reg import NoRegularization
+from .hessian_frobenius import HessianFrobeniusRegularization
 from .l1 import L1Regularization
 from .l2 import L2Regularization
+from .no_reg import NoRegularization
+from .shv import SHVRegularization
 from .tikhonov import TikhonovRegularization
 from .tv import TVRegularization
-from .hessian_frobenius import HessianFrobeniusRegularization
-from .shv import SHVRegularization
-
 
 _ALL_REGULARIZATIONS = [
     NoRegularization,

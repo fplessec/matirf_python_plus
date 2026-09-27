@@ -9,13 +9,16 @@ effectively kept or suppressed at the chosen value.
 
 import math
 
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QDialogButtonBox,
-)
-from PyQt5.QtCore import Qt
-
 import torch
-
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
+    QSlider,
+    QVBoxLayout,
+)
 
 _SLIDER_STEPS = 500
 
@@ -113,6 +116,7 @@ class FrequencyCutoffDialog(QDialog):
 
 if __name__=="__main__":  # test
     import sys
+
     from PyQt5.QtWidgets import QApplication, QStyleFactory
 
     import settings as settings
