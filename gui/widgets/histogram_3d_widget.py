@@ -1,3 +1,7 @@
+"""
+`Histogram3DWidget`: an intensity histogram for a 3D volume.
+"""
+
 import numpy as np
 import torch
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas

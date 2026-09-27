@@ -1,3 +1,8 @@
+"""
+The `Regularization` base class: the contract (loss and prox_sum) every analytic
+regulariser implements.
+"""
+
 class Regularization:
     """
     Base class for regularization terms R(f).

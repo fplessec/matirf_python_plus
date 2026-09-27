@@ -1,3 +1,7 @@
+"""
+`Histogram2DWidget`: an intensity histogram for a 2D image.
+"""
+
 import numpy as np
 import torch
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas

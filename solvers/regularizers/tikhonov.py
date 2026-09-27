@@ -1,3 +1,7 @@
+"""
+The Tikhonov regulariser R(f) = ||grad f||_2^2 -- smoothness (blurs edges).
+"""
+
 import torch
 import torch.nn.functional as F
 

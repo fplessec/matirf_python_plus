@@ -1,3 +1,7 @@
+"""
+Shared fileio helper: locating a data file on disk (`_fetch`).
+"""
+
 from os.path import isfile
 
 

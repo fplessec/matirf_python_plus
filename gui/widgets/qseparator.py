@@ -1,3 +1,7 @@
+"""
+`QSeparator`: a thin horizontal / vertical separator line.
+"""
+
 from PyQt5.QtWidgets import QFrame
 
 

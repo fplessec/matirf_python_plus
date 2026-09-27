@@ -1,3 +1,8 @@
+"""
+The `Metric` base class: the contract every quality metric implements (name, required
+features, result type, and compute(f, f_true, features)).
+"""
+
 class Metric:
     """
     Base class for quality metrics comparing a reconstruction f to a ground truth f_true.

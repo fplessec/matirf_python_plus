@@ -1,3 +1,7 @@
+"""
+`BaseSectionWidget`: a QWidget base for a GUI section built from a parameter spec.
+"""
+
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
 

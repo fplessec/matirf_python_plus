@@ -1,3 +1,7 @@
+"""
+`AlgorithmSelectionSection`: the drop-down that picks the reconstruction algorithm.
+"""
+
 from PyQt5.QtWidgets import (
     QComboBox,
     QGroupBox,

@@ -1,3 +1,7 @@
+"""
+The Gaussian denoiser -- a linear Gaussian blur; scale-invariant.
+"""
+
 import settings as settings
 from solvers.denoisers.base import Denoiser
 from solvers.denoisers.base.utils import (

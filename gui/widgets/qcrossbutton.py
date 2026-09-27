@@ -1,3 +1,7 @@
+"""
+`QCrossButton`: a small cross (close) push-button.
+"""
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QPalette, QPen
 from PyQt5.QtWidgets import QPushButton

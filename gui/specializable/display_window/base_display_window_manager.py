@@ -1,3 +1,7 @@
+"""
+`BaseDisplayWindowManager`: coordinates the display window's sections and the pipeline it shows.
+"""
+
 class BaseDisplayWindowManager:
     """
     Static singleton that manages display window instances.

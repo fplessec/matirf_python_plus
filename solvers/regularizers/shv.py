@@ -1,3 +1,7 @@
+"""
+The Sparse Hessian Variation (SHV) regulariser -- sparse and smooth jointly, balanced by rho.
+"""
+
 from . import _hessian
 from .base import Regularization
 from .hessian_frobenius import _delta

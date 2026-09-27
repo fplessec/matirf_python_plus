@@ -1,3 +1,7 @@
+"""
+The no-op regulariser (R = 0): the no-prior baseline.
+"""
+
 import torch
 
 from .base import Regularization

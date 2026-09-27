@@ -1,3 +1,7 @@
+"""
+`SimpleParameterWidget`: the widget for a single typed parameter (value / option / bool / file).
+"""
+
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QCheckBox,

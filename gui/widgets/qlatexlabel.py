@@ -1,3 +1,7 @@
+"""
+A label rendering LaTeX-like math, with scientific-notation formatting helpers.
+"""
+
 import re
 from io import BytesIO
 

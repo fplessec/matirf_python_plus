@@ -1,3 +1,8 @@
+"""
+Small generic helpers: unpacking values from a dict, and extracting a class's __init__
+keyword arguments from a params dict.
+"""
+
 import inspect
 
 

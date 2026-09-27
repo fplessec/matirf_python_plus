@@ -1,3 +1,8 @@
+"""
+Reading and writing .toml files, creating the file (and its parent directory) from a
+default when it is absent.
+"""
+
 from os.path import isfile
 from pathlib import Path
 

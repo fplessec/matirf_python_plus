@@ -1,3 +1,7 @@
+"""
+The L2 regulariser R(f) = ||f||_2^2 -- penalises large values overall.
+"""
+
 from .base import Regularization
 
 

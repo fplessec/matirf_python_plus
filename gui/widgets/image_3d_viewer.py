@@ -1,3 +1,7 @@
+"""
+`Image3DViewer`: a 3D volume viewer (plane by plane).
+"""
+
 import torch
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure

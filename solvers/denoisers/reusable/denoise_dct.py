@@ -1,3 +1,7 @@
+"""
+The DCT denoiser -- soft-thresholding in the DCT domain (VisuShrink).
+"""
+
 import torch
 
 import settings as settings

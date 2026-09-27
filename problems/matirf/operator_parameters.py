@@ -1,3 +1,7 @@
+"""
+The MA-TIRF operator parameters (depth grid nz / z0 / zN, normalize) and their UI definitions.
+"""
+
 OPERATOR_PARAMETERS_UI = {
         "nz": {
             "title": "Number of cuts on z",

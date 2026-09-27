@@ -1,3 +1,8 @@
+"""
+`PipelineQtBridge`: a QObject relaying pipeline events (progress, result, errors) onto the Qt
+event loop.
+"""
+
 from PyQt5.QtCore import QObject, pyqtSignal
 
 

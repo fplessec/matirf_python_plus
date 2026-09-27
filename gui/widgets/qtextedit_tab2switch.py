@@ -1,3 +1,7 @@
+"""
+`QTextEditTab2Switch`: a QTextEdit where Tab moves focus instead of inserting a tab.
+"""
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QLabel, QTextEdit
 

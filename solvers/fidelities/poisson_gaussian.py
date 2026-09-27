@@ -1,3 +1,7 @@
+"""
+The Poisson-Gaussian data-fidelity term (shot + read noise).
+"""
+
 import torch
 
 from .base import NOISE_FLOOR, DataFidelity, floored

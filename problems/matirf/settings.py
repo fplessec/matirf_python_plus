@@ -1,3 +1,8 @@
+"""
+MA-TIRF-specific settings: the finite-element precision for computing H, and the per-run
+normalisation note.
+"""
+
 # MA-TIRF-specific settings
 
 # The integrals in the computation of H are approximated by a sum of finite elements.

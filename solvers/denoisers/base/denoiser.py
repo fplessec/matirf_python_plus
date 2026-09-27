@@ -1,3 +1,8 @@
+"""
+The `Denoiser` base class: normalises the input to (Z, Y, X), delegates to denoise(), and
+applies a 2D-only denoiser slice by slice along z.
+"""
+
 import torch
 
 import settings as settings

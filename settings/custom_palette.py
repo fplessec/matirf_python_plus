@@ -1,3 +1,7 @@
+"""
+The application's dark and light Qt colour palettes.
+"""
+
 from PyQt5.QtGui import QColor, QPalette
 
 

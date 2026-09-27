@@ -1,3 +1,7 @@
+"""
+`ImageAndHisto3DViewer`: a 3D volume viewer paired with its histogram.
+"""
+
 from PyQt5.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout
 
 from gui.widgets.histogram_3d_widget import Histogram3DWidget

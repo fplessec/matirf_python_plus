@@ -1,3 +1,7 @@
+"""
+The Hessian-Frobenius regulariser -- favours piecewise-linear structure (no staircase).
+"""
+
 from . import _hessian
 from .base import Regularization
 

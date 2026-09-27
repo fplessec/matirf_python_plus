@@ -1,3 +1,8 @@
+"""
+`AlgoParamsWidget`: the section showing a solver's parameters, rebuilt when the solver or its
+dependencies change.
+"""
+
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from gui.base.base_section_widget import BaseSectionWidget

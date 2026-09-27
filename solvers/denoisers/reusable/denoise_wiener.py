@@ -1,3 +1,7 @@
+"""
+The Wiener denoiser -- local adaptive smoothing from the local mean and variance.
+"""
+
 import torch
 
 import settings as settings

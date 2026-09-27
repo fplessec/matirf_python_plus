@@ -1,3 +1,7 @@
+"""
+The Total-Variation regulariser R(f) = ||grad f||_1 -- edge-preserving, piecewise-constant.
+"""
+
 import torch
 
 from .base import Regularization

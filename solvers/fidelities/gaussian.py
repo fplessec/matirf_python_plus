@@ -1,3 +1,7 @@
+"""
+The Gaussian data-fidelity term: D = ||Hf - g||^2 / (2 b n_g).
+"""
+
 import torch.nn.functional as F
 
 from .base import DataFidelity, floored

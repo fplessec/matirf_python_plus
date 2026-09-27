@@ -1,3 +1,7 @@
+"""
+`ImageAndHisto2DViewer`: a 2D image viewer paired with its histogram.
+"""
+
 from PyQt5.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout
 
 from gui.widgets.histogram_2d_widget import Histogram2DWidget

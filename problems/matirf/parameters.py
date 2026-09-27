@@ -1,3 +1,7 @@
+"""
+The MA-TIRF measurement parameters (incident angles, optics) and their UI definitions.
+"""
+
 MEASUREMENT_PARAMETERS_UI = {
     "angles_deg": {
         "title": "Incident angles (deg)",

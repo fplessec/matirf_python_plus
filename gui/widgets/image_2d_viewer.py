@@ -1,3 +1,7 @@
+"""
+`Image2DViewer`: a 2D image viewer.
+"""
+
 import numpy as np
 import torch
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas

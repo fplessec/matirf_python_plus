@@ -1,3 +1,8 @@
+"""
+A config-cache updater: `make_update_cache` binds an `update_cache(key_path, value)` to a
+config path and its defaults, creating any section absent from an older config.toml.
+"""
+
 from fileio import load_or_create_toml, save_toml
 
 

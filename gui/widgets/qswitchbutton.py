@@ -1,3 +1,7 @@
+"""
+`QSwitchButton`: a two-state toggle-switch widget.
+"""
+
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QGridLayout, QHBoxLayout, QPushButton, QWidget
 

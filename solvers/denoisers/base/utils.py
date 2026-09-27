@@ -1,3 +1,7 @@
+"""
+Shared denoiser helpers: Gaussian kernels and reflect-padded 3D convolution.
+"""
+
 import torch
 import torch.nn.functional as F
 

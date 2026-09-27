@@ -1,3 +1,7 @@
+"""
+Reading and writing a flat {key: value} mapping as a two-column CSV file.
+"""
+
 import csv
 
 from .utils import _fetch

@@ -1,3 +1,7 @@
+"""
+The Bilateral denoiser -- edge-preserving spatial + intensity-similarity weighting.
+"""
+
 import torch
 import torch.nn.functional as F
 

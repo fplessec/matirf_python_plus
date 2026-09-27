@@ -1,3 +1,8 @@
+"""
+The add-noise section: the formula display and controls for the synthetic noise added to a
+measurement.
+"""
+
 from core import noise
 from gui.base.base_section_qgroup import BaseSectionQGroup
 

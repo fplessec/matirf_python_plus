@@ -1,3 +1,7 @@
+"""
+The L1 regulariser R(f) = ||f||_1 -- promotes sparsity (a few bright voxels).
+"""
+
 import torch
 
 from .base import Regularization

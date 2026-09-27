@@ -1,3 +1,7 @@
+"""
+`ProfilesViewer`: the yz / zx axial profile views of a 3D reconstruction.
+"""
+
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar

@@ -1,3 +1,7 @@
+"""
+Reading and writing .tif image stacks as torch tensors.
+"""
+
 import tifffile
 import torch
 

@@ -1,3 +1,7 @@
+"""
+Reading and writing .json files as Python dictionaries.
+"""
+
 import json
 
 from .utils import _fetch

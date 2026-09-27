@@ -1,3 +1,7 @@
+"""
+The deconvolution PSF parameters and their UI definitions.
+"""
+
 PSF_PARAMETERS_UI = {
     "sigma": {
         "title": "PSF standard deviation (pixels)",

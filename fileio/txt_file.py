@@ -1,3 +1,7 @@
+"""
+Reading and writing plain-text .txt files.
+"""
+
 from .utils import _fetch
 
 

@@ -1,3 +1,7 @@
+"""
+`MessageSection`: the panel showing a solver's log / progress messages.
+"""
+
 from PyQt5.QtWidgets import QGroupBox, QVBoxLayout
 
 from gui.widgets import QTextEditTab2Switch

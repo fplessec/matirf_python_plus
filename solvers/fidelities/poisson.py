@@ -1,3 +1,7 @@
+"""
+The Poisson data-fidelity term (shot-noise negative log-likelihood).
+"""
+
 import torch
 
 from .base import DataFidelity, floored

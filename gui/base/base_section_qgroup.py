@@ -1,3 +1,7 @@
+"""
+`BaseSectionQGroup`: a QGroupBox base for a GUI section built from a parameter spec.
+"""
+
 from PyQt5.QtWidgets import QGroupBox, QVBoxLayout
 
 from gui.base.base_section_widget import BaseSectionWidget

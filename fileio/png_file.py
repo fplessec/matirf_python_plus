@@ -1,3 +1,7 @@
+"""
+Reading and writing 2D grayscale .png images as torch tensors (normalised to [0, 1]).
+"""
+
 import numpy as np
 import torch
 from PIL import Image
