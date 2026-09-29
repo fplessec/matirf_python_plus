@@ -3,7 +3,7 @@
 How `matirf_python_plus` is put together, and how to extend it: add an inverse problem, a
 solver, a metric, a denoiser or a regulariser. For using the tool see the
 [tutorial](tutorial/tutorial.md); for the algorithms' theory see the
-[algorithms reference](algorithms/reconstruction_algorithms.pdf).
+[algorithms reference](reconstruction_algorithms.pdf).
 
 ---
 
