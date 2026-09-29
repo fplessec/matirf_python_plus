@@ -8,10 +8,10 @@
 > re-derivable**. Treat them as a *pre-benchmark*: strong enough to have driven real decisions
 > (the dedup, the parameter atlas), but **to be re-confirmed by the Étape 4 benchmark** on the
 > current 6-solver set. Where a claim is structural (certain), it lives in
-> [`../algorithms/limits.md`](../algorithms/limits.md) (Étape 3), not here.
+> [the algorithms reference](../algorithms/reconstruction_algorithms.pdf) (Étape 3), not here.
 >
 > The four-step arc: **Étape 1** how to *use* each algorithm · **Étape 2** which of each v1/v2
-> pair to *keep* · **Étape 3** each algorithm's *intrinsic limits* (→ `limits.md`) · **Étape 4**
+> pair to *keep* · **Étape 3** each algorithm's *intrinsic limits* (→ `reconstruction_algorithms.pdf`) · **Étape 4**
 > theoretical vs *effective* parameter ranges → the atlas (the new benchmark).
 
 The pre-benchmark ran the full v1+v2 set: ADAM, PPXA, ADMM, **ADMMv2**, PnP, **PnPv2**,
@@ -42,7 +42,7 @@ Rejection vs parameter — the key to *good use*:
 - **ADAM:** rejection climbs with λ — 0/6 at λ=0, then 4/12 (λ=.02) → 7/12 (λ≥.2).
   Over-regularizing empties / over-smooths. → **use λ ≤ 0.1.**
 - **ADMMv2:** 6/6 rejected at every κ ∈ [0.02, 0.5] → the threshold `τ = κ·max(Hᵀg)` is ~20×
-  too strong on MA-TIRF (diffuse recon). → **κ ≪ 0.02 required** (structural, see `limits.md`).
+  too strong on MA-TIRF (diffuse recon). → **κ ≪ 0.02 required** (structural, see `reconstruction_algorithms.pdf`).
 - **MCMC v1:** 12/12 rejected at every σ → rejected whatever the setting on MA-TIRF.
   → **do not use it there.**
 - **ADMM:** slight over-rejection at low κ (under-thresholding → noise); κ=0.3 never rejected.
@@ -139,7 +139,7 @@ MCMC v1, PnP v1, ADMM-PnPv2, ADMMv2. The `v1.0` tag preserves every v1 reference
 ## Étape 3 — intrinsic limits
 
 Turned into structural statements (largely certain, theory-backed) in
-[`../algorithms/limits.md`](../algorithms/limits.md). One line: on MA-TIRF every wall is the same
+[the algorithms reference](../algorithms/reconstruction_algorithms.pdf). One line: on MA-TIRF every wall is the same
 wall — the ~47-direction null space — and the only lever is the prior.
 
 ## Étape 4 — next

@@ -45,7 +45,7 @@ matirf gui
 3. **Operator Parameters.** The depth grid H reconstructs on: number of planes `nz`, and the
    depth range `z0`–`zN` (nm). **Normalize Operator** stays *off* for MA-TIRF (it would divide H
    by its largest singular value; the physical operator is wanted). See
-   [00_foundation.md](../algorithms/00_foundation.md).
+   [the algorithms reference](../algorithms/reconstruction_algorithms.pdf).
 4. **Add noise to measurement** *(synthetic only).* Inject Gaussian read noise and/or Poisson
    shot noise with a fixed **seed** (same seed → same noise, for reproducible comparisons). The
    formula shown is exactly what is applied.
@@ -162,7 +162,7 @@ figures — with a **view 1 / view 2** toggle.
 View 2 shows the raw **intensity** of the reconstruction: a slice viewer (scroll through the
 `nz` planes), the pixel read-out, and the **histogram of the whole volume**. Note the values sit
 around `0–0.02` — on MA-TIRF `f` peaks near `0.02`, not `1` (this is why parameters "in units of
-`f`" must be read on that scale; see [00_foundation.md](../algorithms/00_foundation.md)).
+`f`" must be read on that scale; see [the algorithms reference](../algorithms/reconstruction_algorithms.pdf)).
 
 ---
 
