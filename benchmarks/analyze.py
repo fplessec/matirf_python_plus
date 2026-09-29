@@ -122,7 +122,9 @@ def cross_comparison(records: list, problem: str) -> str:
     header = "| dataset | noise | best (by NMSE) | params | " + " | ".join(metrics) + " |"
     sep = "|" + "---|" * (4 + len(metrics))
     lines = [f"## Cross-comparison — {problem}: which solver wins, and where", "",
-             header, sep]
+             f"### Best algorithm by NMSE on {_PROBLEM_NAME[problem]} --- winner per structure "
+             "and noise level.",
+             "", header, sep]
     for problem_, dataset, noise in cells:
         group = [r for r in usable if _cell(r) == (problem_, dataset, noise)]
         winner = _best(group, "NMSE")
@@ -342,6 +344,9 @@ def per_algorithm(records: list, solver: str) -> str:
 def rejects_and_cost(records: list) -> str:
     """Per solver: rejection rate, dominant findings, runtime and peak memory, failures."""
     lines = ["## Rejections, failures and cost", "",
+             "### Cost and robustness per solver --- runs, rejection rate, failures, median runtime, "
+             "peak memory and top findings.",
+             "",
              "| solver | runs | rejected | failed/timeout | median s | max mem (MB) | top findings |",
              "|---|---|---|---|---|---|---|"]
     solvers = sorted({r.get("tags", {}).get("solver", "?") for r in records})
