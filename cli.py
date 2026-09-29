@@ -19,26 +19,35 @@ package contains a 'synthetic/' sub-package (today: matirf).
     settings gui                # open settings GUI
 
 Each command name (matirf, deconv, ...) is auto-detected from sys.argv[0].
-A new inverse problem is discovered automatically if it has a main.py
-and a cache/ directory with a config.toml.
+A new inverse problem is discovered automatically: drop a package under problems/
+containing a problem.py, and it appears here with no change to this file — no
+launcher, no window class, nothing else to register.
 """
 
-import sys
 import importlib
+import sys
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent
+PROBLEMS_DIR = PROJECT_ROOT / "problems"
 
 # Commands that are not inverse problem names
 UTILITY_COMMANDS = {"cli", "list", "help", "settings", "inverse-problems", "__main__"}
 
+# sub-commands opening a problem's synthetic ground-truth generator
+SYNTH_COMMANDS = {"synth", "synthetic", "gt", "ground-truth"}
 
-# Auto-discover inverse problem packages: any subdirectory with a main.py
+
+## Auto-discover inverse problems: every package under problems/ that declares one.
+## A problem package is recognised by its problem.py — the file holding its InverseProblem.
+## Dropping a directory there is the ONLY step needed for it to appear in the CLI: it needs
+## no launcher, no window class and no entry in this file.
 def _discover_problems():
     problems = {}
-    for d in sorted(PROJECT_ROOT.iterdir()):
-        if d.is_dir() and (d / "main.py").exists() and (d / "__init__.py").exists():
+    if not PROBLEMS_DIR.is_dir():
+        return problems
+    for d in sorted(PROBLEMS_DIR.iterdir()):
+        if d.is_dir() and (d / "__init__.py").exists() and (d / "problem.py").exists():
             problems[d.name] = d
     return problems
 
@@ -86,7 +95,7 @@ def _reset_problem(problem_name, problem_path):
 
 
 def _handle_settings(args):
-    from common.settings import _settings
+    from settings import _settings
 
     if not args or args[0] == "show":
         print(_settings.show())
@@ -119,7 +128,7 @@ def _handle_settings(args):
         return
 
     if args[0] == "gui":
-        from common.settings.gui import open_settings_gui
+        from settings.gui import open_settings_gui
         open_settings_gui()
         return
 
@@ -184,9 +193,16 @@ def main():
         line("reset", "Delete the cached config.toml (back to defaults)")
         return
 
-    # "matirf gui" or "matirf cli ..." — delegate to the problem's main.py
-    problem_main = importlib.import_module(f"{cmd}.main")
-    problem_main.main()
+    # "matirf synth" — the ground-truth generator, for a problem that ships one
+    if args and args[0] in SYNTH_COMMANDS and (problem_path / "synthetic").is_dir():
+        importlib.import_module(f"problems.{cmd}.synthetic.gui").main()
+        return
+
+    ## "matirf gui" / "matirf cli -c ... -o ..." — the SAME launcher for every problem.
+    ## It reads the problem's own ui declaration, so no problem contributes launcher code.
+    from gui.app import run
+    problem = importlib.import_module(f"problems.{cmd}").PROBLEM
+    run(problem, args)
 
 
 if __name__ == "__main__":

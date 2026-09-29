@@ -1,0 +1,33 @@
+# A network of fibres: thin filaments and thick bundles (radius 12-50 nm), running nearly
+# parallel to the glass at heights from 30 to 250 nm and rising by up to 150 nm along their
+# length — they cross each other at different depths, which is what must be resolved.
+[grid]
+nx = 128
+ny = 128
+nz = 50
+z_oversampling = 3
+dxy_nm = 100.0
+z0_nm = 0.0
+zN_nm = 300.0
+fine_step_nm = 25.0
+
+[sampling]
+seed = 35
+
+[ellipsoid]
+count = 0
+
+[filament]
+count = 25
+radius_min_nm = 12.0
+radius_max_nm = 50.0
+length_min_nm = 5000.0
+length_max_nm = 16000.0
+bend = 0.12
+depth_min_nm = 30.0
+depth_max_nm = 250.0
+axial_rise_nm = 150.0
+amplitude = 1.0
+
+[membrane]
+count = 0
