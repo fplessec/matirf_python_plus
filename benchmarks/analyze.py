@@ -138,6 +138,10 @@ def cross_comparison(records: list, problem: str) -> str:
 SOLVER_ORDER = ["ADAM", "PPXA", "ADMM", "PNP", "ADMM-PnP", "MCMC"]
 
 
+## problem tag -> display name used in table captions
+_PROBLEM_NAME = {"matirf": "MA-TIRF", "deconv": "deconvolution"}
+
+
 DENOISER_SOLVERS = ["PNP", "ADMM-PnP", "MCMC"]
 
 
@@ -155,7 +159,8 @@ def denoiser_comparison(records: list, solver: str) -> str:
             continue
         metrics = MATIRF_METRICS if problem == "matirf" else DECONV_METRICS
         header = "| structure | noise | denoiser | " + " | ".join(metrics) + " |"
-        lines += [f"### {problem}", "", header, "|" + "---|" * (3 + len(metrics))]
+        lines += [f"### {solver} on {_PROBLEM_NAME[problem]} --- best denoiser per structure.",
+                  "", header, "|" + "---|" * (3 + len(metrics))]
         cells = sorted({_cell(r) for r in here}, key=lambda c: (_noise_key(c[2]), str(c[1])))
         for _, dataset, noise in cells:
             group = [r for r in here if _cell(r) == (problem, dataset, noise)]
@@ -279,7 +284,9 @@ def adam_shape(records: list) -> str:
             and r.get("tags", {}).get("role") == "shape" and _done(r)
             and r.get("tags", {}).get("reg") in ("l1", "tikhonov")]
     lines = ["## Adam lambda-shape — reference structure, noise 0.02", "",
-             "| prior | lambda | NMSE | depth err (nm) |", "|---|---|---|---|"]
+             "### Adam --- prior shape at the reference structure (noise 0.02): NMSE and depth "
+             "error versus lambda for the sparse (L1) and smooth (Tikhonov) priors.",
+             "", "| prior | lambda | NMSE | depth err (nm) |", "|---|---|---|---|"]
     for reg in ("l1", "tikhonov"):
         group = sorted((r for r in runs if r["tags"].get("reg") == reg),
                        key=lambda r: r["tags"].get("lambda", 0))
@@ -312,7 +319,9 @@ def per_algorithm(records: list, solver: str) -> str:
         ## apart (a 'use' label is redundant with it). Rows sorted by noise, esoubies (native) last.
         header = "| dataset | noise | params | " + " | ".join(metrics) + " |"
         sep = "|" + "---|" * (3 + len(metrics))
-        lines += [f"### {problem}", "", header, sep]
+        where = "per ground truth and noise level" if problem == "matirf" else "per noise level"
+        lines += [f"### {solver} on {_PROBLEM_NAME[problem]} --- reconstruction metrics {where}.",
+                  "", header, sep]
         cells = sorted({_cell(r) for r in here}, key=lambda c: (_noise_key(c[2]), str(c[1])))
         for _, dataset, noise in cells:
             group = [r for r in here if _cell(r) == (problem, dataset, noise)]
@@ -467,13 +476,14 @@ def _tex_cells(cells: list) -> list:
 def md_to_latex(md: str) -> str:
     """Turn the pipe tables (and `### ` labels) of a summary .md into booktabs tabulars.
 
-    Prose and `##` headings are dropped — the report section carries those; only the tables are
+    Each `### ` label becomes the numbered caption (\\captionof{table}) of the table that follows
+    it. Prose and `##` headings are dropped — the report section carries those; only the tables are
     \\input. Keeps this dependency-free (no pandoc)."""
-    lines, tex, i = md.splitlines(), [], 0
+    lines, tex, i, caption = md.splitlines(), [], 0, None
     while i < len(lines):
         line = lines[i]
         if line.startswith("### "):
-            tex.append(r"\paragraph{" + _tex_escape(line[4:].strip()) + "}")
+            caption = _tex_escape(line[4:].strip())     # caption the next table, don't emit yet
             i += 1
         elif line.startswith("|"):
             block = []
@@ -481,8 +491,13 @@ def md_to_latex(md: str) -> str:
                 block.append(lines[i])
                 i += 1
             header = block[0].strip("|").split("|")
-            ## adjustbox shrinks a too-wide table to the text width (and leaves narrow ones alone)
-            tex.append(r"\begin{center}\begin{adjustbox}{max width=\linewidth}")
+            ## minipage keeps a caption with its table (no page break between them); adjustbox
+            ## shrinks a too-wide table to the text width (and leaves narrow ones alone)
+            tex.append(r"\begin{center}\begin{minipage}{\linewidth}\centering")
+            if caption is not None:
+                tex.append(r"\captionof{table}{" + caption + "}")
+                caption = None
+            tex.append(r"\begin{adjustbox}{max width=\linewidth}")
             tex.append(r"\begin{tabular}{" + "l" * len(header) + "}")
             tex.append(r"\toprule")
             tex.append(" & ".join(_tex_cells(header)) + r" \\")
@@ -490,7 +505,7 @@ def md_to_latex(md: str) -> str:
             for row in block[2:]:                       # skip the |---| separator
                 tex.append(" & ".join(_tex_cells(row.strip("|").split("|"))) + r" \\")
             tex.append(r"\bottomrule")
-            tex.append(r"\end{tabular}\end{adjustbox}\end{center}")
+            tex.append(r"\end{tabular}\end{adjustbox}\end{minipage}\end{center}")
         else:
             i += 1
     return "\n".join(tex) + "\n"
