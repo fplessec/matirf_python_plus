@@ -175,7 +175,7 @@ matirf_python_plus/
     pipeline.py       wires a problem + config into a run (prepare -> solve -> evaluate)
     core/             the contract: operator.py, objective.py, problem.py, features.py, metrics/
     solvers/          every algorithm, once for all problems (adam, ppxa, admm, pnp, pnp_admm,
-                      mcmc) + denoisers/, regularizers/, fidelities/; old/ = retired variants
+                      mcmc) + denoisers/, regularizers/, fidelities/
     problems/
         matirf/       operator.py, problem.py, ui.py, __init__.py (+ physics.py, synthetic/)
         deconv/       operator.py, problem.py, ui.py, __init__.py
@@ -183,7 +183,7 @@ matirf_python_plus/
     fileio/           TOML / TIF / PNG I/O
     benchmarks/       the comparison campaign (campaign.py, runner.py, analyze.py)
     settings/         user settings + dark / light palettes
-    docs/             algorithms/, tutorial/, developer_guide.md, benchmark/
+    docs/             reconstruction_algorithms.pdf, tutorial/, developer_guide.md
 ```
 
 ---
@@ -202,7 +202,14 @@ See the **[developer guide](docs/developer_guide.md)** for the architecture (thr
 
 ## Documentation
 
-- **[Tutorial](docs/tutorial/tutorial.md)** — using the GUI and CLI, with screenshots.
-- **[Algorithm notes](docs/algorithms/)** — theory, per-algorithm parameters and intrinsic limits.
-- **[Developer guide](docs/developer_guide.md)** — architecture and how to extend it.
-- **[Benchmark](docs/benchmark/)** — the comparison campaign and its findings.
+Everything is in `docs/`:
+
+- **[Tutorial](docs/tutorial/tutorial.md)** — using the GUI and CLI, with screenshots
+  (also as [tutorial.pdf](docs/tutorial/tutorial.pdf)).
+- **[Algorithms reference](docs/reconstruction_algorithms.pdf)** — the per-algorithm report:
+  how each of the six solvers (Adam, PPXA, ADMM, PnP-HQS, ADMM-PnP, MCMC) works, its key
+  parameters, the benchmark results on three ground truths (vesicles, fibres, cell) with 2D
+  deconvolution as a well-posed companion, and the intrinsic limits of MA-TIRF. Its LaTeX source
+  is the separate repo [matirf_benchmark_report](https://github.com/fplessec/matirf_benchmark_report).
+- **[Developer guide](docs/developer_guide.md)** — the architecture (`ForwardOperator`,
+  `Objective`, `InverseProblem`) and step-by-step recipes to extend it.
