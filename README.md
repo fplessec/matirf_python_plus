@@ -1,4 +1,4 @@
-========================================================================================== \
+============================================================================== \
 *Pour Charles: \
 https://www.youtube.com/watch?v=2twLJU_ggGI \
 https://www.youtube.com/watch?v=iaoBBwcXYKQ*
@@ -9,7 +9,7 @@ https://www.youtube.com/watch?v=iaoBBwcXYKQ*
 (mise a jour des algos et quelques points différents, mais surtout architecture, propreté etc)*
 
 *Merci à tous·tes !* \
-\==========================================================================================
+\==============================================================================
 
 # matirf_python_plus
 
