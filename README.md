@@ -1,4 +1,18 @@
+========================================================================================== \
+*Pour Charles: \
+https://www.youtube.com/watch?v=2twLJU_ggGI \
+https://www.youtube.com/watch?v=iaoBBwcXYKQ*
+
+*Deux branches sur le github:* \
+*- v1: mon travail humain* \
+*- v2 (dorénavant la branche main): claude code pour faire un beau projet globalement \
+(mise a jour des algos et quelques points différents, mais surtout architecture, propreté etc)*
+
+*Merci à tous·tes !* \
+\==========================================================================================
+
 # matirf_python_plus
+
 
 Generic inverse problem solver. Reconstructs an unknown image **f** from a measurement **g** and a forward operator **H** by solving iteratively:
 
